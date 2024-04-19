@@ -432,8 +432,9 @@ class TVClient(Configured):
         delay: tp.Optional[int] = None,
         retries: int = 3,
         show_progress: bool = True,
-        show_progress_keys: tp.Union[bool, str] = True,
         pbar_kwargs: tp.KwargsLike = None,
+        show_progress_desc: bool = True,
+        pbar_desc_kwargs: tp.KwargsLike = None,
     ) -> tp.List[dict]:
         """Search for a symbol."""
         if text is None:
@@ -442,16 +443,8 @@ class TVClient(Configured):
             exchange = ""
         if pbar_kwargs is None:
             pbar_kwargs = {}
-        as_postfix = None
-        if isinstance(show_progress_keys, str):
-            if show_progress_keys.lower() == "as_postfix":
-                show_progress_keys = True
-                as_postfix = True
-            elif show_progress_keys.lower() == "as_prefix":
-                show_progress_keys = True
-                as_postfix = False
-            else:
-                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
+        if pbar_desc_kwargs is None:
+            pbar_desc_kwargs = {}
 
         symbols_list = []
         pbar = None
@@ -466,6 +459,8 @@ class TVClient(Configured):
                 except json.JSONDecodeError as e:
                     if i == retries - 1:
                         raise e
+                    if delay is not None:
+                        time.sleep(delay)
             symbols_remaining = symbols_data.get("symbols_remaining", 0)
             new_symbols = symbols_data.get("symbols", [])
             symbols_list.extend(new_symbols)
@@ -486,23 +481,23 @@ class TVClient(Configured):
                     **pbar_kwargs,
                 )
             if pbar is not None:
-                pbar.update(1)
-                if show_progress_keys:
+                if show_progress_desc:
                     max_symbols = len(symbols_list) + symbols_remaining
                     if pages is not None:
                         max_symbols = min(max_symbols, pages * len(new_symbols))
                     set_pbar_description(
                         pbar,
                         dict(symbols="%d/%d" % (len(symbols_list), max_symbols)),
-                        as_postfix=as_postfix,
+                        **pbar_desc_kwargs,
                     )
+                pbar.update(1)
             if symbols_remaining == 0:
                 break
             pages_fetched += 1
             if pages is not None and pages_fetched >= pages:
                 break
             if delay is not None:
-                time.sleep(delay / 1000)
+                time.sleep(delay)
         if pbar is not None:
             pbar.close()
 
@@ -577,8 +572,9 @@ class TVData(RemoteData):
         delay: tp.Optional[int] = None,
         retries: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
-        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        show_progress_desc: tp.Optional[bool] = None,
+        pbar_desc_kwargs: tp.KwargsLike = None,
         market: tp.Optional[str] = None,
         markets: tp.Optional[tp.List[str]] = None,
         fields: tp.Optional[tp.MaybeIterable[str]] = None,
@@ -683,11 +679,14 @@ class TVData(RemoteData):
         show_progress = cls.resolve_custom_setting(
             show_progress, "show_progress", sub_path="search", sub_path_only=True
         )
-        show_progress_keys = cls.resolve_custom_setting(
-            show_progress_keys, "show_progress_keys", sub_path="search", sub_path_only=True
-        )
         pbar_kwargs = cls.resolve_custom_setting(
             pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", sub_path_only=True
+        )
+        show_progress_desc = cls.resolve_custom_setting(
+            show_progress_desc, "show_progress_desc", sub_path="search", sub_path_only=True
+        )
+        pbar_desc_kwargs = cls.resolve_custom_setting(
+            pbar_desc_kwargs, "pbar_desc_kwargs", merge=True, sub_path="search", sub_path_only=True
         )
         markets = cls.resolve_custom_setting(markets, "markets", sub_path="scanner", sub_path_only=True)
         fields = cls.resolve_custom_setting(fields, "fields", sub_path="scanner", sub_path_only=True)
@@ -716,8 +715,9 @@ class TVData(RemoteData):
                 delay=delay,
                 retries=retries,
                 show_progress=show_progress,
-                show_progress_keys=show_progress_keys,
                 pbar_kwargs=pbar_kwargs,
+                show_progress_desc=show_progress_desc,
+                pbar_desc_kwargs=pbar_desc_kwargs,
             )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
             return_field_data = False

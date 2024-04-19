@@ -1867,8 +1867,11 @@ class PatternRanges(Ranges):
 
         # Create config from arguments if empty
         if len(flat_search_configs) == 0:
+            single_group = True
             for col in range(arr_2d.shape[1]):
                 flat_search_configs.append(PSC())
+        else:
+            single_group = False
 
         # Prepare function and arguments
         funcs_args = []
@@ -1917,10 +1920,7 @@ class PatternRanges(Ranges):
                 )
 
         # Execute each configuration
-        execute_kwargs = merge_dicts(
-            dict(show_progress=len(flat_search_configs) > 1),
-            execute_kwargs,
-        )
+        execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
         result_list = execute(funcs_args, keys=new_columns, **execute_kwargs)
         records_arr = np.concatenate(result_list)
 

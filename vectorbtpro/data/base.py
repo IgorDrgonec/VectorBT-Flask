@@ -3809,7 +3809,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 keys.append(str(func_name))
 
             keys = pd.Index(keys, name="run_func")
-            execute_kwargs = merge_dicts(dict(show_progress=True), execute_kwargs)
             results = execute(funcs_args, size=len(keys), keys=keys, **execute_kwargs)
 
             skip_indices = set()

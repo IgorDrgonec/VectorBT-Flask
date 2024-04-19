@@ -64,8 +64,9 @@ class SerialEngine(ExecutionEngine):
 
     _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "show_progress",
-        "show_progress_keys",
         "pbar_kwargs",
+        "show_progress_desc",
+        "pbar_desc_kwargs",
         "clear_cache",
         "collect_garbage",
         "cooldown",
@@ -74,8 +75,9 @@ class SerialEngine(ExecutionEngine):
     def __init__(
         self,
         show_progress: tp.Optional[bool] = None,
-        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        show_progress_desc: tp.Optional[bool] = None,
+        pbar_desc_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
         cooldown: tp.Optional[int] = None,
@@ -84,8 +86,9 @@ class SerialEngine(ExecutionEngine):
         ExecutionEngine.__init__(
             self,
             show_progress=show_progress,
-            show_progress_keys=show_progress_keys,
             pbar_kwargs=pbar_kwargs,
+            show_progress_desc=show_progress_desc,
+            pbar_desc_kwargs=pbar_desc_kwargs,
             clear_cache=clear_cache,
             collect_garbage=collect_garbage,
             cooldown=cooldown,
@@ -93,28 +96,32 @@ class SerialEngine(ExecutionEngine):
         )
 
         self._show_progress = self.resolve_setting(show_progress, "show_progress")
-        self._show_progress_keys = self.resolve_setting(show_progress_keys, "show_progress_keys")
         self._pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        self._show_progress_desc = self.resolve_setting(show_progress_desc, "show_progress_desc")
+        self._pbar_desc_kwargs = self.resolve_setting(pbar_desc_kwargs, "pbar_desc_kwargs", merge=True)
         self._clear_cache = self.resolve_setting(clear_cache, "clear_cache")
         self._collect_garbage = self.resolve_setting(collect_garbage, "collect_garbage")
         self._cooldown = self.resolve_setting(cooldown, "cooldown")
 
     @property
     def show_progress(self) -> bool:
-        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
+        """Whether to show the progress bar."""
         return self._show_progress
-
-    @property
-    def show_progress_keys(self) -> tp.Union[bool, str]:
-        """Whether to show keys in the progress bar.
-
-        Can be True, False, "as_prefix", and "as_postfix"."""
-        return self._show_progress_keys
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
         return self._pbar_kwargs
+
+    @property
+    def show_progress_desc(self) -> bool:
+        """Whether to show the progress bar description."""
+        return self._show_progress_desc
+
+    @property
+    def pbar_desc_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `vectorbtpro.utils.pbar.set_pbar_description`."""
+        return self._pbar_desc_kwargs
 
     @property
     def clear_cache(self) -> tp.Union[bool, int]:
@@ -147,29 +154,18 @@ class SerialEngine(ExecutionEngine):
         results = []
         if size is None and hasattr(funcs_args, "__len__"):
             size = len(funcs_args)
-        show_progress_keys = self.show_progress_keys
-        as_postfix = None
-        if isinstance(show_progress_keys, str):
-            if show_progress_keys.lower() == "as_postfix":
-                show_progress_keys = True
-                as_postfix = True
-            elif show_progress_keys.lower() == "as_prefix":
-                show_progress_keys = True
-                as_postfix = False
-            else:
-                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
-        if show_progress_keys and keys is not None:
+        if self.show_progress_desc and keys is not None:
             keys = to_any_index(keys)
 
         with get_pbar(total=size, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+            if self.show_progress_desc and keys is not None:
+                if isinstance(keys, pd.MultiIndex):
+                    set_pbar_description(pbar, dict(zip(keys.names, keys[0])), **self.pbar_desc_kwargs)
+                else:
+                    set_pbar_description(pbar, dict(zip(keys.names, [keys[0]])), **self.pbar_desc_kwargs)
+
             for i, (func, args, kwargs) in enumerate(funcs_args):
-                if show_progress_keys and keys is not None:
-                    if isinstance(keys, pd.MultiIndex):
-                        set_pbar_description(pbar, dict(zip(keys.names, keys[i])), as_postfix=as_postfix)
-                    else:
-                        set_pbar_description(pbar, dict(zip(keys.names, [keys[i]])), as_postfix=as_postfix)
                 results.append(func(*args, **kwargs))
-                pbar.update(1)
                 if isinstance(self.clear_cache, bool):
                     if self.clear_cache:
                         clear_cache()
@@ -182,6 +178,13 @@ class SerialEngine(ExecutionEngine):
                     collect_garbage()
                 if self.cooldown is not None:
                     time.sleep(self.cooldown)
+
+                if self.show_progress_desc and keys is not None and i + 1 < len(keys):
+                    if isinstance(keys, pd.MultiIndex):
+                        set_pbar_description(pbar, dict(zip(keys.names, keys[i + 1])), **self.pbar_desc_kwargs)
+                    else:
+                        set_pbar_description(pbar, dict(zip(keys.names, [keys[i + 1]])), **self.pbar_desc_kwargs)
+                pbar.update(1)
 
         return results
 
@@ -409,7 +412,6 @@ class PathosEngine(ExecutionEngine):
                     while pending:
                         pending = {async_result for async_result in pending if not async_result.ready()}
                         pbar.n = total_futures - len(pending)
-                        pbar.refresh()
                         if len(pending) == 0:
                             break
                         if self.timeout is not None:
@@ -817,8 +819,9 @@ class Executor(Configured):
         "post_execute_kwargs",
         "post_execute_on_sorted",
         "show_progress",
-        "show_progress_keys",
         "pbar_kwargs",
+        "show_progress_desc",
+        "pbar_desc_kwargs",
         "template_context",
     }
 
@@ -881,7 +884,6 @@ class Executor(Configured):
         cls,
         engine: tp.ExecutionEngineLike,
         show_progress: tp.Optional[bool] = None,
-        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
         **engine_config,
     ) -> tp.Tuple[tp.Union[ExecutionEngine, tp.Callable], tp.Optional[str]]:
@@ -919,12 +921,6 @@ class Executor(Configured):
                     or (engine_name is not None and "show_progress" in engines_cfg[engine_name])
                 ) and "show_progress" not in engine_config:
                     engine_config["show_progress"] = show_progress
-            if show_progress_keys is not None:
-                if (
-                    "show_progress_keys" in func_arg_names
-                    or (engine_name is not None and "show_progress_keys" in engines_cfg[engine_name])
-                ) and "show_progress_keys" not in engine_config:
-                    engine_config["show_progress_keys"] = show_progress_keys
             if pbar_kwargs is not None:
                 if (
                     "pbar_kwargs" in func_arg_names
@@ -954,12 +950,6 @@ class Executor(Configured):
                     or (engine_name is not None and "show_progress" in engines_cfg[engine_name])
                 ) and "show_progress" not in engine_config:
                     engine_config["show_progress"] = show_progress
-            if show_progress_keys is not None:
-                if (
-                    "show_progress_keys" in func_arg_names
-                    or (engine_name is not None and "show_progress_keys" in engines_cfg[engine_name])
-                ) and "show_progress_keys" not in engine_config:
-                    engine_config["show_progress_keys"] = show_progress_keys
             if pbar_kwargs is not None:
                 if (
                     "pbar_kwargs" in func_arg_names
@@ -999,7 +989,6 @@ class Executor(Configured):
         post_execute_kwargs: tp.KwargsLike = None,
         post_execute_on_sorted: tp.Optional[bool] = None,
         show_progress: tp.Optional[bool] = None,
-        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
         **kwargs,
@@ -1032,7 +1021,6 @@ class Executor(Configured):
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
             show_progress=show_progress,
-            show_progress_keys=show_progress_keys,
             pbar_kwargs=pbar_kwargs,
             template_context=template_context,
             **kwargs,
@@ -1043,7 +1031,6 @@ class Executor(Configured):
         engine, engine_name = self.resolve_engine(
             engine,
             show_progress=show_progress,
-            show_progress_keys=show_progress_keys,
             pbar_kwargs=pbar_kwargs,
             **engine_config,
         )
@@ -1171,7 +1158,6 @@ class Executor(Configured):
         if release_chunk_cache and post_execute_on_sorted:
             raise ValueError("Cannot use release_chunk_cache and post_execute_on_sorted together")
         show_progress = self.resolve_setting(show_progress, "show_progress")
-        show_progress_keys = self.resolve_setting(show_progress_keys, "show_progress_keys")
         pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
         template_context = self.resolve_engine_setting(
             template_context,
@@ -1205,7 +1191,6 @@ class Executor(Configured):
         self._post_execute_kwargs = post_execute_kwargs
         self._post_execute_on_sorted = post_execute_on_sorted
         self._show_progress = show_progress
-        self._show_progress_keys = show_progress_keys
         self._pbar_kwargs = pbar_kwargs
         self._template_context = template_context
 
@@ -1346,13 +1331,6 @@ class Executor(Configured):
         If `Executor.engine` accepts `show_progress` and there's no key `show_progress`
         in `Executor.engine_config`, then passes it to the engine as well."""
         return self._show_progress
-
-    @property
-    def show_progress_keys(self) -> tp.Union[bool, str]:
-        """Whether to show keys in the progress bar.
-
-        Can be True, False, "as_prefix", and "as_postfix"."""
-        return self._show_progress_keys
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
@@ -1641,7 +1619,6 @@ class Executor(Configured):
         post_execute_kwargs = self.post_execute_kwargs
         post_execute_on_sorted = self.post_execute_on_sorted
         show_progress = self.show_progress
-        show_progress_keys = self.show_progress_keys
         pbar_kwargs = self.pbar_kwargs
         template_context = self.template_context
 
@@ -1690,6 +1667,8 @@ class Executor(Configured):
                 _size = len(funcs_args)
             elif size is not None:
                 _size = size
+            elif keys is not None:
+                _size = len(keys)
             else:
                 if isinstance(funcs_args, CustomTemplate):
                     raise ValueError("When funcs_args is a template, must provide size")
@@ -1821,7 +1800,6 @@ class Executor(Configured):
                             chunk_idx += 1
                             _funcs_args = []
                             pbar.update(1)
-                            pbar.refresh()
                         _funcs_args.append(func_args)
                     if len(_funcs_args) > 0:
                         call_indices = all_call_indices[chunk_idx]
@@ -1861,7 +1839,6 @@ class Executor(Configured):
                         )
                         outputs.extend(call_outputs)
                         pbar.update(1)
-                        pbar.refresh()
                 return self.call_post_execute_func(
                     outputs,
                     cache_chunks=cache_chunks,
@@ -1932,7 +1909,6 @@ class Executor(Configured):
                         outputs.extend(call_outputs)
                         output_indices.extend(call_indices)
                         pbar.update(1)
-                        pbar.refresh()
                 if not post_execute_on_sorted:
                     outputs = self.call_post_execute_func(
                         outputs,
@@ -2090,7 +2066,6 @@ def execute(
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
     show_progress: tp.Optional[bool] = None,
-    show_progress_keys: tp.Union[None, bool, str] = None,
     pbar_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
     merge_to_engine_config: tp.Optional[bool] = None,
@@ -2141,7 +2116,6 @@ def execute(
         post_execute_kwargs=post_execute_kwargs,
         post_execute_on_sorted=post_execute_on_sorted,
         show_progress=show_progress,
-        show_progress_keys=show_progress_keys,
         pbar_kwargs=pbar_kwargs,
         template_context=template_context,
         **kwargs,

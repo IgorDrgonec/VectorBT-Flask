@@ -51,16 +51,17 @@ def get_pbar(*args, pbar_type: tp.Optional[str] = None, show_progress: bool = Tr
     return pbar(*args, disable=not show_progress, **kwargs)
 
 
-def set_pbar_description(
-    pbar: object,
-    desc: tp.Union[None, str, dict],
-    as_postfix: tp.Optional[bool] = None,
-    **kwargs,
-) -> None:
+def set_pbar_description(pbar: object, desc: tp.Union[None, str, dict], **desc_kwargs) -> None:
     """Set description, either as a string or dictionary."""
-    if not pbar.disable:
-        if desc is None:
+    if not pbar.disable and desc is not None:
+        from vectorbtpro._settings import settings
+
+        pbar_cfg = settings["pbar"]
+
+        if pbar_cfg["disable_desc"]:
             return
+        desc_kwargs = merge_dicts(pbar_cfg["desc_kwargs"], desc_kwargs)
+        as_postfix = desc_kwargs.pop("as_postfix", True)
         if isinstance(desc, dict):
             new_desc = []
             for k, v in desc.items():
@@ -69,16 +70,10 @@ def set_pbar_description(
                 else:
                     new_desc.append(str(k) + "=" + str(v))
             desc = ", ".join(new_desc)
-        if as_postfix is None:
-            from vectorbtpro._settings import settings
-
-            pbar_cfg = settings["pbar"]
-
-            as_postfix = pbar_cfg["as_postfix"]
         if as_postfix:
-            pbar.set_postfix_str(desc, **kwargs)
+            pbar.set_postfix_str(desc, **desc_kwargs)
         else:
-            pbar.set_description(desc, **kwargs)
+            pbar.set_description(desc, **desc_kwargs)
 
 
 ProgressHiddenT = tp.TypeVar("ProgressHiddenT", bound="ProgressHidden")

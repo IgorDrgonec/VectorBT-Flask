@@ -42,8 +42,9 @@ def save_animation(
     fps: int = 3,
     writer_kwargs: dict = None,
     show_progress: bool = True,
-    show_progress_keys: tp.Union[bool, str] = True,
     pbar_kwargs: tp.KwargsLike = None,
+    show_progress_desc: bool = True,
+    pbar_desc_kwargs: tp.KwargsLike = None,
     to_image_kwargs: tp.KwargsLike = None,
     **kwargs,
 ) -> None:
@@ -64,10 +65,9 @@ def save_animation(
             Will be translated to `duration` by `1000 / fps`.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
-        show_progress_keys (bool or str): Whether to show keys in the progress bar.
-
-            Can be True, False, "as_prefix", and "as_postfix".
         pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+        show_progress_desc (bool): Whether to show the progress bar description.
+        pbar_desc_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.set_pbar_description`.
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
 
@@ -101,36 +101,39 @@ def save_animation(
         writer_kwargs["duration"] = 1000 / fps
     if pbar_kwargs is None:
         pbar_kwargs = {}
+    if pbar_desc_kwargs is None:
+        pbar_desc_kwargs = {}
     if to_image_kwargs is None:
         to_image_kwargs = {}
     if delta is None:
         delta = len(index) // 2
 
     with imageio.get_writer(fname, **writer_kwargs) as writer:
-        as_postfix = None
-        if isinstance(show_progress_keys, str):
-            if show_progress_keys.lower() == "as_postfix":
-                show_progress_keys = True
-                as_postfix = True
-            elif show_progress_keys.lower() == "as_prefix":
-                show_progress_keys = True
-                as_postfix = False
-            else:
-                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
-        pbar = get_pbar(range(0, len(index) - delta + 1, step), show_progress=show_progress, **pbar_kwargs)
-        for i in pbar:
-            if show_progress_keys:
+        index_steps = range(0, len(index) - delta + 1, step)
+        with get_pbar(index_steps, show_progress=show_progress, **pbar_kwargs) as pbar:
+            if show_progress_desc:
                 set_pbar_description(
                     pbar,
-                    "{} → {}".format(str(index[i]), str(index[i + delta - 1])),
-                    as_postfix=as_postfix,
+                    "{} → {}".format(str(index[0]), str(index[0 + delta - 1])),
+                    **pbar_desc_kwargs,
                 )
-            fig = plot_func(index[i : i + delta], *args, **kwargs)
-            if fig is None:
-                continue
-            if isinstance(fig, (go.Figure, go.FigureWidget)):
-                fig = fig.to_image(format="png", **to_image_kwargs)
-            if not isinstance(fig, np.ndarray):
-                fig = imageio.imread(fig)
-            writer.append_data(fig)
-        pbar.close()
+
+            for i in range(len(index_steps)):
+                j = index_steps[i]
+                fig = plot_func(index[j : j + delta], *args, **kwargs)
+                if fig is None:
+                    continue
+                if isinstance(fig, (go.Figure, go.FigureWidget)):
+                    fig = fig.to_image(format="png", **to_image_kwargs)
+                if not isinstance(fig, np.ndarray):
+                    fig = imageio.imread(fig)
+                writer.append_data(fig)
+
+                if show_progress_desc and i + 1 < len(index_steps):
+                    next_j = index_steps[i + 1]
+                    set_pbar_description(
+                        pbar,
+                        "{} → {}".format(str(index[next_j]), str(index[next_j + delta - 1])),
+                        **pbar_desc_kwargs,
+                    )
+                pbar.update(1)

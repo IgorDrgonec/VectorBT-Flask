@@ -161,8 +161,9 @@ class BinanceData(RemoteData):
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
-        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        show_progress_desc: tp.Optional[bool] = None,
+        pbar_desc_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         **get_klines_kwargs,
     ) -> tp.SymbolData:
@@ -192,12 +193,11 @@ class BinanceData(RemoteData):
 
                 See `binance.enums.HistoricalKlinesType`. Supports strings.
             limit (int): The maximum number of returned items.
-            delay (float): Time to sleep after each request (in milliseconds).
+            delay (float): Time to sleep after each request (in seconds).
             show_progress (bool): Whether to show the progress bar.
-            show_progress_keys (bool or str): Whether to show keys in the progress bar.
-
-                Can be True, False, "as_prefix", and "as_postfix".
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+            show_progress_desc (bool): Whether to show the progress bar description.
+            pbar_desc_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.set_pbar_description`.
             silence_warnings (bool): Whether to silence all warnings.
             **get_klines_kwargs: Keyword arguments passed to `binance.client.Client.get_klines`.
 
@@ -224,8 +224,9 @@ class BinanceData(RemoteData):
         limit = cls.resolve_custom_setting(limit, "limit")
         delay = cls.resolve_custom_setting(delay, "delay")
         show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
-        show_progress_keys = cls.resolve_custom_setting(show_progress_keys, "show_progress_keys")
         pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        show_progress_desc = cls.resolve_custom_setting(show_progress_desc, "show_progress_desc")
+        pbar_desc_kwargs = cls.resolve_custom_setting(pbar_desc_kwargs, "pbar_desc_kwargs", merge=True)
         silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
         get_klines_kwargs = cls.resolve_custom_setting(get_klines_kwargs, "get_klines_kwargs", merge=True)
 
@@ -269,22 +270,12 @@ class BinanceData(RemoteData):
         # Iteratively collect the data
         data = []
         try:
-            as_postfix = None
-            if isinstance(show_progress_keys, str):
-                if show_progress_keys.lower() == "as_postfix":
-                    show_progress_keys = True
-                    as_postfix = True
-                elif show_progress_keys.lower() == "as_prefix":
-                    show_progress_keys = True
-                    as_postfix = False
-                else:
-                    raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                if show_progress_keys:
+                if show_progress_desc:
                     set_pbar_description(
                         pbar,
                         "{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)),
-                        as_postfix=as_postfix,
+                        **pbar_desc_kwargs,
                     )
                 while True:
                     # Fetch the klines for the next timeframe
@@ -305,18 +296,18 @@ class BinanceData(RemoteData):
                     data += next_data
                     if start_ts is None:
                         start_ts = next_data[0][0]
-                    pbar.update(1)
-                    if show_progress_keys:
+                    if show_progress_desc:
                         set_pbar_description(
                             pbar,
                             "{} → {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])),
-                            as_postfix=as_postfix,
+                            **pbar_desc_kwargs,
                         )
+                    pbar.update(1)
                     prev_end_ts = next_data[-1][0]
                     if end_ts is not None and prev_end_ts >= end_ts:
                         break
                     if delay is not None:
-                        time.sleep(delay / 1000)  # be kind to api
+                        time.sleep(delay)  # be kind to api
         except Exception as e:
             if not silence_warnings:
                 warnings.warn(traceback.format_exc(), stacklevel=2)

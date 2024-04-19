@@ -3722,7 +3722,7 @@ class Splitter(Analyzable):
 
             funcs_args = _get_generator()
             keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
-            execute_kwargs = merge_dicts(dict(show_progress=not one_split or not one_set), execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
             results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
@@ -3733,7 +3733,7 @@ class Splitter(Analyzable):
 
             funcs_args = _get_generator()
             keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
-            execute_kwargs = merge_dicts(dict(show_progress=not one_split or not one_set), execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
             results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
@@ -3751,7 +3751,7 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            execute_kwargs = merge_dicts(dict(show_progress=not one_split), execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_split else None), execute_kwargs)
             results = execute(funcs_args, size=n_splits, keys=split_labels, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
@@ -3769,7 +3769,7 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            execute_kwargs = merge_dicts(dict(show_progress=not one_set), execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_set else None), execute_kwargs)
             results = execute(funcs_args, size=n_sets, keys=set_labels, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")

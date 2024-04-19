@@ -3056,7 +3056,7 @@ Other keyword arguments are passed to `{0}.run`.
             else:
                 _n_params = n_params
                 keys = param_index
-            execute_kwargs = merge_dicts(dict(show_progress=not single_comb), execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if single_comb else None), execute_kwargs)
             execute_kwargs["keys"] = keys
 
             if pass_per_column:

@@ -1150,17 +1150,18 @@ class HasSettings:
         If `sub_path` is provided, appends it to the resolved path and gives it more priority.
         If only the `sub_path` should be considered, set `sub_path_only` to True."""
         if merge:
-            return merge_dicts(
-                cls.get_setting(
-                    key,
-                    default=default,
-                    path_id=path_id,
-                    inherit=inherit,
-                    sub_path=sub_path,
-                    sub_path_only=sub_path_only,
-                ),
-                value,
+            setting = cls.get_setting(
+                key,
+                default=default,
+                path_id=path_id,
+                inherit=inherit,
+                sub_path=sub_path,
+                sub_path_only=sub_path_only,
             )
+            if setting is None or isinstance(setting, dict):
+                if value is None or isinstance(value, dict):
+                    return merge_dicts(setting, value)
+            return value
         if value is None:
             return cls.get_setting(
                 key,

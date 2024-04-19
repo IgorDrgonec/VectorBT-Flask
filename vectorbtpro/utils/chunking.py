@@ -1741,7 +1741,7 @@ class Chunker(Configured):
         if return_raw_chunks:
             return chunk_meta, funcs_args
         execute_kwargs = substitute_templates(execute_kwargs, template_context, eval_id="execute_kwargs")
-        execute_kwargs = merge_dicts(dict(show_progress=len(chunk_meta) > 1), execute_kwargs)
+        execute_kwargs = merge_dicts(dict(show_progress=False if len(chunk_meta) == 1 else None), execute_kwargs)
         results = execute(funcs_args, size=len(chunk_meta), **execute_kwargs)
         if merge_func is not None:
             template_context["funcs_args"] = funcs_args

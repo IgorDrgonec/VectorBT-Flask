@@ -1800,7 +1800,7 @@ class Parameterizer(Configured):
             )
 
         execute_kwargs = merge_dicts(
-            dict(show_progress=not template_context["single_comb"]),
+            dict(show_progress=False if template_context["single_comb"] else None),
             execute_kwargs,
         )
         results = execute(
