@@ -1166,11 +1166,13 @@ def get_index_points(
         start = dt.try_align_dt_to_index(start, index)
     if end is not None and isinstance(end, str):
         end = dt.try_align_dt_to_index(end, index)
+    if every is not None and not checks.is_int(every):
+        every = dt.to_freq(every)
 
     start_used = False
     end_used = False
     if at_time is not None and every is None and on is None:
-        every = "D"
+        every = pd.Timedelta(days=1)
     if every is not None:
         start_used = True
         end_used = True
@@ -1653,6 +1655,8 @@ def get_index_ranges(
                 except Exception as e:
                     end = pd.Index([end])
         naive_index = index
+    if every is not None and not checks.is_int(every):
+        every = dt.to_freq(every)
     if lookback_period is not None and not checks.is_int(lookback_period):
         lookback_period = dt.to_freq(lookback_period)
     if fixed_start and lookback_period is not None:
@@ -1662,7 +1666,7 @@ def get_index_ranges(
 
     if start_time is not None or end_time is not None:
         if every is None and start is None and end is None:
-            every = "D"
+            every = pd.Timedelta(days=1)
     if every is not None:
         if not fixed_start:
             if start_time is None and end_time is not None:

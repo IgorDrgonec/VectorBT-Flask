@@ -5,6 +5,7 @@
 import warnings
 from datetime import datetime, timezone, timedelta, tzinfo, date, time
 from collections import namedtuple
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -22,9 +23,6 @@ from vectorbtpro.utils.array_ import min_count_nb
 __all__ = [
     "DTC",
     "date_range",
-    "pd_offset",
-    "pd_timedelta",
-    "pd_timestamp",
 ]
 
 __pdoc__ = {}
@@ -249,7 +247,7 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
         # month
         elif unit.lower() in ("m", "ms", "monthstart", "monthbegin"):
             unit = "MS"
-        elif unit.lower() == ("me", "monthend"):
+        elif unit.lower() in ("me", "monthend"):
             if old_pandas:
                 unit = "M"
             else:
@@ -264,7 +262,7 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
             "businessmonthbegin",
         ):
             unit = "BMS"
-        elif unit.lower() == ("bme", "bmonthend", "businessmonthend"):
+        elif unit.lower() in ("bme", "bmonthend", "businessmonthend"):
             if old_pandas:
                 unit = "BM"
             else:
@@ -279,7 +277,7 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
             "custombusinessmonthbegin",
         ):
             unit = "CBMS"
-        elif unit.lower() == ("cbme", "cbmonthend", "custombusinessmonthend"):
+        elif unit.lower() in ("cbme", "cbmonthend", "custombusinessmonthend"):
             if old_pandas:
                 unit = "CBM"
             else:
@@ -835,14 +833,15 @@ def is_tz_aware(dt: tp.Union[datetime, pd.Timestamp, pd.DatetimeIndex]) -> bool:
 
 
 def to_timezone(
-    tz: tp.TimezoneLike,
+    tz: tp.Optional[tp.TimezoneLike] = None,
     to_fixed_offset: tp.Optional[bool] = None,
     parse_with_dateparser: tp.Optional[bool] = None,
     dateparser_kwargs: tp.KwargsLike = None,
 ) -> tzinfo:
     """Parse the timezone.
 
-    If the object is a string, will parse with Pandas and dateparser (`parse_with_dateparser` must be True).
+    If the object is None, returns the local timezone. If a string, will parse with Pandas and
+    dateparser (`parse_with_dateparser` must be True).
 
     If `to_fixed_offset` is set to True, will convert to `datetime.timezone`. See global settings.
 
@@ -891,7 +890,7 @@ def to_timezone(
 
 
 def to_timestamp(
-    dt: tp.DatetimeLike,
+    dt: tp.DatetimeLike = "now",
     parse_with_dateparser: tp.Optional[bool] = None,
     dateparser_kwargs: tp.KwargsLike = None,
     unit: str = "ns",
@@ -984,8 +983,15 @@ def to_timestamp(
     return dt
 
 
+to_local_timestamp = partial(to_timestamp, tz="tzlocal()")
+"""Alias for `to_timestamp` with `tz="tzlocal()"`."""
+
+to_utc_timestamp = partial(to_timestamp, tz="utc")
+"""Alias for `to_timestamp` with `tz="utc"`."""
+
+
 def to_tzaware_timestamp(
-    dt: tp.DatetimeLike,
+    dt: tp.DatetimeLike = "now",
     naive_tz: tp.TimezoneLike = None,
     tz: tp.TimezoneLike = None,
     **kwargs,
@@ -1014,12 +1020,12 @@ def to_tzaware_timestamp(
     return ts
 
 
-def to_naive_timestamp(dt: tp.DatetimeLike, **kwargs) -> pd.Timestamp:
+def to_naive_timestamp(dt: tp.DatetimeLike = "now", **kwargs) -> pd.Timestamp:
     """Parse the datetime as a timezone-naive `pd.Timestamp`."""
     return to_timestamp(dt, **kwargs).tz_localize(None)
 
 
-def to_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
+def to_datetime(dt: tp.DatetimeLike = "now", **kwargs) -> datetime:
     """Parse the datetime as a `datetime.datetime`.
 
     Uses `to_timestamp`."""
@@ -1028,7 +1034,14 @@ def to_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     return to_timestamp(dt, **kwargs).to_pydatetime()
 
 
-def to_tzaware_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
+to_local_datetime = partial(to_datetime, tz="tzlocal()")
+"""Alias for `to_datetime` with `tz="tzlocal()"`."""
+
+to_utc_datetime = partial(to_datetime, tz="utc")
+"""Alias for `to_datetime` with `tz="utc"`."""
+
+
+def to_tzaware_datetime(dt: tp.DatetimeLike = "now", **kwargs) -> datetime:
     """Parse the datetime as a timezone-aware `datetime.datetime`.
 
     Uses `to_tzaware_timestamp`."""
@@ -1037,7 +1050,7 @@ def to_tzaware_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     return to_tzaware_timestamp(dt, **kwargs).to_pydatetime()
 
 
-def to_naive_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
+def to_naive_datetime(dt: tp.DatetimeLike = "now", **kwargs) -> datetime:
     """Parse the datetime as a timezone-naive `datetime.datetime`.
 
     Uses `to_naive_timestamp`."""
@@ -1067,7 +1080,7 @@ def get_min_td_component(td: pd.Timedelta) -> int:
 
 
 def readable_datetime(
-    dt: tp.DatetimeLike,
+    dt: tp.DatetimeLike = "now",
     drop_tz: tp.Optional[bool] = None,
     freq: tp.Optional[tp.FrequencyLike] = None,
     **kwargs,
@@ -1522,15 +1535,3 @@ def get_rangebreaks(index: tp.IndexLike, **kwargs) -> list:
     """Get `rangebreaks` based on `get_dt_index_gaps`."""
     start_index, end_index = get_dt_index_gaps(index, **kwargs)
     return [dict(bounds=x) for x in zip(start_index, end_index)]
-
-
-# ############# Aliases ############# #
-
-pd_offset = to_offset
-"""Alias for `to_offset`."""
-
-pd_timedelta = to_timedelta
-"""Alias for `to_timedelta`."""
-
-pd_timestamp = to_timestamp
-"""Alias for `to_timestamp`."""
