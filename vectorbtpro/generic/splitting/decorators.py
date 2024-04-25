@@ -179,41 +179,38 @@ def split(
             if splitter_cls is None:
                 splitter_cls = Splitter
             if len(var_kwargs) > 0:
-                if len(splitter_kwargs) == 0 and len(apply_kwargs) > 0:
-                    splitter_kwargs = var_kwargs
-                elif len(splitter_kwargs) > 0 and len(apply_kwargs) == 0:
-                    apply_kwargs = var_kwargs
-                elif len(splitter_kwargs) == 0 and len(apply_kwargs) == 0:
-                    if splitter is None or not isinstance(splitter, splitter_cls):
-                        apply_arg_names = get_func_arg_names(splitter_cls.apply)
-                        if splitter is not None:
-                            if isinstance(splitter, str):
-                                splitter_arg_names = get_func_arg_names(getattr(splitter_cls, splitter))
-                            else:
-                                splitter_arg_names = get_func_arg_names(splitter)
-                            for k, v in var_kwargs.items():
-                                assigned = False
-                                if k in splitter_arg_names:
-                                    splitter_kwargs[k] = v
-                                    assigned = True
-                                if k != "split" and k in apply_arg_names:
-                                    apply_kwargs[k] = v
-                                    assigned = True
-                                if not assigned:
-                                    raise ValueError(f"Argument '{k}' couldn't be assigned")
+                var_splitter_kwargs = {}
+                var_apply_kwargs = {}
+                if splitter is None or not isinstance(splitter, splitter_cls):
+                    apply_arg_names = get_func_arg_names(splitter_cls.apply)
+                    if splitter is not None:
+                        if isinstance(splitter, str):
+                            splitter_arg_names = get_func_arg_names(getattr(splitter_cls, splitter))
                         else:
-                            for k, v in var_kwargs.items():
-                                if k == "freq":
-                                    splitter_kwargs[k] = v
-                                    apply_kwargs[k] = v
-                                elif k == "split" or k not in apply_arg_names:
-                                    splitter_kwargs[k] = v
-                                else:
-                                    apply_kwargs[k] = v
+                            splitter_arg_names = get_func_arg_names(splitter)
+                        for k, v in var_kwargs.items():
+                            assigned = False
+                            if k in splitter_arg_names:
+                                var_splitter_kwargs[k] = v
+                                assigned = True
+                            if k != "split" and k in apply_arg_names:
+                                var_apply_kwargs[k] = v
+                                assigned = True
+                            if not assigned:
+                                raise ValueError(f"Argument '{k}' couldn't be assigned")
                     else:
-                        apply_kwargs = var_kwargs
+                        for k, v in var_kwargs.items():
+                            if k == "freq":
+                                var_splitter_kwargs[k] = v
+                                var_apply_kwargs[k] = v
+                            elif k == "split" or k not in apply_arg_names:
+                                var_splitter_kwargs[k] = v
+                            else:
+                                var_apply_kwargs[k] = v
                 else:
-                    raise ValueError("Pass keyword arguments as splitter_kwargs or apply_kwargs")
+                    var_apply_kwargs = var_kwargs
+                splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
+                apply_kwargs = merge_dicts(var_apply_kwargs, apply_kwargs)
             if splitter is None:
                 splitter = splitter_cls.guess_method(**splitter_kwargs)
             if not isinstance(splitter, splitter_cls) and index is not None:

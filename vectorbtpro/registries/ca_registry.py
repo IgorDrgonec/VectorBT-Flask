@@ -422,6 +422,7 @@ from vectorbtpro.utils.profiling import Timer
 from vectorbtpro.utils.formatting import ptable
 
 __all__ = [
+    "CacheableRegistry",
     "ca_reg",
     "CAQuery",
     "CARule",
@@ -812,7 +813,7 @@ class CARule(DefineMixin):
 
 
 class CacheableRegistry:
-    """Class that registers setups of cacheables."""
+    """Class for registering setups of cacheables."""
 
     def __init__(self) -> None:
         self._class_setups = dict()
@@ -2547,9 +2548,11 @@ def disable_caching(clear_cache: bool = True) -> None:
     """Disable caching globally."""
     from vectorbtpro._settings import settings
 
-    settings.caching["disable"] = True
-    settings.caching["disable_whitelist"] = True
-    settings.caching["disable_machinery"] = True
+    caching_cfg = settings["caching"]
+
+    caching_cfg["disable"] = True
+    caching_cfg["disable_whitelist"] = True
+    caching_cfg["disable_machinery"] = True
 
     if clear_cache:
         CAQueryDelegator().clear_cache()
@@ -2559,9 +2562,11 @@ def enable_caching() -> None:
     """Enable caching globally."""
     from vectorbtpro._settings import settings
 
-    settings.caching["disable"] = False
-    settings.caching["disable_whitelist"] = False
-    settings.caching["disable_machinery"] = False
+    caching_cfg = settings["caching"]
+
+    caching_cfg["disable"] = False
+    caching_cfg["disable_whitelist"] = False
+    caching_cfg["disable_machinery"] = False
 
 
 CachingDisabledT = tp.TypeVar("CachingDisabledT", bound="CachingDisabled")
@@ -2667,15 +2672,17 @@ class CachingDisabled:
         if self.query_like is None:
             from vectorbtpro._settings import settings
 
+            caching_cfg = settings["caching"]
+
             self._init_settings = dict(
-                disable=settings.caching["disable"],
-                disable_whitelist=settings.caching["disable_whitelist"],
-                disable_machinery=settings.caching["disable_machinery"],
+                disable=caching_cfg["disable"],
+                disable_whitelist=caching_cfg["disable_whitelist"],
+                disable_machinery=caching_cfg["disable_machinery"],
             )
 
-            settings.caching["disable"] = True
-            settings.caching["disable_whitelist"] = self.disable_whitelist
-            settings.caching["disable_machinery"] = self.disable_machinery
+            caching_cfg["disable"] = True
+            caching_cfg["disable_whitelist"] = self.disable_whitelist
+            caching_cfg["disable_machinery"] = self.disable_machinery
 
             if self.clear_cache:
                 clear_cache()
@@ -2715,9 +2722,11 @@ class CachingDisabled:
         if self.query_like is None:
             from vectorbtpro._settings import settings
 
-            settings.caching["disable"] = self.init_settings["disable"]
-            settings.caching["disable_whitelist"] = self.init_settings["disable_whitelist"]
-            settings.caching["disable_machinery"] = self.init_settings["disable_machinery"]
+            caching_cfg = settings["caching"]
+
+            caching_cfg["disable"] = self.init_settings["disable"]
+            caching_cfg["disable_whitelist"] = self.init_settings["disable_whitelist"]
+            caching_cfg["disable_machinery"] = self.init_settings["disable_machinery"]
         else:
             self.registry.deregister_rule(self.rule)
 
@@ -2853,15 +2862,17 @@ class CachingEnabled:
         if self.query_like is None:
             from vectorbtpro._settings import settings
 
+            caching_cfg = settings["caching"]
+
             self._init_settings = dict(
-                disable=settings.caching["disable"],
-                disable_whitelist=settings.caching["disable_whitelist"],
-                disable_machinery=settings.caching["disable_machinery"],
+                disable=caching_cfg["disable"],
+                disable_whitelist=caching_cfg["disable_whitelist"],
+                disable_machinery=caching_cfg["disable_machinery"],
             )
 
-            settings.caching["disable"] = False
-            settings.caching["disable_whitelist"] = not self.enable_whitelist
-            settings.caching["disable_machinery"] = not self.enable_machinery
+            caching_cfg["disable"] = False
+            caching_cfg["disable_whitelist"] = not self.enable_whitelist
+            caching_cfg["disable_machinery"] = not self.enable_machinery
         else:
 
             def _enforce_func(setup):
@@ -2898,9 +2909,11 @@ class CachingEnabled:
         if self.query_like is None:
             from vectorbtpro._settings import settings
 
-            settings.caching["disable"] = self.init_settings["disable"]
-            settings.caching["disable_whitelist"] = self.init_settings["disable_whitelist"]
-            settings.caching["disable_machinery"] = self.init_settings["disable_machinery"]
+            caching_cfg = settings["caching"]
+
+            caching_cfg["disable"] = self.init_settings["disable"]
+            caching_cfg["disable_whitelist"] = self.init_settings["disable_whitelist"]
+            caching_cfg["disable_machinery"] = self.init_settings["disable_machinery"]
 
             if self.clear_cache:
                 clear_cache()

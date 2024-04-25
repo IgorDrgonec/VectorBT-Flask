@@ -138,8 +138,15 @@ class SerialEngine(ExecutionEngine):
             size = len(funcs_args)
         if keys is not None:
             keys = to_any_index(keys)
+        pbar_kwargs = dict(self.pbar_kwargs)
+        if "bar_id" not in pbar_kwargs:
+            if keys is not None:
+                if isinstance(keys, pd.MultiIndex):
+                    pbar_kwargs["bar_id"] = tuple(keys.names)
+                else:
+                    pbar_kwargs["bar_id"] = keys.name
 
-        with ProgressBar(total=size, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+        with ProgressBar(total=size, show_progress=self.show_progress, **pbar_kwargs) as pbar:
             if keys is not None:
                 if isinstance(keys, pd.MultiIndex):
                     pbar.set_description(dict(zip(keys.names, keys[0])))
@@ -379,6 +386,13 @@ class PathosEngine(ExecutionEngine):
             funcs_args = [(pass_kwargs_as_args, x, {}) for x in funcs_args]
         else:
             raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
+        pbar_kwargs = dict(self.pbar_kwargs)
+        if "bar_id" not in pbar_kwargs:
+            if keys is not None:
+                if isinstance(keys, pd.MultiIndex):
+                    pbar_kwargs["bar_id"] = tuple(keys.names)
+                else:
+                    pbar_kwargs["bar_id"] = keys.name
 
         with Pool(**self.init_kwargs) as pool:
             async_results = []
@@ -390,10 +404,10 @@ class PathosEngine(ExecutionEngine):
                 total_futures = len(pending)
                 if self.timeout is not None:
                     end_time = self.timeout + time.monotonic()
-                with ProgressBar(total=total_futures, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+                with ProgressBar(total=total_futures, show_progress=self.show_progress, **pbar_kwargs) as pbar:
                     while pending:
                         pending = {async_result for async_result in pending if not async_result.ready()}
-                        pbar.n = total_futures - len(pending)
+                        pbar.update_to(total_futures - len(pending))
                         if len(pending) == 0:
                             break
                         if self.timeout is not None:
@@ -1604,6 +1618,13 @@ class Executor(Configured):
 
         if keys is not None:
             keys = to_any_index(keys)
+        pbar_kwargs = dict(pbar_kwargs)
+        if "bar_id" not in pbar_kwargs:
+            if keys is not None:
+                if isinstance(keys, pd.MultiIndex):
+                    pbar_kwargs["bar_id"] = ("chunk_calls", tuple(keys.names))
+                else:
+                    pbar_kwargs["bar_id"] = ("chunk_calls", keys.name)
 
         if warmup:
             if not hasattr(funcs_args, "__getitem__"):

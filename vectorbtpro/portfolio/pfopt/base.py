@@ -36,7 +36,7 @@ from vectorbtpro.registries.jit_registry import jit_reg
 if tp.TYPE_CHECKING:
     from vectorbtpro.portfolio.base import Portfolio as PortfolioT
 else:
-    PortfolioT = tp.Any
+    PortfolioT = "Portfolio"
 
 try:
     if not tp.TYPE_CHECKING:

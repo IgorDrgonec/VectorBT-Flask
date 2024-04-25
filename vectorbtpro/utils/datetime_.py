@@ -22,6 +22,9 @@ from vectorbtpro.utils.array_ import min_count_nb
 __all__ = [
     "DTC",
     "date_range",
+    "pd_offset",
+    "pd_timedelta",
+    "pd_timestamp",
 ]
 
 __pdoc__ = {}
@@ -40,7 +43,9 @@ sharp_freq_str_config = HybridConfig(
 )
 """_"""
 
-__pdoc__["sharp_freq_str_config"] = f"""Config for sharp frequency mapping.
+__pdoc__[
+    "sharp_freq_str_config"
+] = f"""Config for sharp frequency mapping.
 
 ```python
 {sharp_freq_str_config.prettify()}
@@ -49,16 +54,19 @@ __pdoc__["sharp_freq_str_config"] = f"""Config for sharp frequency mapping.
 
 fuzzy_freq_str_config = HybridConfig(
     dict(
+        n="ns",
         ns="ns",
         nano="ns",
         nanos="ns",
         nanosecond="ns",
         nanoseconds="ns",
+        u="us",
         us="us",
         micro="us",
         micros="us",
         microsecond="us",
         microseconds="us",
+        l="ms",
         ms="ms",
         milli="ms",
         millis="ms",
@@ -78,10 +86,10 @@ fuzzy_freq_str_config = HybridConfig(
         hour="h",
         hours="h",
         hourly="h",
-        d="d",
-        day="d",
-        days="d",
-        daily="d",
+        d="D",
+        day="D",
+        days="D",
+        daily="D",
         w="W",
         wk="W",
         wks="W",
@@ -106,7 +114,9 @@ fuzzy_freq_str_config = HybridConfig(
 )
 """_"""
 
-__pdoc__["fuzzy_freq_str_config"] = f"""Config for fuzzy frequency mapping.
+__pdoc__[
+    "fuzzy_freq_str_config"
+] = f"""Config for fuzzy frequency mapping.
 
 ```python
 {fuzzy_freq_str_config.prettify()}
@@ -134,7 +144,7 @@ def split_freq_str(
     * "s" for second
     * "m" for minute
     * "h" for hour
-    * "d" for day
+    * "D" for day
     * "W" for week
     * "M" for month
     * "Q" for quarter
@@ -188,9 +198,11 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
     from pkg_resources import parse_version
 
     if parse_version(pd.__version__) < parse_version("2.2.0"):
-        year_prefix = "AS"
+        old_pandas = True
+        year_prefix = "A"
     else:
-        year_prefix = "YS"
+        old_pandas = False
+        year_prefix = "Y"
 
     if allow_space:
         freq_parts = re.split(r"[,;\s]", offset_str)
@@ -205,16 +217,136 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
         if split is None:
             return offset_str
         multiplier, unit = split
-        if unit == "m":
+        if unit.lower() == "ns":
+            unit = "ns"
+        elif unit.lower() == "us":
+            unit = "us"
+        elif unit == "ms":  # case!
+            unit = "ms"
+        elif unit.lower() == "s":
+            unit = "s"
+        elif unit == "m":  # case!
             unit = "min"
-        elif unit == "W":
+        # hour
+        elif unit.lower() == "h":
+            unit = "h"
+        elif unit.lower() in ("businesshour", "bh"):
+            unit = "bh"
+        elif unit.lower() in ("custombusinesshour", "cbh"):
+            unit = "cbh"
+        # day
+        elif unit.lower() == "d":
+            unit = "D"
+        elif unit.lower() in ("b", "bd", "bday", "businessday"):
+            unit = "B"
+        elif unit.lower() in ("c", "cd", "cday", "custombusinessday"):
+            unit = "C"
+        # week
+        elif unit.lower() in ("w", "ws", "weekstart", "weekbegin"):
             unit = "W-MON"
-        elif unit == "M":
+        elif unit.lower() in ("we", "weekend"):
+            unit = "W-SUN"
+        # month
+        elif unit.lower() in ("m", "ms", "monthstart", "monthbegin"):
             unit = "MS"
-        elif unit == "Q":
+        elif unit.lower() == ("me", "monthend"):
+            if old_pandas:
+                unit = "M"
+            else:
+                unit = "ME"
+        # business month
+        elif unit.lower() in (
+            "bm",
+            "bms",
+            "bmonthstart",
+            "bmonthbegin",
+            "businessmonthstart",
+            "businessmonthbegin",
+        ):
+            unit = "BMS"
+        elif unit.lower() == ("bme", "bmonthend", "businessmonthend"):
+            if old_pandas:
+                unit = "BM"
+            else:
+                unit = "BME"
+        # custom business month
+        elif unit.lower() in (
+            "cbm",
+            "cbms",
+            "cbmonthstart",
+            "cbmonthbegin",
+            "custombusinessmonthstart",
+            "custombusinessmonthbegin",
+        ):
+            unit = "CBMS"
+        elif unit.lower() == ("cbme", "cbmonthend", "custombusinessmonthend"):
+            if old_pandas:
+                unit = "CBM"
+            else:
+                unit = "CBME"
+        # semi-month
+        elif unit.lower() in ("sm", "sms", "semimonthstart", "semimonthbegin"):
+            unit = "SMS"
+        elif unit.lower() in ("sme", "semimonthend"):
+            if old_pandas:
+                unit = "SM"
+            else:
+                unit = "SME"
+        # quarter
+        elif unit.lower() in ("q", "qs", "quarterstart", "quarterbegin"):
             unit = "QS"
-        elif unit == "Y":
-            unit = "YS"
+        elif unit.lower() in ("qe", "quarterend"):
+            if old_pandas:
+                unit = "Q"
+            else:
+                unit = "QE"
+        # business quarter
+        elif unit.lower() in (
+            "bq",
+            "bqs",
+            "bquarterstart",
+            "bquarterbegin",
+            "businessquarterstart",
+            "businessquarterbegin",
+        ):
+            unit = "BQS"
+        elif unit.lower() in ("bqe", "bquarterend", "businessquarterend"):
+            if old_pandas:
+                unit = "BQ"
+            else:
+                unit = "BQE"
+        # retail quarter
+        elif unit.lower() in ("req", "retailquarter", "fy5253quarter"):
+            unit = "REQ"
+        # year
+        elif unit.lower() in ("a", "y", "as", "ys", "yearstart", "yearbegin"):
+            unit = year_prefix + "S"
+        elif unit.lower() in ("ae", "ye", "yearend"):
+            if old_pandas:
+                unit = year_prefix
+            else:
+                unit = year_prefix + "E"
+        # business year
+        elif unit.lower() in (
+            "ba",
+            "by",
+            "bas",
+            "bys",
+            "byearstart",
+            "byearbegin",
+            "businessyearstart",
+            "businessyearbegin",
+        ):
+            unit = "B" + year_prefix + "S"
+        elif unit.lower() in ("bae", "bye", "byearend", "businessyearend"):
+            if old_pandas:
+                unit = "B" + year_prefix
+            else:
+                unit = "B" + year_prefix + "E"
+        # retail year
+        elif unit.lower() in ("re", "retailyear", "fy5253"):
+            unit = "RE"
+        # day of week
         elif unit.lower() in ("mon", "monday"):
             unit = "W-MON"
         elif unit.lower() in ("tue", "tuesday"):
@@ -229,30 +361,32 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
             unit = "W-SAT"
         elif unit.lower() in ("sun", "sunday"):
             unit = "W-SUN"
+        # month of year
         elif unit.lower() in ("jan", "january"):
-            unit = year_prefix + "-JAN"
+            unit = year_prefix + "S-JAN"
         elif unit.lower() in ("feb", "february"):
-            unit = year_prefix + "-FEB"
+            unit = year_prefix + "S-FEB"
         elif unit.lower() in ("mar", "march"):
-            unit = year_prefix + "-MAR"
+            unit = year_prefix + "S-MAR"
         elif unit.lower() in ("apr", "april"):
-            unit = year_prefix + "-APR"
+            unit = year_prefix + "S-APR"
         elif unit.lower() == "may":
-            unit = year_prefix + "-MAY"
+            unit = year_prefix + "S-MAY"
         elif unit.lower() in ("jun", "june"):
-            unit = year_prefix + "-JUN"
+            unit = year_prefix + "S-JUN"
         elif unit.lower() in ("jul", "july"):
-            unit = year_prefix + "-JUL"
+            unit = year_prefix + "S-JUL"
         elif unit.lower() in ("aug", "august"):
-            unit = year_prefix + "-AUG"
+            unit = year_prefix + "S-AUG"
         elif unit.lower() in ("sep", "september"):
-            unit = year_prefix + "-SEP"
+            unit = year_prefix + "S-SEP"
         elif unit.lower() in ("oct", "october"):
-            unit = year_prefix + "-OCT"
+            unit = year_prefix + "S-OCT"
         elif unit.lower() in ("nov", "november"):
-            unit = year_prefix + "-NOV"
+            unit = year_prefix + "S-NOV"
         elif unit.lower() in ("dec", "december"):
-            unit = year_prefix + "-DEC"
+            unit = year_prefix + "S-DEC"
+
         new_freq_parts.append(str(multiplier) + str(unit))
     return " ".join(new_freq_parts)
 
@@ -290,16 +424,16 @@ def prepare_timedelta_str(timedelta_str: str, allow_space: bool = False) -> str:
             unit = "min"
         elif unit == "W":
             multiplier *= 7
-            unit = "d"
+            unit = "D"
         elif unit == "M":
             multiplier *= nb.mo_ns / nb.d_ns
-            unit = "d"
+            unit = "D"
         elif unit == "Q":
             multiplier *= nb.q_ns / nb.d_ns
-            unit = "d"
+            unit = "D"
         elif unit == "Y":
             multiplier *= nb.y_ns / nb.d_ns
-            unit = "d"
+            unit = "D"
         new_freq_parts.append(str(multiplier) + str(unit))
     return " ".join(new_freq_parts)
 
@@ -983,10 +1117,12 @@ def readable_datetime(
             )
         )
     if min_ts_component == 4 or min_freq_component == 4:
-        return ts.strftime("%Y-%m-%d %H:%M:%S.{:03d}{}".format(
-            ts_components.milliseconds,
-            " %Z" if ts.tz is not None else "",
-        ))
+        return ts.strftime(
+            "%Y-%m-%d %H:%M:%S.{:03d}{}".format(
+                ts_components.milliseconds,
+                " %Z" if ts.tz is not None else "",
+            )
+        )
     if min_ts_component == 3 or min_freq_component == 3:
         return ts.strftime("%Y-%m-%d %H:%M:%S{}".format(" %Z" if ts.tz is not None else ""))
     if min_ts_component == 2 or min_freq_component == 2:
@@ -1386,3 +1522,15 @@ def get_rangebreaks(index: tp.IndexLike, **kwargs) -> list:
     """Get `rangebreaks` based on `get_dt_index_gaps`."""
     start_index, end_index = get_dt_index_gaps(index, **kwargs)
     return [dict(bounds=x) for x in zip(start_index, end_index)]
+
+
+# ############# Aliases ############# #
+
+pd_offset = to_offset
+"""Alias for `to_offset`."""
+
+pd_timedelta = to_timedelta
+"""Alias for `to_timedelta`."""
+
+pd_timestamp = to_timestamp
+"""Alias for `to_timestamp`."""

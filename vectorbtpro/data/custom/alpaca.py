@@ -252,7 +252,7 @@ class AlpacaData(RemoteData):
             unit = TimeFrameUnit.Minute
         elif unit == "h":
             unit = TimeFrameUnit.Hour
-        elif unit == "d":
+        elif unit == "D":
             unit = TimeFrameUnit.Day
         elif unit == "W":
             unit = TimeFrameUnit.Week

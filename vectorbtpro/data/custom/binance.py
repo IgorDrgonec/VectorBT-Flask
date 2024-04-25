@@ -221,6 +221,8 @@ class BinanceData(RemoteData):
         delay = cls.resolve_custom_setting(delay, "delay")
         show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
         pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        if "bar_id" not in pbar_kwargs:
+            pbar_kwargs["bar_id"] = "binance"
         silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
         get_klines_kwargs = cls.resolve_custom_setting(get_klines_kwargs, "get_klines_kwargs", merge=True)
 
@@ -229,7 +231,9 @@ class BinanceData(RemoteData):
         split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "W":
+            if unit == "D":
+                unit = "d"
+            elif unit == "W":
                 unit = "w"
             timeframe = str(multiplier) + unit
         if start is not None:
@@ -265,7 +269,7 @@ class BinanceData(RemoteData):
         data = []
         try:
             with ProgressBar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description("{}→?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
+                pbar.set_description("{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = client._klines(

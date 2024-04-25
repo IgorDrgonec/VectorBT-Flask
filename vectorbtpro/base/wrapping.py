@@ -26,8 +26,8 @@ if tp.TYPE_CHECKING:
     from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT
     from vectorbtpro.generic.splitting.base import Splitter as SplitterT
 else:
-    BaseIDXAccessorT = tp.Any
-    SplitterT = tp.Any
+    BaseIDXAccessorT = "BaseIDXAccessor"
+    SplitterT = "Splitter"
 
 __all__ = [
     "ArrayWrapper",

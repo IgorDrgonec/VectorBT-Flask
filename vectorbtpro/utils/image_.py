@@ -97,6 +97,8 @@ def save_animation(
         writer_kwargs["duration"] = 1000 / fps
     if pbar_kwargs is None:
         pbar_kwargs = {}
+    if "bar_id" not in pbar_kwargs:
+        pbar_kwargs["bar_id"] = "save_animation"
     if to_image_kwargs is None:
         to_image_kwargs = {}
     if delta is None:

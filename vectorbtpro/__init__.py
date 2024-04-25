@@ -95,7 +95,7 @@ def _import_more_stuff():
     from itertools import combinations, product
     from collections import namedtuple
     from datetime import datetime, timedelta, time
-    from time import sleep
+    from time import sleep, time as utc_time
     from pathlib import Path
 
     import numpy as np

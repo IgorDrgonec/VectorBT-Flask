@@ -8,7 +8,7 @@ from datetime import time
 
 import numpy as np
 import pandas as pd
-from pandas.tseries.frequencies import to_offset
+from pandas.tseries.offsets import BaseOffset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks, datetime_ as dt, datetime_nb as dt_nb
@@ -1036,8 +1036,7 @@ class PointIdxr(UniIdxr, DefineMixin):
     add_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `on`.
     
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+    Gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`."""
 
     kind: tp.Optional[str] = define.field(default=None)
     """Kind of data in `on`: indices or labels.
@@ -1328,8 +1327,7 @@ class RangeIdxr(UniIdxr, DefineMixin):
     If `lookback_period` is set, `start` becomes `end-lookback_period`. If `every` is not None, 
     the sequence is generated from `start+lookback_period` to `end` and then assigned to `end`.
 
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html).
+    If string, gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`.
     If integer, gets multiplied by the frequency of the index if the index is not integer."""
 
     start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = define.field(default=None)
@@ -1370,14 +1368,12 @@ class RangeIdxr(UniIdxr, DefineMixin):
     add_start_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `start`.
 
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+    If string, gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`."""
 
     add_end_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `end`.
 
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+    If string, gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`."""
 
     kind: tp.Optional[str] = define.field(default=None)
     """Kind of data in `on`: indices, labels or bounds.
@@ -1658,10 +1654,7 @@ def get_index_ranges(
                     end = pd.Index([end])
         naive_index = index
     if lookback_period is not None and not checks.is_int(lookback_period):
-        try:
-            lookback_period = to_offset(lookback_period)
-        except Exception as e:
-            lookback_period = to_offset(pd.Timedelta(lookback_period))
+        lookback_period = dt.to_freq(lookback_period)
     if fixed_start and lookback_period is not None:
         raise ValueError("Cannot use fixed_start and lookback_period together")
     if exact_start and lookback_period is not None:
@@ -1745,14 +1738,27 @@ def get_index_ranges(
             else:
                 if checks.is_int(lookback_period):
                     lookback_period *= dt.infer_index_freq(naive_index, freq=index_freq)
-                end = dt.date_range(
-                    start_date + lookback_period,
-                    end_date,
-                    freq=every,
-                    normalize=normalize_every,
-                    inclusive="both",
-                )
-                start = end - lookback_period
+                if isinstance(lookback_period, BaseOffset):
+                    end = dt.date_range(
+                        start_date,
+                        end_date,
+                        freq=every,
+                        normalize=normalize_every,
+                        inclusive="both",
+                    )
+                    start = end - lookback_period
+                    start_mask = start >= start_date
+                    start = start[start_mask]
+                    end = end[start_mask]
+                else:
+                    end = dt.date_range(
+                        start_date + lookback_period,
+                        end_date,
+                        freq=every,
+                        normalize=normalize_every,
+                        inclusive="both",
+                    )
+                    start = end - lookback_period
             kind = "bounds"
             lookback_period = None
 

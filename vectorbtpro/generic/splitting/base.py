@@ -44,7 +44,7 @@ from vectorbtpro.generic.splitting.purged import BasePurgedCV, PurgedWalkForward
 if tp.TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator as BaseCrossValidatorT
 else:
-    BaseCrossValidatorT = tp.Any
+    BaseCrossValidatorT = "BaseCrossValidator"
 
 __all__ = [
     "FixRange",
@@ -334,6 +334,12 @@ class Takeable(Annotatable, DefineMixin):
                 if eval_id != self.eval_id:
                     return False
         return True
+
+
+class ZeroLengthError(ValueError):
+    """Thrown whenever a range has a length of zero."""
+
+    pass
 
 
 class Splitter(Analyzable):
@@ -1083,13 +1089,16 @@ class Splitter(Analyzable):
         for start, stop in zip(start_idxs, stop_idxs):
             new_split = slice(start, stop)
             if split is not None:
-                new_split = cls.split_range(
-                    new_split,
-                    split,
-                    template_context=template_context,
-                    index=index,
-                    **split_range_kwargs,
-                )
+                try:
+                    new_split = cls.split_range(
+                        new_split,
+                        split,
+                        template_context=template_context,
+                        index=index,
+                        **split_range_kwargs,
+                    )
+                except ZeroLengthError:
+                    continue
             splits.append(new_split)
 
         return cls.from_splits(
@@ -1161,13 +1170,16 @@ class Splitter(Analyzable):
         indices = []
         for i, new_split in enumerate(grouper.iter_group_idxs()):
             if split is not None:
-                new_split = cls.split_range(
-                    new_split,
-                    split,
-                    template_context=template_context,
-                    index=index,
-                    **split_range_kwargs,
-                )
+                try:
+                    new_split = cls.split_range(
+                        new_split,
+                        split,
+                        template_context=template_context,
+                        index=index,
+                        **split_range_kwargs,
+                    )
+                except ZeroLengthError:
+                    continue
             else:
                 new_split = [new_split]
             splits.append(new_split)
@@ -1763,41 +1775,38 @@ class Splitter(Analyzable):
         if _take_kwargs is None:
             _take_kwargs = {}
         if len(var_kwargs) > 0:
-            if len(splitter_kwargs) == 0 and len(take_kwargs) > 0:
-                splitter_kwargs = var_kwargs
-            elif len(splitter_kwargs) > 0 and len(take_kwargs) == 0:
-                take_kwargs = var_kwargs
-            elif len(splitter_kwargs) == 0 and len(take_kwargs) == 0:
-                if splitter is None or not isinstance(splitter, cls):
-                    take_arg_names = get_func_arg_names(cls.take)
-                    if splitter is not None:
-                        if isinstance(splitter, str):
-                            splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
-                        else:
-                            splitter_arg_names = get_func_arg_names(splitter)
-                        for k, v in var_kwargs.items():
-                            assigned = False
-                            if k in splitter_arg_names:
-                                splitter_kwargs[k] = v
-                                assigned = True
-                            if k != "split" and k in take_arg_names:
-                                take_kwargs[k] = v
-                                assigned = True
-                            if not assigned:
-                                raise ValueError(f"Argument '{k}' couldn't be assigned")
+            var_splitter_kwargs = {}
+            var_take_kwargs = {}
+            if splitter is None or not isinstance(splitter, cls):
+                take_arg_names = get_func_arg_names(cls.take)
+                if splitter is not None:
+                    if isinstance(splitter, str):
+                        splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
                     else:
-                        for k, v in var_kwargs.items():
-                            if k == "freq":
-                                splitter_kwargs[k] = v
-                                take_kwargs[k] = v
-                            elif k == "split" or k not in take_arg_names:
-                                splitter_kwargs[k] = v
-                            else:
-                                take_kwargs[k] = v
+                        splitter_arg_names = get_func_arg_names(splitter)
+                    for k, v in var_kwargs.items():
+                        assigned = False
+                        if k in splitter_arg_names:
+                            var_splitter_kwargs[k] = v
+                            assigned = True
+                        if k != "split" and k in take_arg_names:
+                            var_take_kwargs[k] = v
+                            assigned = True
+                        if not assigned:
+                            raise ValueError(f"Argument '{k}' couldn't be assigned")
                 else:
-                    take_kwargs = var_kwargs
+                    for k, v in var_kwargs.items():
+                        if k == "freq":
+                            var_splitter_kwargs[k] = v
+                            var_take_kwargs[k] = v
+                        elif k == "split" or k not in take_arg_names:
+                            var_splitter_kwargs[k] = v
+                        else:
+                            var_take_kwargs[k] = v
             else:
-                raise ValueError("Pass keyword arguments as splitter_kwargs or take_kwargs")
+                var_take_kwargs = var_kwargs
+            splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
+            take_kwargs = merge_dicts(var_take_kwargs, take_kwargs)
         if splitter is None:
             splitter = cls.guess_method(**splitter_kwargs)
         if splitter is None:
@@ -2265,7 +2274,7 @@ class Splitter(Analyzable):
             meta["stop"] = stop
             meta["length"] = stop - start
             if not allow_zero_len and meta["length"] == 0:
-                raise ValueError("Range has zero length")
+                raise ZeroLengthError("Range has zero length")
             if range_format.lower() == "indices":
                 range_ = np.arange(*range_.indices(len(index)))
             elif range_format.lower() == "mask":
@@ -2281,7 +2290,7 @@ class Splitter(Analyzable):
                 indices = np.flatnonzero(range_)
                 if len(indices) == 0:
                     if not allow_zero_len:
-                        raise ValueError("Range has zero length")
+                        raise ZeroLengthError("Range has zero length")
                     meta["is_constant"] = True
                     meta["start"] = 0
                     meta["stop"] = 0
@@ -2313,7 +2322,7 @@ class Splitter(Analyzable):
                     meta["was_indices"] = True
                     if len(range_) == 0:
                         if not allow_zero_len:
-                            raise ValueError("Range has zero length")
+                            raise ZeroLengthError("Range has zero length")
                         meta["is_constant"] = True
                         meta["start"] = 0
                         meta["stop"] = 0

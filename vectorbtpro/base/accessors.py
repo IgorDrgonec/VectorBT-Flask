@@ -35,7 +35,7 @@ from vectorbtpro.utils.eval_ import multiline_eval
 if tp.TYPE_CHECKING:
     from vectorbtpro.generic.splitting.base import Splitter as SplitterT
 else:
-    SplitterT = tp.Any
+    SplitterT = "Splitter"
 
 __all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
 

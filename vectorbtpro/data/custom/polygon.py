@@ -208,6 +208,8 @@ class PolygonData(RemoteData):
         retries = cls.resolve_custom_setting(retries, "retries")
         show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
         pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        if "bar_id" not in pbar_kwargs:
+            pbar_kwargs["bar_id"] = "polygon"
         silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
 
         # Resolve the timeframe
@@ -221,7 +223,7 @@ class PolygonData(RemoteData):
             unit = "minute"
         elif unit == "h":
             unit = "hour"
-        elif unit == "d":
+        elif unit == "D":
             unit = "day"
         elif unit == "W":
             unit = "week"
@@ -321,7 +323,7 @@ class PolygonData(RemoteData):
         data = []
         try:
             with ProgressBar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description("{}→?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
+                pbar.set_description("{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)

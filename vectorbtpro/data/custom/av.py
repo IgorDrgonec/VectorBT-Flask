@@ -299,7 +299,7 @@ class AVData(RemoteData):
             elif unit == "h":
                 interval = str(60 * multiplier) + "min"
                 interval_type = "intraday"
-            elif unit == "d":
+            elif unit == "D":
                 interval = "daily"
                 interval_type = "daily"
             elif unit == "W":

@@ -1,15 +1,17 @@
 # Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
-"""Utilities for showing progress bars."""
+"""Utilities for progress bars."""
 
-from collections import OrderedDict
+import warnings
 from numbers import Number
 from functools import wraps
 from tqdm.std import tqdm
+from time import time as utc_time
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.attr_ import MISSING
+from vectorbtpro.registries.pbar_registry import PBarRegistry, pbar_reg
 
 __all__ = [
     "ProgressBar",
@@ -18,7 +20,6 @@ __all__ = [
     "ProgressShown",
     "with_progress_shown",
 ]
-
 
 ProgressBarT = tp.TypeVar("ProgressBarT", bound="ProgressBar")
 
@@ -37,71 +38,106 @@ class ProgressBar:
 
     def __init__(
         self,
-        *args,
-        pbar_type: tp.Optional[str] = None,
+        iterable: tp.Optional[tp.Iterable] = None,
+        bar_type: tp.Optional[str] = None,
+        bar_id: tp.Optional[tp.Hashable] = None,
+        reuse: tp.Optional[bool] = None,
+        disable: tp.Optional[bool] = None,
         show_progress: tp.Optional[bool] = None,
         show_progress_desc: tp.Optional[bool] = None,
         desc_kwargs: tp.KwargsLike = None,
+        registry: tp.Optional[PBarRegistry] = pbar_reg,
+        silence_warnings: tp.Optional[bool] = None,
         **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
 
         pbar_cfg = settings["pbar"]
 
-        if pbar_type is None:
-            pbar_type = pbar_cfg["type"]
-        if pbar_type.lower() == "tqdm_auto":
-            from tqdm.auto import tqdm as pbar_type
-        elif pbar_type.lower() == "tqdm_notebook":
-            from tqdm.notebook import tqdm as pbar_type
-        elif pbar_type.lower() == "tqdm_gui":
-            from tqdm.gui import tqdm as pbar_type
-        elif pbar_type.lower() == "tqdm":
-            from tqdm import tqdm as pbar_type
+        if bar_type is None:
+            bar_type = pbar_cfg["type"]
+        if bar_type.lower() == "tqdm_auto":
+            from tqdm.auto import tqdm as bar_type
+        elif bar_type.lower() == "tqdm_notebook":
+            from tqdm.notebook import tqdm as bar_type
+        elif bar_type.lower() == "tqdm_gui":
+            from tqdm.gui import tqdm as bar_type
+        elif bar_type.lower() == "tqdm":
+            from tqdm import tqdm as bar_type
         else:
-            raise ValueError(f"pbar_type cannot be '{pbar_type}'")
-        if pbar_cfg["disable"]:
+            raise ValueError(f"Invalid option bar_type='{bar_type}'")
+        if reuse is None:
+            reuse = pbar_cfg["reuse"]
+        if disable is not None:
+            if show_progress is not None:
+                if disable or not show_progress:
+                    show_progress = False
+                else:
+                    show_progress = True
+            else:
+                show_progress = not disable
+        else:
+            if pbar_cfg["disable"]:
+                show_progress = False
+            if show_progress is None:
+                show_progress = True
+        if pbar_cfg["disable_machinery"]:
             show_progress = False
-        if show_progress is None:
-            show_progress = True
         kwargs = merge_dicts(pbar_cfg["kwargs"], kwargs)
-        if pbar_cfg["disable_desc"]:
+        if pbar_cfg["disable_desc"] or pbar_cfg["disable_machinery"]:
             show_progress_desc = False
         if show_progress_desc is None:
             show_progress_desc = True
         desc_kwargs = merge_dicts(pbar_cfg["desc_kwargs"], desc_kwargs)
+        if pbar_cfg["disable_registry"] or pbar_cfg["disable_machinery"]:
+            registry = None
+        if silence_warnings is None:
+            silence_warnings = pbar_cfg["silence_warnings"]
 
-        self._pbar_type = pbar_type
+        self._iterable = iterable
+        self._bar_type = bar_type
+        self._reuse = reuse
         self._show_progress = show_progress
-        self._args = args
         self._kwargs = kwargs
         self._show_progress_desc = show_progress_desc
         self._desc_kwargs = desc_kwargs
-        self._pbar = None
+        self._registry = registry
+        self._silence_warnings = silence_warnings
+
+        self._bar_id = bar_id
+        self._bar = None
+        self._open_time = None
+        self._update_time = None
+        self._close_time = None
 
     @property
-    def pbar_type(self) -> tp.Type[tqdm]:
-        """Progess bar type."""
-        return self._pbar_type
+    def bar_type(self) -> tp.Type[tqdm]:
+        """Bar type."""
+        return self._bar_type
+
+    @property
+    def reuse(self) -> bool:
+        """Whether the bar can be reused."""
+        return self._reuse
 
     @property
     def show_progress(self) -> bool:
-        """Whether show the progress bar."""
+        """Whether to show the bar."""
         return self._show_progress
 
     @property
-    def args(self) -> tp.Args:
-        """Positional arguments passed to the progress bar."""
-        return self._args
+    def iterable(self) -> tp.Optional[tp.Iterable]:
+        """Iterable."""
+        return self._iterable
 
     @property
     def kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to the progress bar."""
+        """Keyword arguments passed to initialize the bar."""
         return self._kwargs
 
     @property
     def show_progress_desc(self) -> bool:
-        """Whether show the progress bar description."""
+        """Whether show the bar description."""
         return self._show_progress_desc
 
     @property
@@ -110,9 +146,202 @@ class ProgressBar:
         return self._desc_kwargs
 
     @property
-    def pbar(self) -> tp.Optional[tqdm]:
-        """Progress bar."""
-        return self._pbar
+    def registry(self) -> tp.Optional[PBarRegistry]:
+        """Registry of type `vectorbtpro.registries.pbar_registry.PBarRegistry`.
+
+        If None, registry is disabled."""
+        return self._registry
+
+    @property
+    def silence_warnings(self) -> bool:
+        """Whether to silence warnings."""
+        return self._silence_warnings
+
+    @property
+    def bar_id(self) -> tp.Optional[tp.Hashable]:
+        """Bar id."""
+        return self._bar_id
+
+    @property
+    def bar(self) -> tp.Optional[tqdm]:
+        """Bar."""
+        return self._bar
+
+    @property
+    def open_time(self) -> tp.Optional[int]:
+        """Time the bar was opened."""
+        return self._open_time
+
+    @property
+    def update_time(self) -> tp.Optional[int]:
+        """Time the bar was updated."""
+        return self._update_time
+
+    @property
+    def close_time(self) -> tp.Optional[int]:
+        """Time the bar was closed."""
+        return self._close_time
+
+    def set_bar(self, bar: tp.Optional[tqdm] = None) -> None:
+        """Set the bar."""
+        if bar is None:
+            bar = self.bar_type(self.iterable, disable=not self.show_progress, **self.kwargs)
+        self._bar = bar
+
+    def remove_bar(self) -> None:
+        """Remove the bar."""
+        self._bar = None
+
+    def reset(self) -> None:
+        """Reset the bar."""
+        for pbar in self.registry.get_parent_instances(self):
+            if not pbar.disabled and not pbar.displayed:
+                pbar.refresh()  # refresh parents first
+        self.bar.iterable = self.iterable
+        self.bar.delay = 0
+        self.bar.reset(total=self.kwargs.get("total", None))  # tqdm-forced refresh
+
+    def open(self, reuse: tp.Optional[bool] = None) -> None:
+        """Open the bar."""
+        if self.bar is None:
+            self._open_time = utc_time()
+            if self.registry is None:
+                self.set_bar()
+            else:
+                if reuse is None:
+                    reuse = self.reuse
+                if reuse and self.registry.has_conflict(self):
+                    new_bar_id = self.registry.generate_bar_id()
+                    if isinstance(self.bar_id, str):
+                        bar_id = f"'{self.bar_id}'"
+                    else:
+                        bar_id = self.bar_id
+                    if not self.silence_warnings:
+                        warnings.warn(
+                            f"Two active progress bars share the same bar id {bar_id}. "
+                            f"Setting bar id of the new progress bar to '{new_bar_id}'."
+                        )
+                    self._bar_id = new_bar_id
+                pending_bar = self.registry.get_pending_instance(self)
+                if reuse and pending_bar is not None:
+                    self.set_bar(bar=pending_bar.bar)
+                    pending_bar.remove_bar()
+                    self.registry.deregister_instance(pending_bar)
+                    self.reset()
+                else:
+                    if self.bar_id is None:
+                        self._bar_id = self.registry.generate_bar_id()
+                    self.set_bar()
+                self.registry.register_instance(self)
+
+    def close(self, reuse: tp.Optional[bool] = None, close_children: bool = True) -> None:
+        """Close the bar."""
+        if self.bar is not None:
+            self._close_time = utc_time()
+            if self.registry is None:
+                if not self.disabled:
+                    self.bar.close()
+                self.remove_bar()
+            else:
+                if reuse is None:
+                    if not self.should_display:
+                        reuse = False
+                    else:
+                        reuse = self.reuse
+                parent_pbar = self.registry.get_parent_instance(self)
+                if not reuse or parent_pbar is None:
+                    if close_children:
+                        for pbar in self.registry.get_child_instances(self):
+                            pbar.close(reuse=False, close_children=False)
+                    if not self.disabled:
+                        self.bar.close()
+                    self.remove_bar()
+                    self.registry.deregister_instance(self)
+
+    @property
+    def active(self) -> bool:
+        """Whether the bar is active."""
+        return self.bar is not None and self.close_time is None
+
+    @property
+    def pending(self) -> bool:
+        """Whether the bar is pending."""
+        return self.bar is not None and self.close_time is not None
+
+    @property
+    def disabled(self) -> bool:
+        """Whether the bar is disabled."""
+        if self.bar is None:
+            if self.bar_id is not None:
+                if isinstance(self.bar_id, str):
+                    bar_id = f"'{self.bar_id}'"
+                else:
+                    bar_id = self.bar_id
+                raise ValueError(f'Progress bar with bar id {bar_id} must be opened first. Use "with" statement.')
+            else:
+                raise ValueError('Progress bar must be opened first. Use "with" statement.')
+        if self.bar.disable:
+            return True
+        return False
+
+    @property
+    def displayed(self) -> bool:
+        """Whether the bar is displayed."""
+        if self.disabled:
+            return False
+        if self.bar.delay == 0:
+            return True
+        delay_end_t = self.bar.start_t + self.bar.delay
+        return self.bar.last_print_t >= delay_end_t
+
+    @property
+    def should_display(self) -> bool:
+        """Whether the bar should be displayed."""
+        if self.disabled:
+            return False
+        if self.bar.delay == 0:
+            return True
+        delay_end_t = self.bar.start_t + self.bar.delay
+        if self.bar.last_print_t >= delay_end_t:
+            return True
+        if utc_time() >= delay_end_t:
+            return True
+        return False
+
+    def refresh(self) -> None:
+        """Refresh the bar."""
+        self.bar.refresh()
+
+    def before_update(self) -> None:
+        """Do something before an update."""
+        if self.disabled:
+            return
+        should_display = self.should_display
+        if self.registry is not None:
+            for pbar in self.registry.get_parent_instances(self):
+                if not pbar.disabled and not pbar.displayed:
+                    if should_display or pbar.should_display:
+                        pbar.refresh()
+
+    def update(self, n: int = 1) -> None:
+        """Update with one or more iterations."""
+        if self.disabled:
+            return
+        self.before_update()
+        self.bar.update(n=n)
+        self._update_time = utc_time()
+        self.after_update()
+
+    def update_to(self, n: int) -> None:
+        """Update to a specific number."""
+        if self.disabled:
+            return
+        self.update(n=n - self.bar.n)
+
+    def after_update(self) -> None:
+        """Do something after an update."""
+        if self.disabled:
+            return
 
     def prepare_desc(self, desc: tp.Union[None, str, dict]) -> str:
         """Prepare description."""
@@ -124,7 +353,7 @@ class ProgressBar:
                 if v is MISSING:
                     continue
                 if isinstance(v, Number):
-                    v = self.pbar.format_num(v)
+                    v = self.bar.format_num(v)
                 if not isinstance(v, str):
                     v = str(v)
                 v = v.strip()
@@ -132,42 +361,54 @@ class ProgressBar:
                     new_desc.append(v)
                 else:
                     new_desc.append(k + "=" + v)
-            return ', '.join(new_desc)
+            return ", ".join(new_desc)
         return str(desc)
 
     def set_prefix(self, desc: tp.Union[None, str, dict], refresh: tp.Optional[bool] = None) -> None:
         """Set prefix.
 
         Prepares it with `ProgressBar.prepare_desc`."""
-        if self.show_progress_desc:
-            desc = self.prepare_desc(desc)
-            if refresh is None:
-                refresh = self.desc_kwargs.get("refresh", True)
-            self.pbar.set_description_str(desc, refresh=refresh)
+        if self.disabled or not self.show_progress_desc:
+            return
+        desc = self.prepare_desc(desc)
+        self.bar.set_description_str(desc, refresh=False)
+        if refresh is None:
+            refresh = self.desc_kwargs.get("refresh", True)
+        if refresh:
+            self.refresh()
 
     def set_prefix_str(self, desc: str, refresh: tp.Optional[bool] = None) -> None:
         """Set prefix without preparation."""
-        if self.show_progress_desc:
-            if refresh is None:
-                refresh = self.desc_kwargs.get("refresh", True)
-            self.pbar.set_description_str(desc, refresh=refresh)
+        if self.disabled or not self.show_progress_desc:
+            return
+        self.bar.set_description_str(desc, refresh=False)
+        if refresh is None:
+            refresh = self.desc_kwargs.get("refresh", True)
+        if refresh:
+            self.refresh()
 
     def set_postfix(self, desc: tp.Union[None, str, dict], refresh: tp.Optional[bool] = None) -> None:
         """Set postfix.
 
         Prepares it with `ProgressBar.prepare_desc`."""
-        if self.show_progress_desc:
-            desc = self.prepare_desc(desc)
-            if refresh is None:
-                refresh = self.desc_kwargs.get("refresh", True)
-            self.pbar.set_postfix_str(desc, refresh=refresh)
+        if self.disabled or not self.show_progress_desc:
+            return
+        desc = self.prepare_desc(desc)
+        self.bar.set_postfix_str(desc, refresh=False)
+        if refresh is None:
+            refresh = self.desc_kwargs.get("refresh", True)
+        if refresh:
+            self.refresh()
 
     def set_postfix_str(self, desc: str, refresh: tp.Optional[bool] = None) -> None:
         """Set postfix without preparation."""
-        if self.show_progress_desc:
-            if refresh is None:
-                refresh = self.desc_kwargs.get("refresh", True)
-            self.pbar.set_postfix_str(desc, refresh=refresh)
+        if self.disabled or not self.show_progress_desc:
+            return
+        self.bar.set_postfix_str(desc, refresh=False)
+        if refresh is None:
+            refresh = self.desc_kwargs.get("refresh", True)
+        if refresh:
+            self.refresh()
 
     def set_description(
         self,
@@ -181,13 +422,14 @@ class ProgressBar:
         Otherwise, uses the method `ProgressBar.set_postfix`.
 
         Uses `ProgressBar.desc_kwargs` as keyword arguments."""
-        if self.show_progress_desc:
-            if as_postfix is None:
-                as_postfix = self.desc_kwargs.get("as_postfix", True)
-            if as_postfix:
-                self.set_postfix(desc, refresh=refresh)
-            else:
-                self.set_prefix(desc, refresh=refresh)
+        if self.disabled or not self.show_progress_desc:
+            return
+        if as_postfix is None:
+            as_postfix = self.desc_kwargs.get("as_postfix", True)
+        if as_postfix:
+            self.set_postfix(desc, refresh=refresh)
+        else:
+            self.set_prefix(desc, refresh=refresh)
 
     def set_description_str(
         self,
@@ -201,42 +443,45 @@ class ProgressBar:
         Otherwise, uses the method `ProgressBar.set_postfix_str`.
 
         Uses `ProgressBar.desc_kwargs` as keyword arguments."""
-        if self.show_progress_desc:
-            if as_postfix is None:
-                as_postfix = self.desc_kwargs.get("as_postfix", True)
-            if as_postfix:
-                self.set_postfix_str(desc, refresh=refresh)
-            else:
-                self.set_prefix_str(desc, refresh=refresh)
-
-    def __bool__(self) -> bool:
-        return self.pbar.__bool__()
-
-    def __len__(self) -> int:
-        return self.pbar.__len__()
-
-    def __reversed__(self) -> tp.Iterator:
-        return self.pbar.__reversed__()
-
-    def __contains__(self, item: tp.Any) -> bool:
-        return self.pbar.__contains__(item)
+        if self.disabled or not self.show_progress_desc:
+            return
+        if as_postfix is None:
+            as_postfix = self.desc_kwargs.get("as_postfix", True)
+        if as_postfix:
+            self.set_postfix_str(desc, refresh=refresh)
+        else:
+            self.set_prefix_str(desc, refresh=refresh)
 
     def __enter__(self: ProgressBarT) -> ProgressBarT:
-        self._pbar = self.pbar_type(*self.args, disable=not self.show_progress, **self.kwargs)
+        self.open()
         return self
 
     def __exit__(self, *args) -> None:
-        self.pbar.close()
+        self.close()
 
-    def __del__(self) -> None:
-        return self.pbar.__del__()
+    def __len__(self) -> int:
+        return self.bar.__len__()
+
+    def __contains__(self, item: tp.Any) -> bool:
+        return self.bar.__contains__(item)
 
     def __iter__(self) -> tp.Iterator:
-        return self.pbar.__iter__()
+        if self.bar is None:
+            self.open()
+        if self.disabled:
+            return self.bar.__iter__()
+        for i, obj in enumerate(self.bar.__iter__()):
+            if i > 0:
+                self._update_time = utc_time()
+                self.after_update()
+            yield obj
+            self.before_update()
+        self._update_time = utc_time()
+        self.after_update()
+        self.close()
 
-    def __getattr__(self, k: str) -> tp.Any:
-        pbar = object.__getattribute__(self, "pbar")
-        return getattr(pbar, k)
+    def __del__(self) -> None:
+        self.close()
 
 
 ProgressHiddenT = tp.TypeVar("ProgressHiddenT", bound="ProgressHidden")
@@ -245,21 +490,40 @@ ProgressHiddenT = tp.TypeVar("ProgressHiddenT", bound="ProgressHidden")
 class ProgressHidden:
     """Context manager to hide progress."""
 
-    def __init__(self) -> None:
-        self._init_disable = None
+    def __init__(self, disable_registry: bool = True, disable_machinery: bool = True) -> None:
+        self._disable_registry = disable_registry
+        self._disable_machinery = disable_machinery
+        self._init_settings = None
 
     @property
-    def init_disable(self) -> tp.Optional[bool]:
-        """Initial `disable` value."""
-        return self._init_disable
+    def disable_registry(self) -> bool:
+        """Whether to disable registry."""
+        return self._disable_registry
+
+    @property
+    def disable_machinery(self) -> bool:
+        """Whether to disable machinery."""
+        return self._disable_machinery
+
+    @property
+    def init_settings(self) -> tp.Kwargs:
+        """Initial settings."""
+        return self._init_settings
 
     def __enter__(self: ProgressHiddenT) -> ProgressHiddenT:
         from vectorbtpro._settings import settings
 
         pbar_cfg = settings["pbar"]
 
-        self._init_disable = pbar_cfg["disable"]
+        self._init_settings = dict(
+            disable=pbar_cfg["disable"],
+            disable_registry=pbar_cfg["disable_registry"],
+            disable_machinery=pbar_cfg["disable_machinery"],
+        )
+
         pbar_cfg["disable"] = True
+        pbar_cfg["disable_registry"] = self.disable_registry
+        pbar_cfg["disable_machinery"] = self.disable_machinery
 
         return self
 
@@ -268,7 +532,9 @@ class ProgressHidden:
 
         pbar_cfg = settings["pbar"]
 
-        pbar_cfg["disable"] = self.init_disable
+        pbar_cfg["disable"] = self.init_settings["disable"]
+        pbar_cfg["disable_registry"] = self.init_settings["disable_registry"]
+        pbar_cfg["disable_machinery"] = self.init_settings["disable_machinery"]
 
 
 def with_progress_hidden(*args) -> tp.Callable:
@@ -295,21 +561,40 @@ ProgressShownT = tp.TypeVar("ProgressShownT", bound="ProgressShown")
 class ProgressShown:
     """Context manager to show progress."""
 
-    def __init__(self) -> None:
-        self._init_disable = None
+    def __init__(self, enable_registry: bool = True, enable_machinery: bool = True) -> None:
+        self._enable_registry = enable_registry
+        self._enable_machinery = enable_machinery
+        self._init_settings = None
 
     @property
-    def init_disable(self) -> tp.Optional[bool]:
-        """Initial `disable` value."""
-        return self._init_disable
+    def enable_registry(self) -> bool:
+        """Whether to enable registry."""
+        return self._enable_registry
+
+    @property
+    def enable_machinery(self) -> bool:
+        """Whether to enable machinery."""
+        return self._enable_machinery
+
+    @property
+    def init_settings(self) -> tp.Kwargs:
+        """Initial settings."""
+        return self._init_settings
 
     def __enter__(self: ProgressShownT) -> ProgressShownT:
         from vectorbtpro._settings import settings
 
         pbar_cfg = settings["pbar"]
 
-        self._init_disable = pbar_cfg["disable"]
+        self._init_settings = dict(
+            disable=pbar_cfg["disable"],
+            disable_registry=pbar_cfg["disable_registry"],
+            disable_machinery=pbar_cfg["disable_machinery"],
+        )
+
         pbar_cfg["disable"] = False
+        pbar_cfg["disable_registry"] = not self.enable_registry
+        pbar_cfg["disable_machinery"] = not self.enable_machinery
 
         return self
 
@@ -318,7 +603,9 @@ class ProgressShown:
 
         pbar_cfg = settings["pbar"]
 
-        pbar_cfg["disable"] = self.init_disable
+        pbar_cfg["disable"] = self.init_settings["disable"]
+        pbar_cfg["disable_registry"] = self.init_settings["disable_registry"]
+        pbar_cfg["disable_machinery"] = self.init_settings["disable_machinery"]
 
 
 def with_progress_shown(*args) -> tp.Callable:

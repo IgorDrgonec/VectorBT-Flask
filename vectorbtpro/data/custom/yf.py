@@ -132,7 +132,9 @@ class YFData(RemoteData):
         split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "W":
+            if unit == "D":
+                unit = "d"
+            elif unit == "W":
                 unit = "wk"
             elif unit == "M":
                 unit = "mo"

@@ -331,6 +331,8 @@ class CCXTData(RemoteData):
         )
         show_progress = cls.resolve_exchange_setting(show_progress, "show_progress", exchange_name=exchange_name)
         pbar_kwargs = cls.resolve_exchange_setting(pbar_kwargs, "pbar_kwargs", merge=True, exchange_name=exchange_name)
+        if "bar_id" not in pbar_kwargs:
+            pbar_kwargs["bar_id"] = "ccxt"
         silence_warnings = cls.resolve_exchange_setting(
             silence_warnings, "silence_warnings", exchange_name=exchange_name
         )
@@ -344,7 +346,9 @@ class CCXTData(RemoteData):
         split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "W":
+            if unit == "D":
+                unit = "d"
+            elif unit == "W":
                 unit = "w"
             elif unit == "Y":
                 unit = "y"
@@ -415,7 +419,7 @@ class CCXTData(RemoteData):
         data = []
         try:
             with ProgressBar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description("{}→?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
+                pbar.set_description("{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)

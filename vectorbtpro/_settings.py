@@ -1770,14 +1770,18 @@ _settings["messaging"] = messaging
 pbar = frozen_cfg(
     disable=False,
     disable_desc=False,
+    disable_registry=False,
+    disable_machinery=False,
     type="tqdm_auto",
+    reuse=True,
     kwargs=flex_cfg(
-        delay=1,
+        delay=2,
     ),
     desc_kwargs=flex_cfg(
         as_postfix=True,
         refresh=False,
     ),
+    silence_warnings=False,
 )
 """_"""
 

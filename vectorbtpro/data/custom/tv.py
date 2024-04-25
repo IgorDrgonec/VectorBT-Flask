@@ -880,7 +880,7 @@ class TVData(RemoteData):
             interval = str(multiplier)
         elif unit == "h":
             interval = f"{str(multiplier)}H"
-        elif unit == "d":
+        elif unit == "D":
             interval = f"{str(multiplier)}D"
         elif unit == "W":
             interval = f"{str(multiplier)}W"
