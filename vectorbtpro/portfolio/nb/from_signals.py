@@ -6060,7 +6060,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
             )
             post_segment_func_nb(post_segment_ctx, *post_segment_args)
 
-            if i >= sim_end_[group]:
+            if i >= sim_end_[group] - 1:
                 break
 
     return prepare_sim_out_nb(

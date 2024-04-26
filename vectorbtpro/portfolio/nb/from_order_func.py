@@ -1485,7 +1485,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
 
-            if i >= sim_end_[group]:
+            if i >= sim_end_[group] - 1:
                 break
 
         # Call function after the group
@@ -2564,7 +2564,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
         sim_end_reached = True
         for group in range(len(group_lens)):
-            if i < sim_end_[group]:
+            if i < sim_end_[group] - 1:
                 sim_end_reached = False
                 break
         if sim_end_reached:
@@ -3599,7 +3599,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
 
-            if i >= sim_end_[group]:
+            if i >= sim_end_[group] - 1:
                 break
 
         # Call function after the group
@@ -4575,7 +4575,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
         sim_end_reached = True
         for group in range(len(group_lens)):
-            if i < sim_end_[group]:
+            if i < sim_end_[group] - 1:
                 sim_end_reached = False
                 break
         if sim_end_reached:

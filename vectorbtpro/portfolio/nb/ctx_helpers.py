@@ -699,3 +699,48 @@ def get_position_records_nb(
     col_map = records_nb.col_map_nb(exit_trade_records["col"], c.target_shape[1])
     position_records = pf_records_nb.get_positions_nb(exit_trade_records, col_map)
     return position_records
+
+
+# ############# Simulation ############# #
+
+
+@register_jitted
+def start_sim_nb(
+    c: tp.Union[
+        SegmentContext,
+        OrderContext,
+        PostOrderContext,
+        FlexOrderContext,
+        SignalSegmentContext,
+        SignalContext,
+        PostSignalContext,
+    ],
+    group: tp.Optional[int] = None,
+) -> None:
+    """Start simulation in the current group."""
+    if group is None:
+        _group = c.group
+    else:
+        _group = group
+    c.sim_start[_group] = c.i
+
+
+@register_jitted
+def end_sim_nb(
+    c: tp.Union[
+        SegmentContext,
+        OrderContext,
+        PostOrderContext,
+        FlexOrderContext,
+        SignalSegmentContext,
+        SignalContext,
+        PostSignalContext,
+    ],
+    group: tp.Optional[int] = None,
+) -> None:
+    """Stop simulation in the current group."""
+    if group is None:
+        _group = c.group
+    else:
+        _group = group
+    c.sim_end[_group] = c.i + 1
