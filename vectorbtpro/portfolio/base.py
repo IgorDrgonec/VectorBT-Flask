@@ -941,7 +941,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             raise ValueError(f"Grouping '{grouping}' is not supported")
 
         if obj_type is None and checks.is_np_array(obj):
-            n_cols = wrapper.get_shape_2d(group_by=obj_group_by)[1]
             if to_2d_shape(objs[0].shape) == wrappers[0].get_shape_2d(group_by=obj_group_by):
                 can_stack = True
                 reduced = False

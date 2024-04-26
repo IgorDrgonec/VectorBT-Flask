@@ -1971,10 +1971,6 @@ class FOFPreparer(BasePFPreparer):
         sim_start = self["sim_start"]
         if sim_start is None:
             return None
-        if self.row_wise:
-            if checks.is_complex_sequence(sim_start):
-                raise ValueError("Simulation start must be a scalar in a row-wise simulation mode")
-            return self.prepare_sim_start_value(sim_start)
         return BasePFPreparer.sim_start.func(self)
 
     @cachedproperty
@@ -1982,10 +1978,6 @@ class FOFPreparer(BasePFPreparer):
         sim_end = self["sim_end"]
         if sim_end is None:
             return None
-        if self.row_wise:
-            if checks.is_complex_sequence(sim_end):
-                raise ValueError("Simulation end must be a scalar in a row-wise simulation mode")
-            return self.prepare_sim_end_value(sim_end)
         return BasePFPreparer.sim_end.func(self)
 
     @cachedproperty

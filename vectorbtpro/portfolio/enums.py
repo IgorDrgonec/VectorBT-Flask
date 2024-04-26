@@ -1016,19 +1016,29 @@ class AccountState(tp.NamedTuple):
 
 
 __pdoc__["AccountState"] = "State of the account."
-__pdoc__["AccountState.cash"] = """Cash. 
+__pdoc__[
+    "AccountState.cash"
+] = """Cash. 
 
 Per group with cash sharing, otherwise per column."""
-__pdoc__["AccountState.position"] = """Position. 
+__pdoc__[
+    "AccountState.position"
+] = """Position. 
 
 Per column."""
-__pdoc__["AccountState.debt"] = """Debt. 
+__pdoc__[
+    "AccountState.debt"
+] = """Debt. 
 
 Per column."""
-__pdoc__["AccountState.locked_cash"] = """Locked cash.
+__pdoc__[
+    "AccountState.locked_cash"
+] = """Locked cash.
 
 Per column."""
-__pdoc__["AccountState.free_cash"] = """Free cash. 
+__pdoc__[
+    "AccountState.free_cash"
+] = """Free cash. 
 
 Per group with cash sharing, otherwise per column."""
 
@@ -1065,16 +1075,24 @@ class SimulationOutput(tp.NamedTuple):
 __pdoc__["SimulationOutput"] = "A named tuple representing the output of a simulation."
 __pdoc__["SimulationOutput.order_records"] = "Order records (flattened)."
 __pdoc__["SimulationOutput.log_records"] = "Log records (flattened)."
-__pdoc__["SimulationOutput.cash_deposits"] = """Cash deposited/withdrawn at each timestamp.
+__pdoc__[
+    "SimulationOutput.cash_deposits"
+] = """Cash deposited/withdrawn at each timestamp.
 
-If not tracked, becomes shape `(0, 0)`."""
-__pdoc__["SimulationOutput.cash_earnings"] = """Cash earnings added/removed at each timestamp.
+If not tracked, becomes zero of shape `(1, 1)`."""
+__pdoc__[
+    "SimulationOutput.cash_earnings"
+] = """Cash earnings added/removed at each timestamp.
 
-If not tracked, becomes shape `(0, 0)`."""
-__pdoc__["SimulationOutput.call_seq"] = """Call sequence.
+If not tracked, becomes zero of shape `(1, 1)`."""
+__pdoc__[
+    "SimulationOutput.call_seq"
+] = """Call sequence.
 
 If not tracked, becomes None."""
-__pdoc__["SimulationOutput.in_outputs"] = """Named tuple with in-output objects.
+__pdoc__[
+    "SimulationOutput.in_outputs"
+] = """Named tuple with in-output objects.
 
 If not tracked, becomes None."""
 
@@ -1103,9 +1121,14 @@ class SimulationContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -1114,9 +1137,10 @@ class SimulationContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
 
 
 __pdoc__[
@@ -1286,9 +1310,7 @@ __pdoc__[
 If datetime-like, assumed to have the UTC timezone. Preset simulation methods
 will automatically format any index as UTC without actually converting it to UTC, that is, 
 `12:00 +02:00` will become `12:00 +00:00` to avoid timezone conversion issues."""
-__pdoc__[
-    "SimulationContext.freq"
-] = """Frequency of index in integer (nanosecond) format."""
+__pdoc__["SimulationContext.freq"] = """Frequency of index in integer (nanosecond) format."""
 __pdoc__[
     "SimulationContext.open"
 ] = """Opening price.
@@ -1383,10 +1405,33 @@ Example:
     ```
 """
 __pdoc__[
+    "SimulationContext.order_counts"
+] = """Number of filled order records in each column.
+
+Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
+
+Example:
+    `order_counts` of `np.array([2, 100, 0])` means the latest filled order is `order_records[1, 0]` in the
+    first column, `order_records[99, 1]` in the second column, and no orders have been filled yet
+    in the third column (`order_records[0, 2]` is empty).
+
+    !!! note
+        Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
+"""
+__pdoc__[
     "SimulationContext.log_records"
 ] = """Log records per column.
 
 Similar to `SimulationContext.order_records` but of type `log_dt` and count `SimulationContext.log_counts`."""
+__pdoc__[
+    "SimulationContext.log_counts"
+] = """Number of filled log records in each column.
+
+Similar to `SimulationContext.log_counts` but for log records.
+
+!!! note
+    Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
+"""
 __pdoc__[
     "SimulationContext.in_outputs"
 ] = """Named tuple with in-output objects.
@@ -1513,29 +1558,6 @@ Gets updated each time `SimulationContext.last_value` is updated.
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
 __pdoc__[
-    "SimulationContext.order_counts"
-] = """Number of filled order records in each column.
-
-Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
-
-Example:
-    `order_counts` of `np.array([2, 100, 0])` means the latest filled order is `order_records[1, 0]` in the
-    first column, `order_records[99, 1]` in the second column, and no orders have been filled yet
-    in the third column (`order_records[0, 2]` is empty).
-    
-    !!! note
-        Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
-"""
-__pdoc__[
-    "SimulationContext.log_counts"
-] = """Number of filled log records in each column.
-
-Similar to `SimulationContext.log_counts` but for log records.
-
-!!! note
-    Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
-"""
-__pdoc__[
     "SimulationContext.last_pos_info"
 ] = """Latest position record in each column.
 
@@ -1557,6 +1579,16 @@ right after `order_func_nb`, and right before `post_segment_func_nb`.
     In an open position record, the field `exit_price` doesn't reflect the latest valuation price,
     but keeps the average price at which the position has been reduced.
 """
+__pdoc__[
+    "SimulationContext.sim_start"
+] = """Start of the simulation per column or group (also without cash sharing).
+
+Changing in-place won't apply to the current simulation."""
+__pdoc__[
+    "SimulationContext.sim_start"
+] = """End of the simulation per column or group (also without cash sharing).
+
+Changing in-place will apply to the current simulation if it's lower than the initial value."""
 
 
 class GroupContext(tp.NamedTuple):
@@ -1583,9 +1615,14 @@ class GroupContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -1594,9 +1631,11 @@ class GroupContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     group: int
     group_len: int
     from_col: int
@@ -1681,9 +1720,14 @@ class RowContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -1692,9 +1736,11 @@ class RowContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     i: int
 
 
@@ -1743,9 +1789,14 @@ class SegmentContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -1754,14 +1805,17 @@ class SegmentContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     group: int
     group_len: int
     from_col: int
     to_col: int
     i: int
+
     call_seq_now: tp.Optional[tp.Array1d]
 
 
@@ -1824,9 +1878,14 @@ class OrderContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -1835,15 +1894,19 @@ class OrderContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     group: int
     group_len: int
     from_col: int
     to_col: int
     i: int
+
     call_seq_now: tp.Optional[tp.Array1d]
+
     col: int
     call_idx: int
     cash_now: float
@@ -1921,9 +1984,14 @@ class PostOrderContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -1932,15 +2000,19 @@ class PostOrderContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     group: int
     group_len: int
     from_col: int
     to_col: int
     i: int
+
     call_seq_now: tp.Optional[tp.Array1d]
+
     col: int
     call_idx: int
     cash_before: float
@@ -2040,9 +2112,14 @@ class FlexOrderContext(tp.NamedTuple):
     update_value: bool
     fill_pos_info: bool
     track_value: bool
+
     order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
     log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
     in_outputs: tp.Optional[tp.NamedTuple]
+
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
@@ -2051,9 +2128,11 @@ class FlexOrderContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    order_counts: tp.Array1d
-    log_counts: tp.Array1d
     last_pos_info: tp.RecordArray
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     group: int
     group_len: int
     from_col: int
@@ -2292,6 +2371,9 @@ class SignalSegmentContext(tp.NamedTuple):
     last_td_info: tp.Array1d
     last_dt_info: tp.Array1d
 
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
+
     group: int
     group_len: int
     from_col: int
@@ -2308,62 +2390,58 @@ internal information that is not passed by the user but created at the beginning
 To make use of other information, such as order size, use templates.
 
 Passed to `post_segment_func_nb`."""
-__pdoc__["SignalSegmentContext.target_shape"] = "See `SimulationContext.target_shape`."
-__pdoc__["SignalSegmentContext.group_lens"] = "See `SimulationContext.group_lens`."
-__pdoc__["SignalSegmentContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
-__pdoc__["SignalSegmentContext.index"] = "See `SimulationContext.index`."
-__pdoc__["SignalSegmentContext.freq"] = "See `SimulationContext.freq`."
-__pdoc__["SignalSegmentContext.open"] = "See `SimulationContext.open`."
-__pdoc__["SignalSegmentContext.high"] = "See `SimulationContext.high`."
-__pdoc__["SignalSegmentContext.low"] = "See `SimulationContext.low`."
-__pdoc__["SignalSegmentContext.close"] = "See `SimulationContext.close`."
-__pdoc__["SignalSegmentContext.init_cash"] = "See `SimulationContext.init_cash`."
-__pdoc__["SignalSegmentContext.init_position"] = "See `SimulationContext.init_position`."
-__pdoc__["SignalSegmentContext.init_price"] = "See `SimulationContext.init_price`."
-__pdoc__["SignalSegmentContext.order_records"] = "See `SimulationContext.order_records`."
-__pdoc__["SignalSegmentContext.order_counts"] = "See `SimulationContext.order_counts`."
-__pdoc__["SignalSegmentContext.log_records"] = "See `SimulationContext.log_records`."
-__pdoc__["SignalSegmentContext.log_counts"] = "See `SimulationContext.log_counts`."
-__pdoc__["SignalSegmentContext.track_cash_deposits"] = """Whether to track cash deposits.
+for field in SignalSegmentContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__["SignalSegmentContext." + field] = f"See `SimulationContext.{field}`."
+for field in SignalSegmentContext._fields:
+    if field in GroupContext._fields:
+        __pdoc__["SignalSegmentContext." + field] = f"See `GroupContext.{field}`."
+for field in SignalSegmentContext._fields:
+    if field in RowContext._fields:
+        __pdoc__["SignalSegmentContext." + field] = f"See `RowContext.{field}`."
+__pdoc__[
+    "SignalSegmentContext.track_cash_deposits"
+] = """Whether to track cash deposits.
 
 Becomes True if any value in `cash_deposits` is not zero."""
 __pdoc__["SignalSegmentContext.cash_deposits_out"] = "See `SimulationOutput.cash_deposits`."
-__pdoc__["SignalSegmentContext.track_cash_earnings"] = """Whether to track cash earnings.
+__pdoc__[
+    "SignalSegmentContext.track_cash_earnings"
+] = """Whether to track cash earnings.
 
 Becomes True if any value in `cash_earnings` is not zero."""
 __pdoc__["SignalSegmentContext.cash_earnings_out"] = "See `SimulationOutput.cash_earnings`."
 __pdoc__["SignalSegmentContext.in_outputs"] = "See `FSInOutputs`."
-__pdoc__["SignalSegmentContext.last_cash"] = "See `SimulationContext.last_cash`."
-__pdoc__["SignalSegmentContext.last_position"] = "See `SimulationContext.last_position`."
-__pdoc__["SignalSegmentContext.last_debt"] = "See `SimulationContext.last_debt`."
-__pdoc__["SignalSegmentContext.last_free_cash"] = "See `SimulationContext.last_free_cash`."
-__pdoc__["SignalSegmentContext.last_val_price"] = "See `SimulationContext.last_val_price`."
-__pdoc__["SignalSegmentContext.last_value"] = "See `SimulationContext.last_value`."
-__pdoc__["SignalSegmentContext.last_return"] = "See `SimulationContext.last_return`."
-__pdoc__["SignalSegmentContext.last_pos_info"] = "See `SimulationContext.last_pos_info`."
-__pdoc__["SignalSegmentContext.last_limit_info"] = """Record of type `limit_info_dt` per column.
+__pdoc__[
+    "SignalSegmentContext.last_limit_info"
+] = """Record of type `limit_info_dt` per column.
 
 Accessible via `c.limit_info_dt[field][col]`."""
-__pdoc__["SignalSegmentContext.last_sl_info"] = """Record of type `sl_info_dt` per column.
+__pdoc__[
+    "SignalSegmentContext.last_sl_info"
+] = """Record of type `sl_info_dt` per column.
 
 Accessible via `c.last_sl_info[field][col]`."""
-__pdoc__["SignalSegmentContext.last_tsl_info"] = """Record of type `tsl_info_dt` per column.
+__pdoc__[
+    "SignalSegmentContext.last_tsl_info"
+] = """Record of type `tsl_info_dt` per column.
 
 Accessible via `c.last_tsl_info[field][col]`."""
-__pdoc__["SignalSegmentContext.last_tp_info"] = """Record of type `tp_info_dt` per column.
+__pdoc__[
+    "SignalSegmentContext.last_tp_info"
+] = """Record of type `tp_info_dt` per column.
 
 Accessible via `c.last_tp_info[field][col]`."""
-__pdoc__["SignalSegmentContext.last_td_info"] = """Record of type `time_info_dt` per column.
+__pdoc__[
+    "SignalSegmentContext.last_td_info"
+] = """Record of type `time_info_dt` per column.
 
 Accessible via `c.last_td_info[field][col]`."""
-__pdoc__["SignalSegmentContext.last_dt_info"] = """Record of type `time_info_dt` per column.
+__pdoc__[
+    "SignalSegmentContext.last_dt_info"
+] = """Record of type `time_info_dt` per column.
 
 Accessible via `c.last_dt_info[field][col]`."""
-__pdoc__["SignalSegmentContext.group"] = "See `GroupContext.group`."
-__pdoc__["SignalSegmentContext.group_len"] = "See `GroupContext.group_len`."
-__pdoc__["SignalSegmentContext.from_col"] = "See `GroupContext.from_col`."
-__pdoc__["SignalSegmentContext.to_col"] = "See `GroupContext.to_col`."
-__pdoc__["SignalSegmentContext.i"] = "See `RowContext.i`."
 
 
 class SignalContext(tp.NamedTuple):
@@ -2407,6 +2485,9 @@ class SignalContext(tp.NamedTuple):
     last_tp_info: tp.Array1d
     last_td_info: tp.Array1d
     last_dt_info: tp.Array1d
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
 
     group: int
     group_len: int
@@ -2471,6 +2552,9 @@ class PostSignalContext(tp.NamedTuple):
     last_tp_info: tp.Array1d
     last_td_info: tp.Array1d
     last_dt_info: tp.Array1d
+
+    sim_start: tp.Array1d
+    sim_end: tp.Array1d
 
     group: int
     group_len: int

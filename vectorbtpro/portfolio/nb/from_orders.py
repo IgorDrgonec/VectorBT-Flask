@@ -61,7 +61,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         max_log_records=None,
         skipna=None,
     ),
-    **portfolio_ch.merge_sim_outs_config
+    **portfolio_ch.merge_sim_outs_config,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def from_orders_nb(
@@ -175,16 +175,11 @@ def from_orders_nb(
     val_price_ = to_2d_array_nb(np.asarray(val_price))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-
-    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
+    order_records, log_records = prepare_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     last_cash = prepare_last_cash_nb(
@@ -258,18 +253,20 @@ def from_orders_nb(
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
+    sim_start_, sim_end_ = prepare_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+        _sim_start = sim_start_[group]
+        _sim_end = sim_end_[group]
         for i in range(_sim_start, _sim_end):
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
@@ -502,7 +499,7 @@ def from_orders_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    return prepare_simout_nb(
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,

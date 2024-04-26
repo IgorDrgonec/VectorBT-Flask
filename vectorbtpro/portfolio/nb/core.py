@@ -6,6 +6,7 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
@@ -1723,8 +1724,38 @@ def prepare_last_pos_info_nb(
     return last_pos_info
 
 
+@register_jitted(cache=True)
+def prepare_sim_range_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """Prepare `sim_start` and `sim_end`."""
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
+    sim_start_bc = np.empty(len(group_lens), dtype=np.int_)
+    sim_end_bc = np.empty(len(group_lens), dtype=np.int_)
+    for group in range(len(group_lens)):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+        sim_start_bc[group] = _sim_start
+        sim_end_bc[group] = _sim_end
+    return sim_start_bc, sim_end_bc
+
+
 @register_jitted
-def prepare_simout_nb(
+def prepare_sim_out_nb(
     order_records: tp.RecordArray2d,
     order_counts: tp.Array1d,
     log_records: tp.RecordArray2d,
