@@ -1070,6 +1070,8 @@ class SimulationOutput(tp.NamedTuple):
     cash_earnings: tp.Array2d
     call_seq: tp.Optional[tp.Array2d]
     in_outputs: tp.Optional[tp.NamedTuple]
+    sim_start: tp.Optional[tp.Array1d]
+    sim_end: tp.Optional[tp.Array1d]
 
 
 __pdoc__["SimulationOutput"] = "A named tuple representing the output of a simulation."
@@ -1093,6 +1095,20 @@ If not tracked, becomes None."""
 __pdoc__[
     "SimulationOutput.in_outputs"
 ] = """Named tuple with in-output objects.
+
+If not tracked, becomes None."""
+__pdoc__[
+    "SimulationOutput.sim_start"
+] = """Start of the simulation per column.
+
+Use `vectorbtpro.portfolio.nb.core.prepare_sim_range_out_nb` to ungroup the array.
+
+If not tracked, becomes None."""
+__pdoc__[
+    "SimulationOutput.sim_end"
+] = """End of the simulation per column.
+
+Use `vectorbtpro.portfolio.nb.core.prepare_sim_range_out_nb` to ungroup the array.
 
 If not tracked, becomes None."""
 

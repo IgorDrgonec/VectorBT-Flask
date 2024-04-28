@@ -3359,37 +3359,48 @@ class TestFromOrderFunc:
         _order_size_wide.iloc[:1] = np.nan
         assert_records_close(
             _from_order_func(order_size_wide, sim_start=1).order_records,
-            _from_order_func(_order_size_wide).order_records
+            _from_order_func(_order_size_wide).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_start=1).sim_start,
+            np.array([1, 1, 1]),
         )
         _order_size_wide = order_size_wide.copy()
         _order_size_wide.iloc[2:] = np.nan
         assert_records_close(
             _from_order_func(order_size_wide, sim_end=2).order_records,
-            _from_order_func(_order_size_wide).order_records
+            _from_order_func(_order_size_wide).order_records,
         )
-        if not test_row_wise:
-            _order_size_wide = order_size_wide.copy()
-            _order_size_wide.iloc[:1, 0] = np.nan
-            _order_size_wide.iloc[:2, 1] = np.nan
-            _order_size_wide.iloc[:3, 2] = np.nan
-            assert_records_close(
-                _from_order_func(order_size_wide, sim_start=[1, 2, 3]).order_records,
-                _from_order_func(_order_size_wide).order_records
-            )
-            with pytest.raises(Exception):
-                _from_order_func(order_size_wide, sim_start=[1, 2])
-            _order_size_wide = order_size_wide.copy()
-            _order_size_wide.iloc[:1, 0] = np.nan
-            _order_size_wide.iloc[:2, 1] = np.nan
-            _order_size_wide.iloc[:2, 2] = np.nan
-            assert_records_close(
-                _from_order_func(
-                    order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True
-                ).order_records,
-                _from_order_func(
-                    _order_size_wide, group_by=[0, 0, 1], cash_sharing=True
-                ).order_records
-            )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_end=2).sim_end,
+            np.array([2, 2, 2]),
+        )
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1, 0] = np.nan
+        _order_size_wide.iloc[:2, 1] = np.nan
+        _order_size_wide.iloc[:3, 2] = np.nan
+        assert_records_close(
+            _from_order_func(order_size_wide, sim_start=[1, 2, 3]).order_records,
+            _from_order_func(_order_size_wide).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_start=[1, 2, 3]).sim_start,
+            np.array([1, 2, 3]),
+        )
+        with pytest.raises(Exception):
+            _from_order_func(order_size_wide, sim_start=[1, 2])
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1, 0] = np.nan
+        _order_size_wide.iloc[:2, 1] = np.nan
+        _order_size_wide.iloc[:2, 2] = np.nan
+        assert_records_close(
+            _from_order_func(order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True).order_records,
+            _from_order_func(_order_size_wide, group_by=[0, 0, 1], cash_sharing=True).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True).sim_start,
+            np.array([1, 1, 2]),
+        )
 
 
 # ############# from_def_order_func ############# #

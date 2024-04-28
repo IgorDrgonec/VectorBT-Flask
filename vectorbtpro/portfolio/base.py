@@ -162,7 +162,9 @@ returns_acc_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["returns_acc_config"] = f"""Config of returns accessor methods to be attached to `Portfolio`.
+__pdoc__[
+    "returns_acc_config"
+] = f"""Config of returns accessor methods to be attached to `Portfolio`.
 
 ```python
 {returns_acc_config.prettify()}
@@ -399,7 +401,9 @@ shortcut_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["shortcut_config"] = f"""Config of shortcut properties to be attached to `Portfolio`.
+__pdoc__[
+    "shortcut_config"
+] = f"""Config of shortcut properties to be attached to `Portfolio`.
 
 ```python
 {shortcut_config.prettify()}
@@ -474,6 +478,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             To substitute `Portfolio` attributes, provide already broadcasted and grouped objects.
             Also see `Portfolio.in_outputs_indexing_func` on how in-output objects are indexed.
         use_in_outputs (bool): Whether to return in-output objects when calling properties.
+        sim_start (array_like of int): Simulation start per column.
+
+            If None, started as usual.
+        sim_end (array_like of int): Simulation end per column.
+
+            If None, ended as usual.
         bm_close (array_like): Last benchmark asset price at each time step.
         fillna_close (bool): Whether to forward and backward fill NaN values in `close`.
 
@@ -879,6 +889,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 )
         if "in_outputs" not in kwargs:
             kwargs["in_outputs"] = cls.row_stack_in_outputs(*objs, **kwargs)
+        if "sim_start" not in kwargs:
+            new_sim_start = broadcast_array_to(objs[0]._sim_start, n_cols)
+            for obj in objs[1:]:
+                if obj._sim_start is not None:
+                    raise ValueError("Objects to be merged (except the first one) must have 'sim_start=None'")
+            kwargs["sim_start"] = new_sim_start
+        if "sim_end" not in kwargs:
+            new_sim_end = broadcast_array_to(objs[-1]._sim_end, n_cols)
+            for obj in objs[:-1]:
+                if obj._sim_end is not None:
+                    raise ValueError("Objects to be merged (except the last one) must have 'sim_end=None'")
+            kwargs["sim_end"] = new_sim_end
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1234,6 +1256,38 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 kwargs["bm_close"] = new_bm_close
         if "in_outputs" not in kwargs:
             kwargs["in_outputs"] = cls.column_stack_in_outputs(*objs, **kwargs)
+        if "sim_start" not in kwargs:
+            stack_sim_start_objs = False
+            for obj in objs:
+                if obj._sim_start is not None:
+                    stack_sim_start_objs = True
+                    break
+            if stack_sim_start_objs:
+                kwargs["sim_start"] = to_1d_array(
+                    kwargs["wrapper"].concat_arrs(
+                        *[obj._sim_start for obj in objs],
+                        group_by=False,
+                        wrap=False,
+                    ),
+                )
+            else:
+                kwargs["sim_start"] = None
+        if "sim_end" not in kwargs:
+            stack_sim_end_objs = False
+            for obj in objs:
+                if obj._sim_end is not None:
+                    stack_sim_end_objs = True
+                    break
+            if stack_sim_end_objs:
+                kwargs["sim_end"] = to_1d_array(
+                    kwargs["wrapper"].concat_arrs(
+                        *[obj._sim_end for obj in objs],
+                        group_by=False,
+                        wrap=False,
+                    ),
+                )
+            else:
+                kwargs["sim_end"] = None
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1256,6 +1310,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         "call_seq",
         "in_outputs",
         "use_in_outputs",
+        "sim_start",
+        "sim_end",
         "bm_close",
         "fillna_close",
         "year_freq",
@@ -1290,6 +1346,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         call_seq: tp.Optional[tp.Array2d] = None,
         in_outputs: tp.Optional[tp.NamedTuple] = None,
         use_in_outputs: tp.Optional[bool] = None,
+        sim_start: tp.Optional[tp.Array1d] = None,
+        sim_end: tp.Optional[tp.Array1d] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         fillna_close: tp.Optional[bool] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
@@ -1319,6 +1377,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_earnings = sim_out.cash_earnings
             call_seq = sim_out.call_seq
             in_outputs = sim_out.in_outputs
+            sim_start = sim_out.sim_start
+            sim_end = sim_out.sim_end
         Analyzable.__init__(
             self,
             wrapper,
@@ -1338,6 +1398,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq=call_seq,
             in_outputs=in_outputs,
             use_in_outputs=use_in_outputs,
+            sim_start=sim_start,
+            sim_end=sim_end,
             bm_close=bm_close,
             fillna_close=fillna_close,
             year_freq=year_freq,
@@ -1399,6 +1461,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._call_seq = call_seq
         self._in_outputs = in_outputs
         self._use_in_outputs = use_in_outputs
+        self._sim_start = sim_start
+        self._sim_end = sim_end
         self._bm_close = bm_close
         self._fillna_close = fillna_close
         self._year_freq = year_freq
@@ -1969,12 +2033,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 group_select=self.group_select,
                 **kwargs,
             )
+        new_wrapper = wrapper_meta["new_wrapper"]
         row_idxs = wrapper_meta["row_idxs"]
         rows_changed = wrapper_meta["rows_changed"]
         col_idxs = wrapper_meta["col_idxs"]
         columns_changed = wrapper_meta["columns_changed"]
         group_idxs = wrapper_meta["group_idxs"]
-        groups_changed = wrapper_meta["groups_changed"]
 
         new_close = ArrayWrapper.select_from_flex_array(
             self._close,
@@ -2074,6 +2138,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             new_bm_close = self._bm_close
         new_in_outputs = self.in_outputs_indexing_func(wrapper_meta, **resolve_dict(in_output_kwargs))
+        if self._sim_start is None:
+            new_sim_start = None
+        elif not rows_changed:
+            new_sim_start = self._sim_start
+        else:
+            new_sim_start = np.clip(self._sim_start - row_idxs.start, 0, len(new_wrapper.index))
+        if self._sim_end is None:
+            new_sim_end = None
+        elif not rows_changed:
+            new_sim_end = self._sim_end
+        else:
+            new_sim_end = np.clip(self._sim_end - row_idxs.start, 0, len(new_wrapper.index))
 
         return self.replace(
             wrapper=wrapper_meta["new_wrapper"],
@@ -2091,6 +2167,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq=new_call_seq,
             in_outputs=new_in_outputs,
             bm_close=new_bm_close,
+            sim_start=new_sim_start,
+            sim_end=new_sim_end,
         )
 
     # ############# Resampling ############# #
@@ -2295,6 +2373,42 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             new_in_outputs = self.resample_in_outputs(resampler, **resolve_dict(in_output_kwargs))
         else:
             new_in_outputs = None
+        if self._sim_start is not None:
+            new_sim_start = np.empty(len(self._sim_start), dtype=np.int_)
+            for i in range(len(self._sim_start)):
+                sim_start = self._sim_start[i]
+                if sim_start <= 0:
+                    new_sim_start[i] = 0
+                elif sim_start >= len(self.wrapper.index):
+                    new_sim_start[i] = len(new_wrapper.index)
+                else:
+                    _new_sim_start = new_wrapper.index.get_indexer(
+                        [self.wrapper.index[sim_start]],
+                        method="ffill",
+                    )[0]
+                    if _new_sim_start == -1:
+                        _new_sim_start = 0
+                    new_sim_start[i] = _new_sim_start
+        else:
+            new_sim_start = None
+        if self._sim_end is not None:
+            new_sim_end = np.empty(len(self._sim_end), dtype=np.int_)
+            for i in range(len(self._sim_end)):
+                sim_end = self._sim_end[i]
+                if sim_end <= 0:
+                    new_sim_end[i] = 0
+                elif sim_end >= len(self.wrapper.index):
+                    new_sim_start[i] = len(new_wrapper.index)
+                else:
+                    _new_sim_end = new_wrapper.index.get_indexer(
+                        [self.wrapper.index[sim_end]],
+                        method="bfill",
+                    )[0]
+                    if _new_sim_end == -1:
+                        _new_sim_end = len(new_wrapper.index)
+                    new_sim_end[i] = _new_sim_end
+        else:
+            new_sim_end = None
 
         return self.replace(
             wrapper=new_wrapper,
@@ -2308,6 +2422,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_earnings=new_cash_earnings,
             in_outputs=new_in_outputs,
             bm_close=new_bm_close,
+            sim_start=new_sim_start,
+            sim_end=new_sim_end,
         )
 
     # ############# Class methods ############# #
@@ -3738,6 +3854,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             close_at_end = portfolio_cfg["close_at_end"]
 
         if dynamic_mode:
+
             def _substitute_signal_args(preparer):
                 return (
                     direction,
@@ -4823,6 +4940,58 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def use_in_outputs(self) -> bool:
         """Whether to return in-output objects when calling properties."""
         return self._use_in_outputs
+
+    @property
+    def sim_start(self) -> tp.Optional[tp.Series]:
+        """Simulation start."""
+        if self._sim_start is None:
+            return None
+        return self.wrapper.wrap_reduced(self._sim_start, group_by=False)
+
+    @property
+    def sim_end(self) -> tp.Optional[tp.Series]:
+        """Simulation end."""
+        if self._sim_end is None:
+            return None
+        return self.wrapper.wrap_reduced(self._sim_end, group_by=False)
+
+    @property
+    def sim_start_index(self) -> tp.Optional[tp.Series]:
+        """Simulation start index."""
+        if self._sim_start is None:
+            return None
+        sim_start_index = []
+        for i in range(len(self._sim_start)):
+            sim_start = self._sim_start[i]
+            if sim_start <= 0:
+                sim_start_index.append(self.wrapper.index[0])
+            elif sim_start >= len(self.wrapper.index):
+                if self.wrapper.freq is None:
+                    sim_start_index.append(self.wrapper.index[-1] + self.wrapper.freq)
+                else:
+                    sim_start_index.append(pd.NaT)
+            else:
+                sim_start_index.append(self.wrapper.index[sim_start])
+        return self.wrapper.wrap_reduced(sim_start_index, group_by=False)
+
+    @property
+    def sim_end_index(self) -> tp.Optional[tp.Series]:
+        """Simulation end index."""
+        if self._sim_end is None:
+            return None
+        sim_end_index = []
+        for i in range(len(self._sim_end)):
+            sim_end = self._sim_end[i]
+            if sim_end <= 0:
+                sim_end_index.append(self.wrapper.index[0])
+            elif sim_end >= len(self.wrapper.index):
+                if self.wrapper.freq is None:
+                    sim_end_index.append(self.wrapper.index[-1] + self.wrapper.freq)
+                else:
+                    sim_end_index.append(pd.NaT)
+            else:
+                sim_end_index.append(self.wrapper.index[sim_end])
+        return self.wrapper.wrap_reduced(sim_end_index, group_by=False)
 
     @property
     def fillna_close(self) -> bool:

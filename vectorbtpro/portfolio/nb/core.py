@@ -1754,6 +1754,42 @@ def prepare_sim_range_nb(
     return sim_start_bc, sim_end_bc
 
 
+@register_jitted(cache=True)
+def prepare_sim_range_out_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    sim_start: tp.Array1d,
+    sim_end: tp.Array1d,
+) -> tp.Tuple[tp.Optional[tp.Array1d], tp.Optional[tp.Array1d]]:
+    """Prepare `sim_start` and `sim_end` outputs.
+
+    Ungroups both arrays and returns None if possible."""
+    sim_start_out = np.empty(target_shape[1], dtype=np.int_)
+    sim_end_out = np.empty(target_shape[1], dtype=np.int_)
+    track_sim_start = False
+    track_sim_end = False
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    for group in range(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+        sim_start_out[from_col:to_col] = sim_start[group]
+        sim_end_out[from_col:to_col] = sim_end[group]
+        if sim_start[group] != 0:
+            track_sim_start = True
+        if sim_end[group] != target_shape[0]:
+            track_sim_end = True
+    if track_sim_start:
+        _sim_start_out = sim_start_out
+    else:
+        _sim_start_out = None
+    if track_sim_end:
+        _sim_end_out = sim_end_out
+    else:
+        _sim_end_out = None
+    return _sim_start_out, _sim_end_out
+
+
 @register_jitted
 def prepare_sim_out_nb(
     order_records: tp.RecordArray2d,
@@ -1764,6 +1800,8 @@ def prepare_sim_out_nb(
     cash_earnings: tp.Array2d,
     call_seq: tp.Optional[tp.Array2d] = None,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
+    sim_start: tp.Optional[tp.Array1d] = None,
+    sim_end: tp.Optional[tp.Array1d] = None,
 ) -> SimulationOutput:
     """Prepare simulation output."""
     order_records_flat = generic_nb.repartition_nb(order_records, order_counts)
@@ -1775,6 +1813,8 @@ def prepare_sim_out_nb(
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start,
+        sim_end=sim_end,
     )
 
 

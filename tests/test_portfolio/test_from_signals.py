@@ -6695,6 +6695,10 @@ class TestFromHolding:
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
             _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
         )
+        np.testing.assert_array_equal(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).sim_start,
+            np.array([1, 1, 1]),
+        )
         assert_records_close(
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
             _from_signals_both(entries=_entries_wide, exits=_exits_wide, sim_start="auto").order_records,
@@ -6706,6 +6710,10 @@ class TestFromHolding:
         assert_records_close(
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
             _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).sim_end,
+            np.array([2, 2, 2]),
         )
         assert_records_close(
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
@@ -6729,6 +6737,10 @@ class TestFromHolding:
                 entries=_entries_wide,
                 exits=_exits_wide,
             ).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3]).sim_start,
+            np.array([1, 2, 3]),
         )
         assert_records_close(
             _from_signals_both(
@@ -6779,6 +6791,20 @@ class TestFromHolding:
                     group_by=[0, 0, 1],
                     sim_start="auto",
                 ).order_records,
+            )
+        if not test_flexible:
+            np.testing.assert_array_equal(
+                _from_signals_both(
+                    entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3], group_by=[0, 0, 1]
+                ).sim_start,
+                np.array([1, 2, 3]),
+            )
+        else:
+            np.testing.assert_array_equal(
+                _from_signals_both(
+                    entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3], group_by=[0, 0, 1]
+                ).sim_start,
+                np.array([1, 1, 3]),
             )
         _entries_wide = entries_wide.copy()
         _exits_wide = exits_wide.copy()
@@ -6877,6 +6903,8 @@ class TestFromHolding:
             _ = vbt.pf_nb.get_exit_trade_records_nb(c, col=1)
             _ = vbt.pf_nb.get_position_records_nb(c)
             _ = vbt.pf_nb.get_position_records_nb(c, col=1)
+            _ = vbt.pf_nb.stop_group_sim_nb(c)
+            _ = vbt.pf_nb.stop_group_sim_nb(c, group=1)
 
         _ = vbt.PF.from_signals(
             [1],

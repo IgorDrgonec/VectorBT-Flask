@@ -705,7 +705,7 @@ def get_position_records_nb(
 
 
 @register_jitted
-def start_sim_nb(
+def stop_group_sim_nb(
     c: tp.Union[
         SegmentContext,
         OrderContext,
@@ -717,28 +717,7 @@ def start_sim_nb(
     ],
     group: tp.Optional[int] = None,
 ) -> None:
-    """Start simulation in the current group."""
-    if group is None:
-        _group = c.group
-    else:
-        _group = group
-    c.sim_start[_group] = c.i
-
-
-@register_jitted
-def end_sim_nb(
-    c: tp.Union[
-        SegmentContext,
-        OrderContext,
-        PostOrderContext,
-        FlexOrderContext,
-        SignalSegmentContext,
-        SignalContext,
-        PostSignalContext,
-    ],
-    group: tp.Optional[int] = None,
-) -> None:
-    """Stop simulation in the current group."""
+    """Stop the simulation of the current group."""
     if group is None:
         _group = c.group
     else:

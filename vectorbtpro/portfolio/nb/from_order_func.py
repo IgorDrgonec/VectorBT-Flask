@@ -1580,6 +1580,12 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -1589,6 +1595,8 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         cash_earnings=cash_earnings_,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -2614,6 +2622,12 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -2623,6 +2637,8 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
         cash_earnings=cash_earnings_,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -3694,6 +3710,12 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -3703,6 +3725,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         cash_earnings=cash_earnings_,
         call_seq=None,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -4625,6 +4649,12 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -4634,6 +4664,8 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         cash_earnings=cash_earnings_,
         call_seq=None,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 

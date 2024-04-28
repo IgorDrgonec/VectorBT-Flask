@@ -499,6 +499,12 @@ def from_orders_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -508,4 +514,6 @@ def from_orders_nb(
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )

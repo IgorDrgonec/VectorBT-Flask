@@ -1069,6 +1069,12 @@ def from_basic_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -1078,6 +1084,8 @@ def from_basic_signals_nb(
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -3382,6 +3390,12 @@ def from_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -3391,6 +3405,8 @@ def from_signals_nb(
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -6063,6 +6079,12 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
             if i >= sim_end_[group] - 1:
                 break
 
+    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+    )
     return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
@@ -6072,6 +6094,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
