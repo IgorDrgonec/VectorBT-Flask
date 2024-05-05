@@ -2,7 +2,6 @@ import os
 from datetime import datetime
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 close = pd.DataFrame(

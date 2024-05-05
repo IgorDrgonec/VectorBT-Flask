@@ -1,9 +1,9 @@
 """Module with `MEANLB`."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.generic import enums as generic_enums
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.labels import nb
-from vectorbtpro.generic import enums as generic_enums
 
 __all__ = [
     "MEANLB",

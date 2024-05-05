@@ -3,10 +3,9 @@ import os
 import pytest
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.base import indexes, indexing, flex_indexing, reshaping
 from vectorbtpro.utils import checks
-
-from tests.utils import *
 
 day_dt = np.timedelta64(86400000000000)
 

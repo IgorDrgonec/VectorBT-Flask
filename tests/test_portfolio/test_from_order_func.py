@@ -9,10 +9,9 @@ from numba import njit, typeof
 from numba.typed import List
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import *
-
-from tests.utils import *
 
 seed = 42
 

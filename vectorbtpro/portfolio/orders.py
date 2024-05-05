@@ -103,13 +103,13 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_dict
-from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.generic.enums import RangeStatus, range_dt
+from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderType, OrderPriceStatus
-from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
+from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig

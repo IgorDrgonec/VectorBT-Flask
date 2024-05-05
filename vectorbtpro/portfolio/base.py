@@ -2,8 +2,8 @@
 
 """Base class for simulating a portfolio and measuring its performance."""
 
-import string
 import inspect
+import string
 import warnings
 from functools import partial
 
@@ -11,18 +11,17 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import ExceptLevel
+from vectorbtpro.base.merging import row_stack_arrays
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.reshaping import (
     to_1d_array,
     to_2d_array,
     broadcast_array_to,
-    broadcast_to,
     to_pd_array,
     to_2d_shape,
 )
-from vectorbtpro.base.merging import row_stack_arrays
-from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexes import ExceptLevel
 from vectorbtpro.data.base import OHLCDataMixin, Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -32,7 +31,6 @@ from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.decorators import attach_shortcut_properties, attach_returns_acc_methods
 from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders
-from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
 from vectorbtpro.portfolio.preparing import (
     PFPrepResult,
@@ -42,6 +40,7 @@ from vectorbtpro.portfolio.preparing import (
     FOFPreparer,
     FDOFPreparer,
 )
+from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg

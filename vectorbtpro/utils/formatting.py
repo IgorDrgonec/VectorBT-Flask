@@ -2,9 +2,9 @@
 
 """Utilities for formatting."""
 
-import attr
 import inspect
 
+import attr
 import numpy as np
 import pandas as pd
 

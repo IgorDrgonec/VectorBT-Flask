@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import resolve_dict, merge_dicts

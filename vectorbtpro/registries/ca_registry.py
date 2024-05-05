@@ -400,15 +400,15 @@ To remove all setups:
 ```
 """
 
-import attr
 import inspect
 import sys
 import warnings
-from datetime import datetime, timezone, timedelta
-from weakref import ref, ReferenceType
 from collections.abc import ValuesView
+from datetime import datetime, timezone, timedelta
 from functools import wraps
+from weakref import ref, ReferenceType
 
+import attr
 import humanize
 import pandas as pd
 
@@ -417,9 +417,9 @@ from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import cacheableT, cacheable_property
+from vectorbtpro.utils.formatting import ptable
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError, get_func_arg_names
 from vectorbtpro.utils.profiling import Timer
-from vectorbtpro.utils.formatting import ptable
 
 __all__ = [
     "CacheableRegistry",

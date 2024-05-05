@@ -3,16 +3,16 @@
 """Utilities for parsing."""
 
 import ast
-import inspect
-import re
-import io
 import contextlib
-import warnings
+import inspect
+import io
+import re
 import sys
+import warnings
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.annotations import get_annotations, VarArgs, VarKwargs
+from vectorbtpro.utils.attr_ import DefineMixin, define
 
 __all__ = [
     "Regex",

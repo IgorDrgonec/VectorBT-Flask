@@ -8,12 +8,12 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import stack_indexes, concat_indexes, clean_index
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
+from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig
 from vectorbtpro.utils.merging import MergeFunc
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
-from vectorbtpro.base.indexes import stack_indexes, concat_indexes, clean_index
 
 __all__ = [
     "concat_arrays",

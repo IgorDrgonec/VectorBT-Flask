@@ -117,9 +117,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, tile
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.generic import nb, enums
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
@@ -134,8 +134,8 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, Readonly
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
-from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
+from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import substitute_templates
 
 __all__ = [

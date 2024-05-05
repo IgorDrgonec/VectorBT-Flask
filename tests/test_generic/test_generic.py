@@ -1,16 +1,12 @@
 import os
 from datetime import datetime
-from itertools import permutations
 
 import pytest
 from numba import njit
-from sklearn.model_selection import TimeSeriesSplit
 
 import vectorbtpro as vbt
-from vectorbtpro.generic import nb
-from vectorbtpro.generic import enums
-
 from tests.utils import *
+from vectorbtpro.generic import nb
 
 seed = 42
 

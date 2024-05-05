@@ -13,13 +13,13 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, Annotatable, Union
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.config import merge_dicts, FrozenConfig, Configured
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
-from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, Annotatable, Union
-from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
-from vectorbtpro.utils.execution import execute
 
 __all__ = [
     "ChunkMeta",

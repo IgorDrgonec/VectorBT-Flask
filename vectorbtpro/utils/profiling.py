@@ -4,8 +4,8 @@
 
 import tracemalloc
 from datetime import timedelta
-from timeit import default_timer, Timer as Timer_timeit
 from functools import wraps, partial
+from timeit import default_timer, Timer as Timer_timeit
 
 import humanize
 

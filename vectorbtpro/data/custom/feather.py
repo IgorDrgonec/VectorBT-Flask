@@ -7,9 +7,9 @@ from pathlib import Path
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.file import FileData
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.data.custom.file import FileData
 
 __all__ = [
     "FeatherData",

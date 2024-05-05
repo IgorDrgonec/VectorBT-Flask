@@ -1,9 +1,9 @@
 """Module with `FMAX`."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.labels import nb
+from vectorbtpro.utils.config import merge_dicts
 
 __all__ = [
     "FMAX",

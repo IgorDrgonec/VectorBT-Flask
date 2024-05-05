@@ -2,7 +2,6 @@
 
 """Utilities for working with parameters."""
 
-import math
 import inspect
 from collections import OrderedDict
 from collections.abc import Callable
@@ -14,15 +13,15 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import FrozenConfig, Configured, merge_dicts
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.template import CustomTemplate, substitute_templates
-from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
-from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
-from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
+from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
 from vectorbtpro.utils.search import find_in_obj, replace_in_obj
+from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
+from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 __all__ = [
     "generate_param_combs",

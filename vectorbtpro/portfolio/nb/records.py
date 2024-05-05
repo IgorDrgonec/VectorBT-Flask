@@ -5,7 +5,7 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_2d_array_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch

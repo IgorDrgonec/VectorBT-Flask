@@ -3,11 +3,11 @@
 """Classes for working with allocation records."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.config import ReadonlyConfig, Config
-from vectorbtpro.records.base import Records
 from vectorbtpro.generic.ranges import Ranges
-from vectorbtpro.records.decorators import override_field_config
 from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
+from vectorbtpro.records.base import Records
+from vectorbtpro.records.decorators import override_field_config
+from vectorbtpro.utils.config import ReadonlyConfig, Config
 
 __all__ = [
     "AllocRanges",

@@ -6,8 +6,10 @@ import inspect
 from functools import wraps
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.generic.splitting.base import Splitter, Takeable
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import FrozenConfig, merge_dicts
+from vectorbtpro.utils.params import parameterized
 from vectorbtpro.utils.parsing import (
     annotate_args,
     flatten_ann_args,
@@ -16,10 +18,8 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
     get_func_arg_names,
 )
-from vectorbtpro.utils.params import parameterized
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.template import Rep, RepEval, substitute_templates
-from vectorbtpro.generic.splitting.base import Splitter, Takeable
 
 __all__ = [
     "split",

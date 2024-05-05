@@ -1,7 +1,6 @@
 import os
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 

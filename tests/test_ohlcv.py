@@ -1,9 +1,9 @@
 import os
 from datetime import datetime
+
 import pytest
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 ohlcv_df = pd.DataFrame(

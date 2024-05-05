@@ -4,9 +4,8 @@ from datetime import datetime
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.portfolio.enums import *
-
 from tests.utils import *
+from vectorbtpro.portfolio.enums import *
 
 seed = 42
 

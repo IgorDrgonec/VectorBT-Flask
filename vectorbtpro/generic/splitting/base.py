@@ -2,22 +2,35 @@
 
 """Base class for splitting."""
 
-import warnings
-import math
 import inspect
+import math
+import warnings
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.accessors import BaseIDXAccessor
+from vectorbtpro.base.grouping.base import Grouper
+from vectorbtpro.base.indexes import combine_indexes, stack_indexes
+from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
+from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, is_merge_func_from_config
+from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.reshaping import to_dict
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic.splitting import nb
+from vectorbtpro.generic.splitting.purged import BasePurgedCV, PurgedWalkForwardCV, PurgedKFoldCV
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
+from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.array_ import is_range
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
 from vectorbtpro.utils.parsing import (
     get_func_arg_names,
     annotate_args,
@@ -25,21 +38,8 @@ from vectorbtpro.utils.parsing import (
     unflatten_ann_args,
     ann_args_to_args,
 )
-from vectorbtpro.utils.annotations import Annotatable, has_annotatables
-from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
-from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.selection import _NoResult, NoResultsException, PosSel, LabelSel
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
-from vectorbtpro.base.indexes import combine_indexes, stack_indexes
-from vectorbtpro.base.reshaping import to_dict
-from vectorbtpro.base.accessors import BaseIDXAccessor
-from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.grouping.base import Grouper
-from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, is_merge_func_from_config
-from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic.splitting import nb
-from vectorbtpro.generic.splitting.purged import BasePurgedCV, PurgedWalkForwardCV, PurgedKFoldCV
+from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 
 if tp.TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator as BaseCrossValidatorT

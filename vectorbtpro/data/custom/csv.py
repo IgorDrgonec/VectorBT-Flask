@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.file import FileData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.data.custom.file import FileData
 
 __all__ = [
     "CSVData",

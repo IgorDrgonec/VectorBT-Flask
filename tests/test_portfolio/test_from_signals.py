@@ -1,14 +1,12 @@
 import os
-from functools import partial
 
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import *
-
-from tests.utils import *
 
 seed = 42
 

@@ -2,23 +2,23 @@
 
 """Utilities for working with dates and time."""
 
+import re
 import warnings
-from datetime import datetime, timezone, timedelta, tzinfo, date, time
 from collections import namedtuple
+from datetime import datetime, timezone, timedelta, tzinfo, date, time
 from functools import partial
 
 import numpy as np
 import pandas as pd
-from pandas.tseries.offsets import BaseOffset
 from pandas.tseries.frequencies import to_offset as pd_to_offset
-import re
+from pandas.tseries.offsets import BaseOffset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.array_ import min_count_nb
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
-from vectorbtpro.utils.array_ import min_count_nb
 
 __all__ = [
     "DTC",

@@ -4,8 +4,8 @@
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.indicators import nb
-from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.indicators.configs import flex_elem_param_config
+from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 

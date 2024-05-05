@@ -2,21 +2,21 @@
 
 """Module with `AVData`."""
 
+import re
+import urllib.parse
 import warnings
 from functools import lru_cache
-import re
-import requests
-import urllib.parse
 
 import numpy as np
 import pandas as pd
+import requests
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.module_ import check_installed
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.data.custom.remote import RemoteData
 
 try:
     if not tp.TYPE_CHECKING:

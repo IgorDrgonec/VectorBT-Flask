@@ -9,21 +9,11 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsFiltered
-from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
-from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.random_ import set_seed_nb
-from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.params import Param, combine_params, Parameterizer
-from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes, select_levels
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict, broadcast_array_to
-from vectorbtpro.base.merging import row_stack_arrays
 from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults
+from vectorbtpro.base.merging import row_stack_arrays
+from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict, broadcast_array_to
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.enums import RangeStatus
@@ -32,6 +22,16 @@ from vectorbtpro.portfolio.pfopt import nb
 from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.returns.accessors import ReturnsAccessor
+from vectorbtpro.utils import checks, datetime_ as dt
+from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.params import Param, combine_params, Parameterizer
+from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsFiltered
+from vectorbtpro.utils.pickling import pdict
+from vectorbtpro.utils.random_ import set_seed_nb
+from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 
 if tp.TYPE_CHECKING:
     from vectorbtpro.portfolio.base import Portfolio as PortfolioT

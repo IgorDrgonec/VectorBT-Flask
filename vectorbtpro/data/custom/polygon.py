@@ -6,15 +6,15 @@ import time
 import traceback
 import warnings
 from functools import wraps, partial
-import requests
 
 import pandas as pd
+import requests
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.pbar import ProgressBar
-from vectorbtpro.data.custom.remote import RemoteData
 
 try:
     if not tp.TYPE_CHECKING:

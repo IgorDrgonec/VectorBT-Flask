@@ -2,8 +2,8 @@
 
 """Module with `CustomData`."""
 
-import re
 import fnmatch
+import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.data.base import Data

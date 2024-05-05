@@ -3,22 +3,23 @@
 """Module with `TVData`."""
 
 import datetime
+import json
+import math
 import random
 import re
 import string
+import time
+
 import pandas as pd
 import requests
-import json
-import time
-import math
 from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.template import CustomTemplate
-from vectorbtpro.data.custom.remote import RemoteData
 
 __all__ = [
     "TVClient",

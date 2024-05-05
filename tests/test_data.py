@@ -4,10 +4,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import to_timezone
-
-from tests.utils import *
 
 seed = 42
 

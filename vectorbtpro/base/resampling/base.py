@@ -8,12 +8,12 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import repeat_index
+from vectorbtpro.base.resampling import nb
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
-from vectorbtpro.base.resampling import nb
-from vectorbtpro.base.indexes import repeat_index
-from vectorbtpro.registries.jit_registry import jit_reg
 
 __all__ = [
     "Resampler",

@@ -7,9 +7,9 @@ from typing import Iterator
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.db import DBData
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.data.custom.db import DBData
 
 try:
     if not tp.TYPE_CHECKING:

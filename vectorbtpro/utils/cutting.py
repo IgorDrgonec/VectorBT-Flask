@@ -2,14 +2,14 @@
 
 """Utilities for cutting code."""
 
-import inspect
-from types import ModuleType, FunctionType
 import importlib
+import inspect
 from pathlib import Path
+from types import ModuleType, FunctionType
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.template import CustomTemplate, RepEval
 from vectorbtpro.utils.path_ import check_mkdir
+from vectorbtpro.utils.template import CustomTemplate, RepEval
 
 __all__ = [
     "cut_and_save_module",

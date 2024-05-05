@@ -199,27 +199,27 @@ from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
+from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbtpro.generic.drawdowns import Drawdowns
+from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode, ErrorType, DistanceMeasure
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.ranges import Ranges, PatternRanges
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
-from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode, ErrorType, DistanceMeasure
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, chunking as ch, datetime_ as dt
+from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
+from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import apply_mapping, to_value_mapping
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
-from vectorbtpro.utils.enum_ import map_enum_fields
 
 try:
     import bottleneck as bn

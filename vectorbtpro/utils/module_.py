@@ -2,16 +2,16 @@
 
 """Utilities for modules."""
 
-import warnings
 import importlib
 import importlib.util
 import inspect
 import pkgutil
 import sys
+import urllib.request
+import warnings
+import webbrowser
 from pathlib import Path
 from types import ModuleType, FunctionType
-import webbrowser
-import urllib.request
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._opt_deps import opt_dep_config

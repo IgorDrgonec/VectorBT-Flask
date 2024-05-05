@@ -26,6 +26,7 @@ Run for the examples below:
 2020-01-05  5.0  1.0
 ```"""
 
+import fnmatch
 import functools
 import inspect
 import itertools
@@ -34,7 +35,6 @@ import warnings
 from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from types import ModuleType
-import fnmatch
 
 import numpy as np
 import pandas as pd
@@ -44,8 +44,8 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref
 from vectorbtpro.base.merging import row_stack_arrays, column_stack_arrays
+from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
@@ -53,12 +53,14 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured, HybridConfig
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
+from vectorbtpro.utils.module_ import search_package_for_funcs
 from vectorbtpro.utils.params import (
     to_typed_list,
     broadcast_params,
@@ -75,8 +77,6 @@ from vectorbtpro.utils.parsing import (
 )
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates, Rep
-from vectorbtpro.utils.module_ import search_package_for_funcs
-from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 
 __all__ = [
     "IndicatorBase",

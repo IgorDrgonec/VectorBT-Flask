@@ -6,7 +6,6 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
-from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted

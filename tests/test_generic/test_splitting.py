@@ -1,11 +1,8 @@
 import os
 
-import numpy as np
-import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 seed = 42

@@ -2,36 +2,36 @@
 
 """Base class for working with data sources."""
 
-import warnings
-from pathlib import Path
-import traceback
 import inspect
 import string
+import traceback
+import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.merging import column_stack_arrays, is_merge_func_from_config
+from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.data.decorators import attach_symbol_dict_methods
+from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic.drawdowns import Drawdowns
+from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
+from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 from vectorbtpro.utils.pickling import pdict, RecState
-from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
-from vectorbtpro.utils.merging import MergeFunc
-from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexes import stack_indexes
-from vectorbtpro.base.merging import column_stack_arrays, is_merge_func_from_config
-from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.data.decorators import attach_symbol_dict_methods
+from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:

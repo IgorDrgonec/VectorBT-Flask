@@ -1,13 +1,12 @@
 import os
-import pytest
 
+import pytest
 from numba import njit
 
 import vectorbtpro as vbt
 import vectorbtpro.portfolio.pfopt.base as pfopt
-from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
-
 from tests.utils import *
+from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
 
 pypfopt_available = True
 try:

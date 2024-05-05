@@ -11,16 +11,16 @@ from pandas.core.groupby import GroupBy as PandasGroupBy
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
-from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import IndexingError, ExtPandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes, IndexApplier
+from vectorbtpro.base.indexing import IndexingError, ExtPandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks, datetime_ as dt
+from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
-from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
 from vectorbtpro.utils.params import Param, Itemable, Paramable
+from vectorbtpro.utils.parsing import get_func_arg_names
 
 if tp.TYPE_CHECKING:
     from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT

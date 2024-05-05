@@ -7,8 +7,8 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import prepare_sim_range_nb, repartition_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb

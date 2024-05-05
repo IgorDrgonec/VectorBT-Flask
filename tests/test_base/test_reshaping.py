@@ -3,9 +3,8 @@ import os
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.base import indexes, indexing, reshaping
-
 from tests.utils import *
+from vectorbtpro.base import indexes, indexing, reshaping
 
 # Initialize global variables
 a1 = np.array([1])

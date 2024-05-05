@@ -10,12 +10,12 @@ from functools import partial
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.data.custom.remote import RemoteData
+from vectorbtpro.utils.pbar import ProgressBar
 
 try:
     if not tp.TYPE_CHECKING:

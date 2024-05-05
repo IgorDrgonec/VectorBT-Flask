@@ -3,8 +3,8 @@
 """Numba-compiled helper functions for portfolio simulation."""
 
 from vectorbtpro.base.flex_indexing import flex_select_col_nb
-from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb import records as pf_records_nb
+from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import nb as records_nb
 
 

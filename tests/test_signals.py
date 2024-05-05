@@ -5,10 +5,9 @@ import pytest
 from numba import njit
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.enums import range_dt
-
-from tests.utils import *
 
 seed = 42
 

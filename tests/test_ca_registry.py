@@ -4,10 +4,9 @@ import weakref
 import pytest
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.registries.ca_registry import ca_reg, CAQuery, CARunSetup, CARunResult
 from vectorbtpro.utils.caching import Cacheable
-
-from tests.utils import *
 
 
 # ############# Global ############# #

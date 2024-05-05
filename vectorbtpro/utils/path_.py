@@ -2,11 +2,12 @@
 
 """Utilities for working with paths."""
 
-from pathlib import Path
+import shutil
 from glob import glob
 from itertools import islice
+from pathlib import Path
+
 import humanize
-import shutil
 
 from vectorbtpro import _typing as tp
 

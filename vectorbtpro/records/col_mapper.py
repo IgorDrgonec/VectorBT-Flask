@@ -5,9 +5,9 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.grouping import nb as grouping_nb
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.grouping import nb as grouping_nb
 from vectorbtpro.records import nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks

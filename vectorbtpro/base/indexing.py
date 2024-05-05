@@ -2,23 +2,23 @@
 
 """Classes and functions for indexing."""
 
-from functools import partial
 import functools
 from datetime import time
+from functools import partial
 
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import BaseOffset
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
-from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.config import hdict, merge_dicts
-from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
+from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.selection import PosSel, LabelSel
-from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils.template import CustomTemplate
 
 __all__ = [
     "PandasIndexer",

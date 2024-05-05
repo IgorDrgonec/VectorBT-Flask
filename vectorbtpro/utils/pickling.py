@@ -2,20 +2,20 @@
 
 """Utilities for pickling."""
 
-import humanize
 import ast
 from pathlib import Path
 
+import humanize
 import numpy as np
 import pandas as pd
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.attr_ import DefineMixin, define
-from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
+from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import Prettified, prettify_dict
+from vectorbtpro.utils.path_ import check_mkdir
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 

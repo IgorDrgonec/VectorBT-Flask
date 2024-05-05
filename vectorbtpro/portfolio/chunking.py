@@ -5,13 +5,13 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.chunking import ChunkMeta, ArraySlicer
-from vectorbtpro.utils.config import ReadonlyConfig
-from vectorbtpro.utils.template import Rep
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
 from vectorbtpro.portfolio.enums import SimulationOutput
 from vectorbtpro.records.chunking import merge_records
+from vectorbtpro.utils.chunking import ChunkMeta, ArraySlicer
+from vectorbtpro.utils.config import ReadonlyConfig
+from vectorbtpro.utils.template import Rep
 
 __all__ = []
 

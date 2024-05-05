@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import AutoIdxr
 from vectorbtpro.base.reshaping import broadcast_array_to, to_1d_array
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.decorators import class_or_instancemethod
 
 SimRangeMixinT = tp.TypeVar("SimRangeMixinT", bound="SimRangeMixin")
 

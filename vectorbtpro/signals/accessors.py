@@ -192,9 +192,9 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
+from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import RepEval, substitute_templates
-from vectorbtpro.utils.enum_ import map_enum_fields
 
 __all__ = [
     "SignalsAccessor",

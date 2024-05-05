@@ -5,7 +5,6 @@ import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 day_dt = np.timedelta64(86400000000000)

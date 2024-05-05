@@ -5,15 +5,15 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_2d_array_nb
-from vectorbtpro.generic.nb.base import prepare_sim_range_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.generic.enums import BarZone
+from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.from_order_func import no_post_func_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
-from vectorbtpro.signals.enums import StopType
 from vectorbtpro.returns.nb import get_return_nb
+from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.math_ import is_less_nb

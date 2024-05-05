@@ -2,8 +2,8 @@
 
 """Classes and functions for flexible indexing."""
 
-from vectorbtpro._settings import settings
 from vectorbtpro import _typing as tp
+from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = [

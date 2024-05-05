@@ -9,13 +9,13 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_col_nb
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_col_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
+from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS
 from vectorbtpro.utils import chunking as ch
 
 __all__ = []

@@ -4,11 +4,10 @@ import pytest
 from numba import njit
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.generic.enums import range_dt, pattern_range_dt, drawdown_dt
 from vectorbtpro.portfolio.enums import order_dt, trade_dt, log_dt
 from vectorbtpro.records.base import Records
-
-from tests.utils import *
 
 day_dt = np.timedelta64(86400000000000)
 

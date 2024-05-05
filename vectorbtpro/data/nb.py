@@ -9,9 +9,9 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
+from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = []
 

@@ -132,8 +132,8 @@ from numba import config as nb_config
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
 from vectorbtpro.utils.config import Config
-from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 from vectorbtpro.utils.module_ import check_installed
+from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 
 __all__ = [
     "settings",

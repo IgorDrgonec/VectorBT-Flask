@@ -414,8 +414,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, index_to_series, index_to_frame
 from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.reshaping import to_1d_array, index_to_series, index_to_frame
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.records import nb

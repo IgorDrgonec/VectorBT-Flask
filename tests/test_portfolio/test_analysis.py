@@ -2,15 +2,12 @@ import os
 from collections import namedtuple
 from datetime import datetime
 
-import numpy as np
-import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.generic.enums import drawdown_dt
 from vectorbtpro.portfolio.enums import *
-
-from tests.utils import *
 
 qs_available = True
 try:

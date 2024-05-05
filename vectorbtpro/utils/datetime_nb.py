@@ -5,9 +5,9 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.datetime_ import DTCNT
 from vectorbtpro.utils.formatting import prettify
-from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = []
 

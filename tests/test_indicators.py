@@ -3,12 +3,10 @@ from collections import namedtuple
 from datetime import datetime
 from itertools import product
 
-import numpy as np
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 ta_available = True

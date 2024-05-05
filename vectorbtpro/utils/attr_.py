@@ -2,20 +2,20 @@
 
 """Utilities for working with class/instance attributes."""
 
-import attr
-from attr.exceptions import NotAnAttrsClassError
 import enum
-import re
 import inspect
+import re
 from collections.abc import Iterable
 from functools import cached_property as cachedproperty
 
+import attr
 import pandas as pd
+from attr.exceptions import NotAnAttrsClassError
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
+from vectorbtpro.utils.hashing import Hashable
 
 __all__ = [
     "MISSING",

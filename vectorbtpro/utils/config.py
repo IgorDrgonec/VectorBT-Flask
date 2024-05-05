@@ -2,19 +2,19 @@
 
 """Utilities for configuration."""
 
-import warnings
 import inspect
+import warnings
 from copy import copy, deepcopy
 from pathlib import Path
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.attr_ import MISSING
-from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
 from vectorbtpro.utils.caching import Cacheable
+from vectorbtpro.utils.chaining import Chainable
+from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
-from vectorbtpro.utils.chaining import Chainable
 
 __all__ = [
     "hdict",

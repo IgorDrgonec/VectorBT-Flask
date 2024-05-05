@@ -2,8 +2,8 @@
 
 """General types used across vectorbtpro."""
 
-from enum import EnumMeta
 from datetime import datetime, timedelta, tzinfo, date, time
+from enum import EnumMeta
 from pathlib import Path
 from typing import *
 
@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 from mypy_extensions import VarArg
 from pandas import Series, DataFrame as Frame, Index
-from pandas.tseries.offsets import BaseOffset
 from pandas.core.groupby import GroupBy as PandasGroupBy
-from pandas.core.resample import Resampler as PandasResampler
 from pandas.core.indexing import _IndexSlice as IndexSlice
+from pandas.core.resample import Resampler as PandasResampler
+from pandas.tseries.offsets import BaseOffset
 
 try:
     if not TYPE_CHECKING:

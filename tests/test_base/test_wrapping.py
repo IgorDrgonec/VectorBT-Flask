@@ -4,9 +4,8 @@ from datetime import datetime
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.base import wrapping, indexing
-
 from tests.utils import *
+from vectorbtpro.base import wrapping, indexing
 
 day_dt = np.timedelta64(86400000000000)
 

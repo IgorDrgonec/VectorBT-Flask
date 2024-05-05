@@ -3,13 +3,13 @@
 """Base class for working with records that can make use of OHLC data."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.generic import nb
 from vectorbtpro.records.base import Records
-from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.records.decorators import attach_shortcut_properties
+from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import ReadonlyConfig
 

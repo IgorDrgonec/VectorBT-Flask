@@ -411,16 +411,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
-from vectorbtpro.utils import chunking as ch
-from vectorbtpro.utils.array_ import index_repeating_rows_nb
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
-from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
-from vectorbtpro.base.reshaping import to_1d_array, to_dict, index_to_series, index_to_frame
 from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
 from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.reshaping import to_1d_array, to_dict, index_to_series, index_to_frame
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -428,6 +421,13 @@ from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
+from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils.array_ import index_repeating_rows_nb
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
+from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
+from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 
 __all__ = [
     "MappedArray",

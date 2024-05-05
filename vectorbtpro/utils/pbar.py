@@ -3,15 +3,16 @@
 """Utilities for progress bars."""
 
 import warnings
-from numbers import Number
 from functools import wraps
-from tqdm.std import tqdm
+from numbers import Number
 from time import time as utc_time
 
+from tqdm.std import tqdm
+
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.attr_ import MISSING
 from vectorbtpro.registries.pbar_registry import PBarRegistry, pbar_reg
+from vectorbtpro.utils.attr_ import MISSING
+from vectorbtpro.utils.config import merge_dicts
 
 __all__ = [
     "ProgressBar",

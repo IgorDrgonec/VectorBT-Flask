@@ -6,20 +6,20 @@ import inspect
 import string
 from collections import defaultdict
 from datetime import timedelta, time
-from functools import partial, cached_property as cachedproperty
+from functools import cached_property as cachedproperty
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.indexing import index_dict, IdxSetter, IdxSetterFactory, IdxRecords
-from vectorbtpro.base.reshaping import BCO, Default, Ref, broadcast
-from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
-from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
-from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexes import repeat_index
+from vectorbtpro.base.indexing import index_dict, IdxSetter, IdxSetterFactory, IdxRecords
+from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
+from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.reshaping import BCO, Default, Ref, broadcast
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import Configured
@@ -28,9 +28,9 @@ from vectorbtpro.utils.cutting import suggest_module_path, cut_and_save_func
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import import_module_from_path
 from vectorbtpro.utils.params import Param
+from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import CustomTemplate, RepFunc, substitute_templates
-from vectorbtpro.utils.parsing import get_func_arg_names
 
 __all__ = [
     "BasePreparer",

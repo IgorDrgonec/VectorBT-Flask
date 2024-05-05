@@ -3,22 +3,22 @@
 """Engines for executing functions."""
 
 import concurrent.futures
+import enum
 import time
+import warnings
 from functools import partial
 from pathlib import Path
-import warnings
-import enum
 
 import pandas as pd
 from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
-from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 from vectorbtpro.utils.path_ import remove_dir, file_exists
+from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.pickling import load, save
+from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:
