@@ -1575,14 +1575,14 @@ def order_nothing_nb() -> Order:
 
 
 @register_jitted(cache=True)
-def check_group_lens_nb(group_lens: tp.Array1d, n_cols: int) -> None:
+def check_group_lens_nb(group_lens: tp.GroupLens, n_cols: int) -> None:
     """Check `group_lens`."""
     if np.sum(group_lens) != n_cols:
         raise ValueError("group_lens has incorrect total number of columns")
 
 
 @register_jitted(cache=True)
-def is_grouped_nb(group_lens: tp.Array1d) -> bool:
+def is_grouped_nb(group_lens: tp.GroupLens) -> bool:
     """Check if columm,ns are grouped, that is, more than one column per group."""
     return np.any(group_lens > 1)
 
@@ -1626,7 +1626,7 @@ def prepare_records_nb(
 @register_jitted(cache=True)
 def prepare_last_cash_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1d,
 ) -> tp.Array1d:
@@ -1654,7 +1654,7 @@ def prepare_last_position_nb(target_shape: tp.Shape, init_position: tp.FlexArray
 @register_jitted(cache=True)
 def prepare_last_value_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1d,
     init_position: tp.FlexArray1d,
@@ -1722,72 +1722,6 @@ def prepare_last_pos_info_nb(
     else:
         last_pos_info = np.empty(0, dtype=trade_dt)
     return last_pos_info
-
-
-@register_jitted(cache=True)
-def prepare_sim_range_nb(
-    target_shape: tp.Shape,
-    group_lens: tp.Array1d,
-    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
-    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
-) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-    """Prepare `sim_start` and `sim_end`."""
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-    sim_start_bc = np.empty(len(group_lens), dtype=np.int_)
-    sim_end_bc = np.empty(len(group_lens), dtype=np.int_)
-    for group in range(len(group_lens)):
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-        sim_start_bc[group] = _sim_start
-        sim_end_bc[group] = _sim_end
-    return sim_start_bc, sim_end_bc
-
-
-@register_jitted(cache=True)
-def prepare_sim_range_out_nb(
-    target_shape: tp.Shape,
-    group_lens: tp.Array1d,
-    sim_start: tp.Array1d,
-    sim_end: tp.Array1d,
-) -> tp.Tuple[tp.Optional[tp.Array1d], tp.Optional[tp.Array1d]]:
-    """Prepare `sim_start` and `sim_end` outputs.
-
-    Ungroups both arrays and returns None if possible."""
-    sim_start_out = np.empty(target_shape[1], dtype=np.int_)
-    sim_end_out = np.empty(target_shape[1], dtype=np.int_)
-    track_sim_start = False
-    track_sim_end = False
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
-    for group in range(len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
-        sim_start_out[from_col:to_col] = sim_start[group]
-        sim_end_out[from_col:to_col] = sim_end[group]
-        if sim_start[group] != 0:
-            track_sim_start = True
-        if sim_end[group] != target_shape[0]:
-            track_sim_end = True
-    if track_sim_start:
-        _sim_start_out = sim_start_out
-    else:
-        _sim_start_out = None
-    if track_sim_end:
-        _sim_end_out = sim_end_out
-    else:
-        _sim_end_out = None
-    return _sim_start_out, _sim_end_out
 
 
 @register_jitted

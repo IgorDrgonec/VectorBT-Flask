@@ -6,6 +6,7 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_2d_array_nb
+from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.generic.enums import BarZone
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
@@ -437,7 +438,7 @@ def prepare_fs_records_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def from_basic_signals_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     open: tp.FlexArray2dLike = np.nan,
     high: tp.FlexArray2dLike = np.nan,
     low: tp.FlexArray2dLike = np.nan,
@@ -617,8 +618,7 @@ def from_basic_signals_nb(
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -1069,11 +1069,12 @@ def from_basic_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,
@@ -1176,7 +1177,7 @@ def from_basic_signals_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def from_signals_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
     open: tp.FlexArray2dLike = np.nan,
@@ -1521,8 +1522,7 @@ def from_signals_nb(
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -3390,11 +3390,12 @@ def from_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,
@@ -3626,7 +3627,7 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 )
 def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
@@ -3953,8 +3954,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -6079,11 +6079,12 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
             if i >= sim_end_[group] - 1:
                 break
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,

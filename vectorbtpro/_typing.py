@@ -96,8 +96,7 @@ ItemGenerator = Generator[Tuple[Hashable, Any], None, None]
 
 # Arrays
 class SupportsArray(Protocol):
-    def __array__(self) -> np.ndarray:
-        ...
+    def __array__(self) -> np.ndarray: ...
 
 
 DTypeLike = Any

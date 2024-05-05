@@ -17,7 +17,6 @@ __all__ = [
     "ColumnMapper",
 ]
 
-
 ColumnMapperT = tp.TypeVar("ColumnMapperT", bound="ColumnMapper")
 
 

@@ -25,7 +25,6 @@ __all__ = [
     "TVData",
 ]
 
-
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
 """Sign-in URL."""
 
@@ -776,7 +775,7 @@ class TVData(RemoteData):
                 symbol = item["symbol"]
             else:
                 item = symbol
-            if "\"symbol\"" in symbol:
+            if '"symbol"' in symbol:
                 continue
             if exchange_pattern is not None:
                 if not cls.key_match(symbol.split(":")[0], exchange_pattern, use_regex=use_regex):

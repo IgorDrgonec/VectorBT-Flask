@@ -27,7 +27,6 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 DuckDBDataT = tp.TypeVar("DuckDBDataT", bound="DuckDBData")
 
 

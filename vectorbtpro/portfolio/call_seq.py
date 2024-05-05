@@ -12,7 +12,7 @@ __all__ = []
 
 
 @register_jitted(cache=True)
-def shuffle_call_seq_nb(call_seq: tp.Array2d, group_lens: tp.Array1d) -> None:
+def shuffle_call_seq_nb(call_seq: tp.Array2d, group_lens: tp.GroupLens) -> None:
     """Shuffle the call sequence array."""
     from_col = 0
     for group in range(len(group_lens)):
@@ -25,7 +25,7 @@ def shuffle_call_seq_nb(call_seq: tp.Array2d, group_lens: tp.Array1d) -> None:
 @register_jitted(cache=True)
 def build_call_seq_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     call_seq_type: int = CallSeqType.Default,
 ) -> tp.Array2d:
     """Build a new call sequence array."""
@@ -51,7 +51,7 @@ def require_call_seq(call_seq: tp.Array2d) -> tp.Array2d:
 
 def build_call_seq(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     call_seq_type: int = CallSeqType.Default,
 ) -> tp.Array2d:
     """Not compiled but faster version of `build_call_seq_nb`."""

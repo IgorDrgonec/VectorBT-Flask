@@ -84,7 +84,7 @@ def bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         _base_cls_plot: tp.Callable = base_cls_plot,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> tp.BaseFigure:
         self_col = self.select_col(column=column, group_by=False)
 

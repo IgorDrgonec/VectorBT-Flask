@@ -10,13 +10,14 @@ from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic.enums import *
-from vectorbtpro.generic.nb.base import repartition_nb
+from vectorbtpro.generic.nb.base import prepare_sim_range_nb, repartition_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.template import Rep
+
 
 # ############# Ranges ############# #
 
@@ -807,6 +808,8 @@ def fill_drawdown_record_nb(
         high=ch.ArraySlicer(axis=1),
         low=ch.ArraySlicer(axis=1),
         close=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -817,6 +820,8 @@ def get_drawdowns_nb(
     high: tp.Optional[tp.Array2d],
     low: tp.Optional[tp.Array2d],
     close: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.RecordArray:
     """Fill drawdown records by analyzing a time series.
 
@@ -850,7 +855,18 @@ def get_drawdowns_nb(
     new_records = np.empty(close.shape, dtype=drawdown_dt)
     counts = np.full(close.shape[1], 0, dtype=np.int_)
 
+    sim_start_, sim_end_ = prepare_sim_range_nb(
+        sim_shape=close.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+
     for col in prange(close.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
         drawdown_started = False
         _close = close[0, col]
         if open is None:
@@ -862,7 +878,7 @@ def get_drawdowns_nb(
         start_val = _open
         valley_val = _open
 
-        for i in range(close.shape[0]):
+        for i in range(_sim_start, _sim_end):
             _close = close[i, col]
             if open is None:
                 _open = np.nan
@@ -946,7 +962,7 @@ def get_drawdowns_nb(
                     valley_val = _low
 
             if drawdown_started:
-                if i == close.shape[0] - 1:
+                if i == _sim_end - 1:
                     drawdown_started = False
                     fill_drawdown_record_nb(
                         new_records=new_records,

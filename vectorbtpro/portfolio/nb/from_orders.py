@@ -5,7 +5,8 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
+from vectorbtpro.base.reshaping import to_2d_array_nb
+from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -66,7 +67,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 @register_jitted(cache=True, tags={"can_parallel"})
 def from_orders_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     open: tp.FlexArray2dLike = np.nan,
     high: tp.FlexArray2dLike = np.nan,
     low: tp.FlexArray2dLike = np.nan,
@@ -254,8 +255,7 @@ def from_orders_nb(
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -499,11 +499,12 @@ def from_orders_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,

@@ -1020,9 +1020,9 @@ class TestAccessors:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Return [%]",
                 "Benchmark Return [%]",
                 "Annualized Return [%]",
@@ -1154,9 +1154,9 @@ class TestAccessors:
                 ],
                 index=pd.Index(
                     [
-                        "Start",
-                        "End",
-                        "Period",
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
                         "Total Return [%]",
                         "Annualized Return [%]",
                         "Annualized Volatility [%]",

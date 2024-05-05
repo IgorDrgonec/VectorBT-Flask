@@ -39,7 +39,6 @@ else:
 
 __all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
 
-
 BaseIDXAccessorT = tp.TypeVar("BaseIDXAccessorT", bound="BaseIDXAccessor")
 
 
@@ -217,8 +216,10 @@ class BaseIDXAccessor(Configured, IndexApplier):
 
     # ############# Frequency ############# #
 
+    @class_or_instancemethod
     def get_freq(
-        self,
+        cls_or_self,
+        index: tp.Optional[tp.Index] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> tp.Union[None, float, tp.PandasFrequency]:
@@ -227,12 +228,17 @@ class BaseIDXAccessor(Configured, IndexApplier):
 
         wrapping_cfg = settings["wrapping"]
 
-        if freq is None:
-            freq = self._freq
+        if not isinstance(cls_or_self, type):
+            index = cls_or_self.obj
+            if freq is None:
+                freq = cls_or_self._freq
+        else:
+            checks.assert_not_none(index, arg_name="index")
+
         if freq is None:
             freq = wrapping_cfg["freq"]
         try:
-            return dt.infer_index_freq(self.obj, freq=freq, **kwargs)
+            return dt.infer_index_freq(index, freq=freq, **kwargs)
         except Exception as e:
             return None
 
@@ -256,24 +262,42 @@ class BaseIDXAccessor(Configured, IndexApplier):
         """Index frequency of any type."""
         return self.get_freq()
 
-    @property
-    def period(self) -> int:
+    @class_or_instancemethod
+    def get_dt_period(cls_or_self, index: tp.Optional[tp.Index] = None) -> int:
         """Get the period of the index, without taking into account its datetime-like properties."""
-        return len(self.obj)
+        if not isinstance(cls_or_self, type):
+            index = cls_or_self.obj
+        else:
+            checks.assert_not_none(index, arg_name="index")
+        return len(index)
 
     @property
-    def dt_period(self) -> float:
+    def period(self) -> int:
+        """`BaseIDXAccessor.get_period` with default arguments."""
+        return len(self.obj)
+
+    @class_or_instancemethod
+    def get_dt_period(
+        cls_or_self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.PandasFrequency] = None,
+    ) -> float:
         """Get the period of the index, taking into account its datetime-like properties."""
         from vectorbtpro._settings import settings
 
         wrapping_cfg = settings["wrapping"]
 
-        if isinstance(self.obj, pd.DatetimeIndex):
-            freq = self.freq
+        if not isinstance(cls_or_self, type):
+            index = cls_or_self.obj
+        else:
+            checks.assert_not_none(index, arg_name="index")
+
+        if isinstance(index, pd.DatetimeIndex):
+            freq = cls_or_self.get_freq(index=index, freq=freq, allow_offset=True, allow_numeric=False)
             if freq is not None:
                 if not isinstance(freq, pd.Timedelta):
                     freq = dt.to_timedelta(freq, approximate=True)
-                return (self.obj[-1] - self.obj[0]) / freq + 1
+                return (index[-1] - index[0]) / freq + 1
             if not wrapping_cfg["silence_warnings"]:
                 warnings.warn(
                     (
@@ -282,14 +306,19 @@ class BaseIDXAccessor(Configured, IndexApplier):
                     ),
                     stacklevel=2,
                 )
-        if checks.is_number(self.obj[0]) and checks.is_number(self.obj[-1]):
-            freq = self.get_freq(allow_offset=False, allow_numeric=True)
+        if checks.is_number(index[0]) and checks.is_number(index[-1]):
+            freq = cls_or_self.get_freq(index=index, freq=freq, allow_offset=False, allow_numeric=True)
             if checks.is_number(freq):
-                return (self.obj[-1] - self.obj[0]) / freq + 1
-            return self.obj[-1] - self.obj[0] + 1
+                return (index[-1] - index[0]) / freq + 1
+            return index[-1] - index[0] + 1
         if not wrapping_cfg["silence_warnings"]:
             warnings.warn("Index is neither datetime-like nor integer", stacklevel=2)
-        return self.period
+        return cls_or_self.get_dt_period(index=index)
+
+    @property
+    def dt_period(self) -> float:
+        """`BaseIDXAccessor.get_dt_period` with default arguments."""
+        return self.get_dt_period()
 
     def arr_to_timedelta(
         self,

@@ -68,6 +68,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
 
             target_post_name = "_post_" + arg_name
             if not hasattr(cls, target_post_name):
+
                 def post_arg_prop(self, _arg_name: str = arg_name) -> return_type:
                     return self.prepare_post_arg(_arg_name)
 
@@ -85,6 +86,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
 
             target_name = arg_name
             if not hasattr(cls, target_name):
+
                 def arg_prop(self, _target_post_name: str = target_post_name) -> return_type:
                     return getattr(self, _target_post_name)
 
@@ -96,6 +98,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 getattr(cls, arg_prop.__name__).__set_name__(cls, arg_prop.__name__)
         elif (isinstance(attach, bool) and attach) or attach is None:
             if not hasattr(cls, arg_name):
+
                 def arg_prop(self, _arg_name: str = arg_name) -> tp.Any:
                     return self.get_arg(_arg_name)
 

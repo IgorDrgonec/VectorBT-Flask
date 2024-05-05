@@ -4493,29 +4493,29 @@ class TestPortfolio:
         assert_series_equal(pf.position_coverage, result)
         assert_series_equal(pf_grouped.get_position_coverage(group_by=False), result)
         assert_series_equal(pf_shared.get_position_coverage(group_by=False), result)
-        result = pd.Series(np.array([0.9, 0.6]), pd.Index(["first", "second"], dtype="object", name="group")).rename(
+        result = pd.Series(np.array([1.0, 0.6]), pd.Index(["first", "second"], dtype="object", name="group")).rename(
             "position_coverage"
         )
         assert_series_equal(pf.get_position_coverage(group_by=group_by), result)
         assert_series_equal(pf_grouped.position_coverage, result)
         assert_series_equal(pf_shared.position_coverage, result)
+        result = pd.Series(np.array([0.9, 0.6]), pd.Index(["first", "second"], dtype="object", name="group")).rename(
+            "position_coverage"
+        )
+        assert_series_equal(pf.get_position_coverage(granular_groups=True, group_by=group_by), result)
+        assert_series_equal(pf_grouped.get_position_coverage(granular_groups=True), result)
+        assert_series_equal(pf_shared.get_position_coverage(granular_groups=True), result)
         assert_series_equal(
             pf.position_coverage,
-            vbt.Portfolio.get_position_coverage(position_mask=pf.get_position_mask(group_by=False), wrapper=pf.wrapper),
+            vbt.Portfolio.get_position_coverage(assets=pf.assets, wrapper=pf.wrapper),
         )
         assert_series_equal(
             pf_grouped.position_coverage,
-            vbt.Portfolio.get_position_coverage(
-                position_mask=pf_grouped.get_position_mask(group_by=False),
-                wrapper=pf_grouped.wrapper,
-            ),
+            vbt.Portfolio.get_position_coverage(assets=pf_grouped.assets, wrapper=pf_grouped.wrapper),
         )
         assert_series_equal(
             pf_shared.position_coverage,
-            vbt.Portfolio.get_position_coverage(
-                position_mask=pf_shared.get_position_mask(group_by=False),
-                wrapper=pf_shared.wrapper,
-            ),
+            vbt.Portfolio.get_position_coverage(assets=pf_shared.assets, wrapper=pf_shared.wrapper),
         )
         assert_series_equal(
             pf_grouped.get_position_coverage(jitted=dict(parallel=True)),
@@ -5089,40 +5089,24 @@ class TestPortfolio:
         assert_series_equal(
             pf.input_value,
             vbt.Portfolio.get_input_value(
+                total_cash_deposits=pf.total_cash_deposits,
                 init_value=pf.init_value,
-                cash_deposits_raw=pf._cash_deposits,
-                cash_sharing=pf.cash_sharing,
-                split_shared=False,
-                wrapper=pf.wrapper,
-            ),
-        )
-        assert_series_equal(
-            pf.input_value,
-            vbt.Portfolio.get_input_value(
-                init_value=pf.init_value,
-                cash_deposits_raw=pf._cash_deposits,
-                cash_sharing=pf.cash_sharing,
-                split_shared=True,
                 wrapper=pf.wrapper,
             ),
         )
         assert_series_equal(
             pf_grouped.input_value,
             vbt.Portfolio.get_input_value(
+                total_cash_deposits=pf_grouped.total_cash_deposits,
                 init_value=pf_grouped.init_value,
-                cash_deposits_raw=pf_grouped._cash_deposits,
-                cash_sharing=pf_grouped.cash_sharing,
-                split_shared=False,
                 wrapper=pf_grouped.wrapper,
             ),
         )
         assert_series_equal(
             pf_shared.input_value,
             vbt.Portfolio.get_input_value(
+                total_cash_deposits=pf_shared.total_cash_deposits,
                 init_value=pf_shared.init_value,
-                cash_deposits_raw=pf_shared._cash_deposits,
-                cash_sharing=pf_shared.cash_sharing,
-                split_shared=False,
                 wrapper=pf_shared.wrapper,
             ),
         )
@@ -5471,11 +5455,11 @@ class TestPortfolio:
                     [0.021590645676110087, -0.022472823716428926, 0.021830620581035857],
                     [0.0014790253499028883, -0.01111694919382411, 0.002949383274126105],
                     [0.0, -0.020451154513687394, 0.0],
-                    [0.024675782427111933, -0.05144337771456415, 0.0]
+                    [0.024675782427111933, -0.05144337771456415, 0.0],
                 ],
                 index=close_na.index,
                 columns=close_na.columns,
-            )
+            ),
         )
         assert_frame_equal(
             pf.get_allocations(direction="longonly"),
@@ -5489,7 +5473,7 @@ class TestPortfolio:
                 ],
                 index=close_na.index,
                 columns=close_na.columns,
-            )
+            ),
         )
         assert_frame_equal(
             pf.get_allocations(direction="shortonly"),
@@ -5503,7 +5487,7 @@ class TestPortfolio:
                 ],
                 index=close_na.index,
                 columns=close_na.columns,
-            )
+            ),
         )
         assert_frame_equal(
             pf_grouped.allocations,
@@ -6400,17 +6384,17 @@ class TestPortfolio:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Start Value",
                 "Min Value",
                 "Max Value",
                 "End Value",
-                "Cash Deposits",
+                "Total Cash Deposits",
                 "Total Return [%]",
                 "Benchmark Return [%]",
-                "Total Time Exposure [%]",
+                "Position Coverage [%]",
                 "Max Gross Exposure [%]",
                 "Max Drawdown [%]",
                 "Max Drawdown Duration",
@@ -6555,16 +6539,16 @@ class TestPortfolio:
                 ),
                 index=pd.Index(
                     [
-                        "Start",
-                        "End",
-                        "Period",
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
                         "Start Value",
                         "Min Value",
                         "Max Value",
                         "End Value",
-                        "Cash Deposits",
+                        "Total Cash Deposits",
                         "Total Return [%]",
-                        "Total Time Exposure [%]",
+                        "Position Coverage [%]",
                         "Max Gross Exposure [%]",
                         "Max Drawdown [%]",
                         "Max Drawdown Duration",
@@ -7082,9 +7066,9 @@ class TestPortfolio:
     def test_returns_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Return [%]",
                 "Benchmark Return [%]",
                 "Annualized Return [%]",
@@ -7193,9 +7177,9 @@ class TestPortfolio:
                 ),
                 index=pd.Index(
                     [
-                        "Start",
-                        "End",
-                        "Period",
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
                         "Total Return [%]",
                         "Annualized Return [%]",
                         "Annualized Volatility [%]",
@@ -7229,6 +7213,13 @@ class TestPortfolio:
             pf.plot(subplots="all")
         with pytest.raises(Exception):
             pf_grouped.plot(subplots="all")
+        pf.plot(column="a", subplots="all", settings=dict(sim_start=1, sim_end=4))
+        pf.replace(bm_close=None).plot(column="a", subplots="all", settings=dict(sim_start=1, sim_end=4))
+        pf.replace(bm_close=False).plot(column="a", subplots="all", settings=dict(sim_start=1, sim_end=4))
+        pf.plot(column="a", subplots="all", settings=dict(sim_start=1, sim_end=4))
+        pf_grouped.plot(column="first", subplots="all", settings=dict(sim_start=1, sim_end=4))
+        pf_grouped.plot(column="a", subplots="all", group_by=False, settings=dict(sim_start=1, sim_end=4))
+        pf_shared.plot(column="a", subplots="all", group_by=False, settings=dict(sim_start=1, sim_end=4))
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):

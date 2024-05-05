@@ -90,7 +90,7 @@ def generate_gbm_data_1d_nb(
         else:
             prev_value = out[i - 1]
         rand = np.random.standard_normal()
-        out[i] = prev_value * np.exp((mean - 0.5 * std ** 2) * dt + std * np.sqrt(dt) * rand)
+        out[i] = prev_value * np.exp((mean - 0.5 * std**2) * dt + std * np.sqrt(dt) * rand)
 
     return out
 

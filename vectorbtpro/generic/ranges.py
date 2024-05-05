@@ -146,7 +146,6 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 # ############# Ranges ############# #
 
 ranges_field_config = ReadonlyConfig(
@@ -163,7 +162,9 @@ ranges_field_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["ranges_field_config"] = f"""Field config for `Ranges`.
+__pdoc__[
+    "ranges_field_config"
+] = f"""Field config for `Ranges`.
 
 ```python
 {ranges_field_config.prettify()}
@@ -173,7 +174,9 @@ __pdoc__["ranges_field_config"] = f"""Field config for `Ranges`.
 ranges_attach_field_config = ReadonlyConfig(dict(status=dict(attach_filters=True)))
 """_"""
 
-__pdoc__["ranges_attach_field_config"] = f"""Config of fields to be attached to `Ranges`.
+__pdoc__[
+    "ranges_attach_field_config"
+] = f"""Config of fields to be attached to `Ranges`.
 
 ```python
 {ranges_attach_field_config.prettify()}
@@ -200,7 +203,9 @@ ranges_shortcut_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["ranges_shortcut_config"] = f"""Config of shortcut properties to be attached to `Ranges`.
+__pdoc__[
+    "ranges_shortcut_config"
+] = f"""Config of shortcut properties to be attached to `Ranges`.
 
 ```python
 {ranges_shortcut_config.prettify()}
@@ -685,10 +690,20 @@ class Ranges(PriceRecords):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -1509,7 +1524,6 @@ Ranges.override_field_config_doc(__pdoc__)
 Ranges.override_metrics_doc(__pdoc__)
 Ranges.override_subplots_doc(__pdoc__)
 
-
 # ############# Pattern ranges ############# #
 
 
@@ -1668,7 +1682,9 @@ pattern_ranges_field_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["pattern_ranges_field_config"] = f"""Field config for `PatternRanges`.
+__pdoc__[
+    "pattern_ranges_field_config"
+] = f"""Field config for `PatternRanges`.
 
 ```python
 {pattern_ranges_field_config.prettify()}

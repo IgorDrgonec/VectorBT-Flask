@@ -988,11 +988,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         else:
             if keys is None:
                 keys = cls_or_self.keys
-        level_name = cls_or_self.get_level_name(
-            keys=keys,
-            level_name=level_name,
-            feature_oriented=feature_oriented
-        )
+        level_name = cls_or_self.get_level_name(keys=keys, level_name=level_name, feature_oriented=feature_oriented)
         if isinstance(level_name, tuple):
             return pd.MultiIndex.from_tuples(keys, names=level_name)
         return pd.Index(keys, name=level_name)
@@ -4963,20 +4959,20 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title="Start",
+            start_index=dict(
+                title="Start Index",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
                 tags="wrapper",
             ),
-            end=dict(
-                title="End",
+            end_index=dict(
+                title="End Index",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
                 tags="wrapper",
             ),
-            period=dict(
-                title="Period",
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,

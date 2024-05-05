@@ -14,6 +14,7 @@ from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 
+
 # ############# Rolling functions ############# #
 
 

@@ -670,7 +670,9 @@ merge_func_config = HybridConfig(
 )
 """_"""
 
-__pdoc__["merge_func_config"] = f"""Config for merging functions.
+__pdoc__[
+    "merge_func_config"
+] = f"""Config for merging functions.
 
 ```python
 {merge_func_config.prettify()}

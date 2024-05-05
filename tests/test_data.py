@@ -3080,9 +3080,9 @@ class TestData:
 
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Symbols",
                 "Null Counts: S1",
                 "Null Counts: S2",
@@ -3159,9 +3159,9 @@ class TestData:
 
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Features",
                 "Null Counts: F1",
                 "Null Counts: F2",

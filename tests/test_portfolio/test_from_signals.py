@@ -6797,14 +6797,14 @@ class TestFromHolding:
                 _from_signals_both(
                     entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3], group_by=[0, 0, 1]
                 ).sim_start,
-                np.array([1, 2, 3]),
+                np.array([1, 3]),
             )
         else:
             np.testing.assert_array_equal(
                 _from_signals_both(
                     entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3], group_by=[0, 0, 1]
                 ).sim_start,
-                np.array([1, 1, 3]),
+                np.array([1, 3]),
             )
         _entries_wide = entries_wide.copy()
         _exits_wide = exits_wide.copy()

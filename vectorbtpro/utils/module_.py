@@ -27,11 +27,12 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 package_shortcut_config = HybridConfig(dict(vbt="vectorbtpro", pd="pandas", np="numpy", nb="numba"))
 """_"""
 
-__pdoc__["package_shortcut_config"] = f"""Config for package shortcuts.
+__pdoc__[
+    "package_shortcut_config"
+] = f"""Config for package shortcuts.
 
 ```python
 {package_shortcut_config.prettify()}

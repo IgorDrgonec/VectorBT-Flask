@@ -53,7 +53,6 @@ class AllocRanges(Ranges):
 
 AllocRanges.override_field_config_doc(__pdoc__)
 
-
 # ############# AllocPoints ############# #
 
 alloc_points_field_config = ReadonlyConfig(

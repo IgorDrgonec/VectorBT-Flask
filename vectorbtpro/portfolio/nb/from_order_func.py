@@ -5,7 +5,8 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
+from vectorbtpro.base.reshaping import to_2d_array_nb
+from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.iter_ import *
@@ -446,7 +447,7 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, tp.VarArg()], None]
 )
 def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
@@ -890,8 +891,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -1580,11 +1580,12 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,
@@ -1701,8 +1702,8 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
-        sim_start=None,
-        sim_end=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -1721,7 +1722,7 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
 )
 def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
@@ -1755,8 +1756,8 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
-    sim_start: tp.Optional[int] = None,
-    sim_end: tp.Optional[int] = None,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -1930,8 +1931,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -2622,11 +2622,12 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,
@@ -2752,7 +2753,7 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
 )
 def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
@@ -3030,8 +3031,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -3710,11 +3710,12 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,
@@ -3794,8 +3795,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
-        sim_start=None,
-        sim_end=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -3814,7 +3815,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 )
 def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
@@ -3847,8 +3848,8 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
-    sim_start: tp.Optional[int] = None,
-    sim_end: tp.Optional[int] = None,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -3967,8 +3968,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     group_start_idxs = group_end_idxs - group_lens
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
-        target_shape=target_shape,
-        group_lens=group_lens,
+        sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
     )
@@ -4649,11 +4649,12 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = prepare_sim_range_out_nb(
+    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
         sim_end=sim_end_,
+        allow_none=True,
     )
     return prepare_sim_out_nb(
         order_records=order_records,

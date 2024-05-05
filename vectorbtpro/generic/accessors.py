@@ -256,14 +256,11 @@ SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigu
 
 
 class TransformerT(tp.Protocol):
-    def __init__(self, **kwargs) -> None:
-        ...
+    def __init__(self, **kwargs) -> None: ...
 
-    def transform(self, *args, **kwargs) -> tp.Array2d:
-        ...
+    def transform(self, *args, **kwargs) -> tp.Array2d: ...
 
-    def fit_transform(self, *args, **kwargs) -> tp.Array2d:
-        ...
+    def fit_transform(self, *args, **kwargs) -> tp.Array2d: ...
 
 
 nb_config = ReadonlyConfig(
@@ -292,7 +289,9 @@ nb_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["nb_config"] = f"""Config of Numba methods to be attached to `GenericAccessor`.
+__pdoc__[
+    "nb_config"
+] = f"""Config of Numba methods to be attached to `GenericAccessor`.
 
 ```python
 {nb_config.prettify()}
@@ -3656,12 +3655,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, *args, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, *args, **kwargs) -> Drawdowns:
         """Generate drawdown records.
 
         See `vectorbtpro.generic.drawdowns.Drawdowns.from_price`."""
-        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Drawdowns.from_price(self.obj, *args, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Drawdowns.from_price(self.obj, *args, wrapper=self.wrapper, **kwargs)
 
     def to_mapped(
         self,
@@ -3896,10 +3894,20 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -4739,6 +4747,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def areaplot(
         self,
         line_shape: str = "spline",
+        line_visible: bool = False,
+        colorway: tp.Union[None, str, tp.Sequence[str]] = None,
         trace_kwargs: tp.KwargsLikeSequence = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
@@ -4748,6 +4758,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Args:
             line_shape (str): Line shape.
+            line_visible (bool): Whether to make line visible.
+            colorway (str or sequence): Name of the built-in, qualitative colorway, or a list with colors.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
@@ -4771,12 +4783,15 @@ class GenericAccessor(BaseAccessor, Analyzable):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        if fig.layout.colorway is not None:
-            colorway = fig.layout.colorway
-        else:
-            colorway = fig.layout.template.layout.colorway
-        if len(self.wrapper.columns) > len(colorway):
-            colorway = px.colors.qualitative.Alphabet
+        if colorway is None:
+            if fig.layout.colorway is not None:
+                colorway = fig.layout.colorway
+            else:
+                colorway = fig.layout.template.layout.colorway
+            if len(self.wrapper.columns) > len(colorway):
+                colorway = px.colors.qualitative.Alphabet
+        elif isinstance(colorway, str):
+            colorway = getattr(px.colors.qualitative, colorway)
 
         pos_mask = self.obj.values > 0
         pos_mask_any = pos_mask.any()
@@ -4788,6 +4803,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             pos_showlegend = True
         elif neg_mask_any:
             neg_showlegend = True
+        line_width = None if line_visible else 0
+        line_opacity = 0.3 if line_visible else 0.8
         if pos_mask_any:
             pos_df = self.obj.copy()
             pos_df[neg_mask] = 0.0
@@ -4795,10 +4812,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 trace_kwargs=[
                     merge_dicts(
                         dict(
-                            legendgroup="pfopt_" + str(c),
+                            legendgroup="area_" + str(c),
                             stackgroup="one",
-                            line=dict(width=0, shape=line_shape),
-                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
+                            line=dict(width=line_width, color=colorway[c % len(colorway)], shape=line_shape),
+                            fillcolor=adjust_opacity(colorway[c % len(colorway)], line_opacity),
                             showlegend=pos_showlegend,
                         ),
                         resolve_dict(trace_kwargs, i=c),
@@ -4817,10 +4834,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 trace_kwargs=[
                     merge_dicts(
                         dict(
-                            legendgroup="pfopt_" + str(c),
+                            legendgroup="area_" + str(c),
                             stackgroup="two",
-                            line=dict(width=0, shape=line_shape),
-                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
+                            line=dict(width=line_width, color=colorway[c % len(colorway)], shape=line_shape),
+                            fillcolor=adjust_opacity(colorway[c % len(colorway)], line_opacity),
                             showlegend=neg_showlegend,
                         ),
                         resolve_dict(trace_kwargs, i=c),
@@ -5094,7 +5111,9 @@ if settings["importing"]["sklearn"]:
     )
     """_"""
 
-    __pdoc__["transform_config"] = f"""Config of transform methods to be attached to `GenericAccessor`.
+    __pdoc__[
+        "transform_config"
+    ] = f"""Config of transform methods to be attached to `GenericAccessor`.
 
     ```python
     {transform_config.prettify()}
@@ -5102,7 +5121,6 @@ if settings["importing"]["sklearn"]:
     """
 
     GenericAccessor = attach_transform_methods(transform_config)(GenericAccessor)
-
 
 GenericAccessor.override_metrics_doc(__pdoc__)
 GenericAccessor.override_subplots_doc(__pdoc__)

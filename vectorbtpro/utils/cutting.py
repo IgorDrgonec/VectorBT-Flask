@@ -112,7 +112,7 @@ def cut_from_code(
             if sline.startswith("# % <skip") and sline.endswith(">"):
                 if skip:
                     raise ValueError("Missing </skip>")
-                expression = sline[len("# % <skip"): -1].strip()
+                expression = sline[len("# % <skip") : -1].strip()
                 if len(expression) == 0:
                     skip = True
                 else:
@@ -130,7 +130,7 @@ def cut_from_code(
                 if sline.startswith("# % <uncomment") and sline.endswith(">"):
                     if uncomment:
                         raise ValueError("Missing </uncomment>")
-                    expression = sline[len("# % <uncomment"): -1].strip()
+                    expression = sline[len("# % <uncomment") : -1].strip()
                     if len(expression) == 0:
                         uncomment = True
                     else:
@@ -159,7 +159,7 @@ def cut_from_code(
                             if isinstance(eval_line, str):
                                 out_lines.append(eval_line)
                             else:
-                                lines[i + 1: i + 1] = eval_line
+                                lines[i + 1 : i + 1] = eval_line
                         else:
                             out_lines.append(line)
                 elif uncomment:

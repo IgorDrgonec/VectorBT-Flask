@@ -583,7 +583,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                     elif col_lens[col] > 0:
                         col_end_idxs = np.cumsum(col_lens)
                         col_start_idxs = col_end_idxs - col_lens
-                        _record_indices = col_idxs[col_start_idxs[col]: col_end_idxs[col]] + cum_n_rows_sum[i]
+                        _record_indices = col_idxs[col_start_idxs[col] : col_end_idxs[col]] + cum_n_rows_sum[i]
                         record_indices.append(_record_indices)
 
         if len(record_indices) == 0:
@@ -1305,10 +1305,20 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,

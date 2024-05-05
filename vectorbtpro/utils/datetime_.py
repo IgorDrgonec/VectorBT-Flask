@@ -29,7 +29,6 @@ __pdoc__ = {}
 
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
-
 # ############# Frequency ############# #
 
 
@@ -568,7 +567,6 @@ def to_freq(freq: tp.FrequencyLike, allow_offset: bool = True, keep_offset: bool
 
 DTCNT = namedtuple("DTCNT", ["year", "month", "day", "weekday", "hour", "minute", "second", "nanosecond"])
 """Named tuple version of `DTC`."""
-
 
 DTCT = tp.TypeVar("DTCT", bound="DTC")
 

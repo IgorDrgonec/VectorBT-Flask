@@ -11,7 +11,6 @@ if tp.TYPE_CHECKING:
 else:
     ProgressBarT = "ProgressBar"
 
-
 __all__ = [
     "PBarRegistry",
     "pbar_reg",

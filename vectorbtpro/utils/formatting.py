@@ -233,6 +233,7 @@ def ptable(*args, display_html: tp.Optional[bool] = None, **kwargs) -> None:
         display_html = is_notebook()
     if display_html:
         from IPython.display import display, HTML
+
         display(HTML(format_array(*args, html=True, **kwargs)))
     else:
         print(format_array(*args, **kwargs))

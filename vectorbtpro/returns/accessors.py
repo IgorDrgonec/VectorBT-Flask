@@ -1806,16 +1806,14 @@ class ReturnsAccessor(GenericAccessor):
         self,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> Drawdowns:
         """Generate drawdown records of cumulative returns.
 
         See `vectorbtpro.generic.drawdowns.Drawdowns`."""
-        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
         return Drawdowns.from_price(
             self.cumulative(start_value=1.0, jitted=jitted),
-            wrapper_kwargs=wrapper_kwargs,
+            wrapper=self.wrapper,
             **kwargs,
         )
 
@@ -1932,22 +1930,22 @@ class ReturnsAccessor(GenericAccessor):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title="Start",
+            start_index=dict(
+                title="Start Index",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
                 check_is_not_grouped=False,
                 tags="wrapper",
             ),
-            end=dict(
-                title="End",
+            end_index=dict(
+                title="End Index",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
                 check_is_not_grouped=False,
                 tags="wrapper",
             ),
-            period=dict(
-                title="Period",
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -2126,32 +2124,41 @@ class ReturnsAccessor(GenericAccessor):
             if bm_kwargs is None:
                 bm_kwargs = {}
             bm_kwargs = merge_dicts(
-                dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["gray"]), name="Benchmark")),
+                dict(
+                    trace_kwargs=dict(
+                        line=dict(
+                            color=plotting_cfg["color_schema"]["gray"],
+                        ),
+                        name="Benchmark",
+                    )
+                ),
                 bm_kwargs,
             )
-            bm_cumrets = bm_returns.vbt.returns.cumulative(start_value=start_value)
-            bm_cumrets.vbt.lineplot(**bm_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            bm_cum_returns = bm_returns.vbt.returns.cumulative(start_value=start_value)
+            bm_cum_returns.vbt.lineplot(**bm_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:
-            bm_cumrets = None
+            bm_cum_returns = None
 
-        # Plot main
         if main_kwargs is None:
             main_kwargs = {}
-        cumrets = self.cumulative(start_value=start_value)
-        cumrets = self.select_col_from_obj(cumrets, column, wrapper=self.wrapper.regroup(False))
+        cum_returns = self.cumulative(start_value=start_value)
+        cum_returns = self.select_col_from_obj(cum_returns, column, wrapper=self.wrapper.regroup(False))
         main_kwargs = merge_dicts(
             dict(
-                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"])),
+                trace_kwargs=dict(
+                    line=dict(
+                        color=plotting_cfg["color_schema"]["purple"],
+                    ),
+                ),
                 other_trace_kwargs="hidden",
             ),
             main_kwargs,
         )
         if fill_to_benchmark:
-            cumrets.vbt.plot_against(bm_cumrets, add_trace_kwargs=add_trace_kwargs, fig=fig, **main_kwargs)
+            cum_returns.vbt.plot_against(bm_cum_returns, add_trace_kwargs=add_trace_kwargs, fig=fig, **main_kwargs)
         else:
-            cumrets.vbt.plot_against(start_value, add_trace_kwargs=add_trace_kwargs, fig=fig, **main_kwargs)
+            cum_returns.vbt.plot_against(start_value, add_trace_kwargs=add_trace_kwargs, fig=fig, **main_kwargs)
 
-        # Plot hline
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
         fig.add_shape(
@@ -2172,7 +2179,6 @@ class ReturnsAccessor(GenericAccessor):
                 hline_shape_kwargs,
             )
         )
-
         return fig
 
     @property

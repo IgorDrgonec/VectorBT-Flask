@@ -435,7 +435,7 @@ def groupby_transform_nb(
     or an array that broadcasts against the group array's shape."""
     group_idxs, group_lens = group_map
     group_start_idxs = np.cumsum(group_lens) - group_lens
-    group_0_idxs = group_idxs[group_start_idxs[0]: group_start_idxs[0] + group_lens[0]]
+    group_0_idxs = group_idxs[group_start_idxs[0] : group_start_idxs[0] + group_lens[0]]
     group_0_out = transform_func_nb(arr[group_0_idxs], *args)
     out = np.empty(arr.shape, dtype=np.asarray(group_0_out).dtype)
     out[group_0_idxs] = group_0_out
@@ -443,7 +443,7 @@ def groupby_transform_nb(
     for group in prange(1, group_lens.shape[0]):
         group_len = group_lens[group]
         start_idx = group_start_idxs[group]
-        idxs = group_idxs[start_idx: start_idx + group_len]
+        idxs = group_idxs[start_idx : start_idx + group_len]
         out[idxs] = transform_func_nb(arr[idxs], *args)
     return out
 
@@ -461,7 +461,7 @@ def groupby_transform_meta_nb(
     Must return a scalar or an array that broadcasts against the group's shape."""
     group_idxs, group_lens = group_map
     group_start_idxs = np.cumsum(group_lens) - group_lens
-    group_0_idxs = group_idxs[group_start_idxs[0]: group_start_idxs[0] + group_lens[0]]
+    group_0_idxs = group_idxs[group_start_idxs[0] : group_start_idxs[0] + group_lens[0]]
     group_0_out = transform_func_nb(group_0_idxs, 0, *args)
     out = np.empty(target_shape, dtype=np.asarray(group_0_out).dtype)
     out[group_0_idxs] = group_0_out
@@ -469,7 +469,7 @@ def groupby_transform_meta_nb(
     for group in prange(1, group_lens.shape[0]):
         group_len = group_lens[group]
         start_idx = group_start_idxs[group]
-        idxs = group_idxs[start_idx: start_idx + group_len]
+        idxs = group_idxs[start_idx : start_idx + group_len]
         out[idxs] = transform_func_nb(idxs, group, *args)
     return out
 
@@ -1065,6 +1065,7 @@ def flatten_uniform_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_ord
 
 
 # ############# Proximity ############# #
+
 
 @register_jitted(tags={"can_parallel"})
 def proximity_reduce_nb(

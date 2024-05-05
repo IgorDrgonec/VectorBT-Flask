@@ -2286,20 +2286,22 @@ class PortfolioOptimizer(Analyzable):
         # Generate allocations
         funcs_args = []
         for group_idx, group_config in enumerate(group_configs):
-            funcs_args.append((
-                cls.run_allocation_group,
-                (),
-                dict(
-                    wrapper=wrapper,
-                    group_configs=group_configs,
-                    group_index=group_index,
-                    group_idx=group_idx,
-                    pre_group_func=pre_group_func,
-                    jitted_loop=jitted_loop,
-                    jitted=jitted,
-                    chunked=chunked,
-                ),
-            ))
+            funcs_args.append(
+                (
+                    cls.run_allocation_group,
+                    (),
+                    dict(
+                        wrapper=wrapper,
+                        group_configs=group_configs,
+                        group_index=group_index,
+                        group_idx=group_idx,
+                        pre_group_func=pre_group_func,
+                        jitted_loop=jitted_loop,
+                        jitted=jitted,
+                        chunked=chunked,
+                    ),
+                )
+            )
         execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
         results = execute(funcs_args, keys=group_index, **execute_kwargs)
         alloc_points, allocations = zip(*results)
@@ -2743,15 +2745,19 @@ class PortfolioOptimizer(Analyzable):
                 __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                 funcs_args.append((__optimize_func, __args, __kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
-                    keys.append("{} → {}".format(
-                        dt.readable_datetime(wrapper.index[_index_ranges[0][i]], freq=wrapper.freq),
-                        dt.readable_datetime(wrapper.index[_index_ranges[1][i] - 1], freq=wrapper.freq),
-                    ))
+                    keys.append(
+                        "{} → {}".format(
+                            dt.readable_datetime(wrapper.index[_index_ranges[0][i]], freq=wrapper.freq),
+                            dt.readable_datetime(wrapper.index[_index_ranges[1][i] - 1], freq=wrapper.freq),
+                        )
+                    )
                 else:
-                    keys.append("{} → {}".format(
-                        str(wrapper.index[_index_ranges[0][i]]),
-                        str(wrapper.index[_index_ranges[1][i] - 1]),
-                    ))
+                    keys.append(
+                        "{} → {}".format(
+                            str(wrapper.index[_index_ranges[0][i]]),
+                            str(wrapper.index[_index_ranges[1][i] - 1]),
+                        )
+                    )
             results = execute(funcs_args, keys=keys, **_execute_kwargs)
             _allocations = pd.DataFrame(results, columns=wrapper.columns)
             if isinstance(_allocations.columns, pd.RangeIndex):
@@ -3174,20 +3180,22 @@ class PortfolioOptimizer(Analyzable):
         # Generate allocations
         funcs_args = []
         for group_idx, group_config in enumerate(group_configs):
-            funcs_args.append((
-                cls.run_optimization_group,
-                (),
-                dict(
-                    wrapper=wrapper,
-                    group_configs=group_configs,
-                    group_index=group_index,
-                    group_idx=group_idx,
-                    pre_group_func=pre_group_func,
-                    jitted_loop=jitted_loop,
-                    jitted=jitted,
-                    chunked=chunked,
-                ),
-            ))
+            funcs_args.append(
+                (
+                    cls.run_optimization_group,
+                    (),
+                    dict(
+                        wrapper=wrapper,
+                        group_configs=group_configs,
+                        group_index=group_index,
+                        group_idx=group_idx,
+                        pre_group_func=pre_group_func,
+                        jitted_loop=jitted_loop,
+                        jitted=jitted,
+                        chunked=chunked,
+                    ),
+                )
+            )
         execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
         results = execute(funcs_args, keys=group_index, **execute_kwargs)
         alloc_ranges, allocations = zip(*results)
@@ -3378,10 +3386,20 @@ class PortfolioOptimizer(Analyzable):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,

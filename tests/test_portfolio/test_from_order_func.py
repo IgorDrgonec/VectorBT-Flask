@@ -2147,7 +2147,7 @@ class TestFromOrderFunc:
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
-        assert_series_equal(pf.cash_earnings, pd.Series([0, 1, 2, 3]))
+        assert_series_equal(pf.cash_earnings, pd.Series([0.0, 1.0, 2.0, 3.0]))
         assert_records_close(
             pf.order_records,
             np.array(
@@ -3399,7 +3399,7 @@ class TestFromOrderFunc:
         )
         np.testing.assert_array_equal(
             _from_order_func(order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True).sim_start,
-            np.array([1, 1, 2]),
+            np.array([1, 2]),
         )
 
 

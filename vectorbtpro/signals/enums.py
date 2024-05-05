@@ -35,7 +35,9 @@ class StopTypeT(tp.NamedTuple):
 StopType = StopTypeT()
 """_"""
 
-__pdoc__["StopType"] = f"""Stop type.
+__pdoc__[
+    "StopType"
+] = f"""Stop type.
 
 ```python
 {prettify(StopType)}
@@ -55,7 +57,9 @@ class SignalRelationT(tp.NamedTuple):
 SignalRelation = SignalRelationT()
 """_"""
 
-__pdoc__["SignalRelation"] = f"""SignalRelation between two masks.
+__pdoc__[
+    "SignalRelation"
+] = f"""SignalRelation between two masks.
 
 ```python
 {prettify(SignalRelation)}
@@ -81,7 +85,9 @@ class FactoryModeT(tp.NamedTuple):
 FactoryMode = FactoryModeT()
 """_"""
 
-__pdoc__["FactoryMode"] = f"""Factory mode.
+__pdoc__[
+    "FactoryMode"
+] = f"""Factory mode.
 
 ```python
 {prettify(FactoryMode)}
@@ -113,6 +119,7 @@ Attributes:
         
         Such generators often have suffix 'CX'.
 """
+
 
 # ############# Named tuples ############# #
 
@@ -225,7 +232,9 @@ __pdoc__["RankContext.reset_wait"] = """Number of ticks to wait before resetting
 __pdoc__["RankContext.col"] = "Current column."
 __pdoc__["RankContext.i"] = "Current row."
 __pdoc__["RankContext.last_false_i"] = "Row of the last False value in the main mask."
-__pdoc__["RankContext.last_reset_i"] = """Row of the last True value in the resetting mask. 
+__pdoc__[
+    "RankContext.last_reset_i"
+] = """Row of the last True value in the resetting mask. 
 
 Doesn't take into account `reset_wait`."""
 __pdoc__["RankContext.all_sig_cnt"] = """Number of all signals encountered including this."""

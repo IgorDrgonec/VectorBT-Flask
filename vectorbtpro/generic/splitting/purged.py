@@ -146,6 +146,7 @@ class PurgedWalkForwardCV(BasePurgedCV):
     With `split_by_time=True` in the `PurgedWalkForwardCV.split` method, it is also possible to
     split the samples in folds spanning equal time intervals (using the prediction time as a time tag),
     instead of folds containing equal numbers of samples."""
+
     def __init__(
         self,
         n_folds: int = 10,

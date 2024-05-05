@@ -40,7 +40,6 @@ class _Missing(enum.Enum):
 MISSING = _Missing.MISSING
 """Sentinel that represents a missing value."""
 
-
 DefineMixinT = tp.TypeVar("DefineMixinT", bound="DefineMixin")
 
 

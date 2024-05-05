@@ -550,7 +550,7 @@ def within_periodic_dtc_nb(
             prev_status=prev_status,
             closed_start=closed_start,
             closed_end=closed_end,
-            is_last=is_last
+            is_last=is_last,
         )
         status_before_end = within_fixed_dtc_nb(
             c,
@@ -559,7 +559,7 @@ def within_periodic_dtc_nb(
             prev_status=prev_status,
             closed_start=closed_start,
             closed_end=closed_end,
-            is_last=is_last
+            is_last=is_last,
         )
         if status_after_start == DTCS.O and status_before_end == DTCS.O:
             return DTCS.O
@@ -578,7 +578,7 @@ def within_periodic_dtc_nb(
         prev_status=prev_status,
         closed_start=closed_start,
         closed_end=closed_end,
-        is_last=is_last
+        is_last=is_last,
     )
 
 

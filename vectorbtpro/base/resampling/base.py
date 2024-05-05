@@ -19,7 +19,6 @@ __all__ = [
     "Resampler",
 ]
 
-
 ResamplerT = tp.TypeVar("ResamplerT", bound="Resampler")
 
 

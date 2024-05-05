@@ -34,7 +34,6 @@ __all__ = [
     "Wrapping",
 ]
 
-
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
 
@@ -1234,10 +1233,14 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
             if force_1d and arr.ndim == 0:
                 arr = arr[None]
             if fillna is not None:
-                arr[pd.isnull(arr)] = fillna
+                if arr.ndim == 0:
+                    if pd.isnull(arr):
+                        arr = fillna
+                else:
+                    arr[pd.isnull(arr)] = fillna
             if arr.ndim == 0:
                 # Scalar per Series/DataFrame
-                return _apply_dtype(pd.Series(arr))[0]
+                return _apply_dtype(pd.Series(arr[None]))[0]
             if arr.ndim == 1:
                 if not force_1d and _self.ndim == 1:
                     if arr.shape[0] == 1:
@@ -1251,6 +1254,8 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
                         name_or_index = None
                     return _apply_dtype(pd.Series(arr, index=name_or_index, name=sr_name))
                 # Scalar per column in DataFrame
+                if arr.shape[0] == 1 and len(columns) > 1:
+                    arr = reshaping.broadcast_array_to(arr, len(columns))
                 return _apply_dtype(pd.Series(arr, index=columns, name=name_or_index))
             if arr.ndim == 2:
                 if arr.shape[1] == 1 and _self.ndim == 1:
@@ -1265,6 +1270,8 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
                 # Array per column in DataFrame
                 if isinstance(name_or_index, str):
                     name_or_index = None
+                if arr.shape[0] == 1 and len(columns) > 1:
+                    arr = reshaping.broadcast_array_to(arr, (arr.shape[0], len(columns)))
                 return _apply_dtype(pd.DataFrame(arr, index=name_or_index, columns=columns))
             raise ValueError(f"{arr.ndim}-d input is not supported")
 
@@ -1292,7 +1299,6 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
         """Stack reduced objects along columns and wrap the final object."""
         from vectorbtpro.base.merging import concat_arrays
 
-        _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
@@ -1303,6 +1309,7 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
 
         stacked_obj = concat_arrays(new_objs)
         if wrap:
+            _self = self.resolve(group_by=group_by)
             return _self.wrap_reduced(stacked_obj, **kwargs)
         return stacked_obj
 
@@ -1725,6 +1732,135 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
             return self.wrap(arr, group_by=False)
         return arr
 
+    # ############# Selection ############# #
+
+    def select_col(
+        self: ArrayWrapperT,
+        column: tp.Any = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> ArrayWrapperT:
+        """Select one column/group.
+
+        `column` can be a label-based position as well as an integer position (if label fails)."""
+        _self = self.regroup(group_by, **kwargs)
+
+        def _check_out_dim(out: ArrayWrapperT) -> ArrayWrapperT:
+            if out.get_ndim() == 2:
+                if out.get_shape_2d()[1] == 1:
+                    if out.column_only_select:
+                        return out.iloc[0]
+                    return out.iloc[:, 0]
+                if _self.grouper.is_grouped():
+                    raise TypeError("Could not select one group: multiple groups returned")
+                else:
+                    raise TypeError("Could not select one column: multiple columns returned")
+            return out
+
+        if column is None:
+            if _self.get_ndim() == 2 and _self.get_shape_2d()[1] == 1:
+                column = 0
+        if column is not None:
+            if _self.grouper.is_grouped():
+                if _self.grouped_ndim == 1:
+                    raise TypeError("This object already contains one group of data")
+                if column not in _self.get_columns():
+                    if isinstance(column, int):
+                        if _self.column_only_select:
+                            return _check_out_dim(_self.iloc[column])
+                        return _check_out_dim(_self.iloc[:, column])
+                    raise KeyError(f"Group '{column}' not found")
+            else:
+                if _self.ndim == 1:
+                    raise TypeError("This object already contains one column of data")
+                if column not in _self.columns:
+                    if isinstance(column, int):
+                        if _self.column_only_select:
+                            return _check_out_dim(_self.iloc[column])
+                        return _check_out_dim(_self.iloc[:, column])
+                    raise KeyError(f"Column '{column}' not found")
+            return _check_out_dim(_self[column])
+        if _self.grouper.is_grouped():
+            if _self.grouped_ndim == 1:
+                return _self
+            raise TypeError("Only one group is allowed. Use indexing or column argument.")
+        if _self.ndim == 1:
+            return _self
+        raise TypeError("Only one column is allowed. Use indexing or column argument.")
+
+    def select_col_from_obj(
+        self,
+        obj: tp.Optional[tp.SeriesFrame],
+        column: tp.Any = None,
+        obj_ungrouped: bool = False,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
+        """Select one column/group from a Pandas object.
+
+        `column` can be a label-based position as well as an integer position (if label fails)."""
+        if obj is None:
+            return None
+        _self = self.regroup(group_by, **kwargs)
+
+        def _check_out_dim(out: tp.SeriesFrame, from_df: bool) -> tp.Series:
+            bad_shape = False
+            if from_df and isinstance(out, pd.DataFrame):
+                if len(out.columns) == 1:
+                    return out.iloc[:, 0]
+                bad_shape = True
+            if not from_df and isinstance(out, pd.Series):
+                if len(out) == 1:
+                    return out.iloc[0]
+                bad_shape = True
+            if bad_shape:
+                if _self.grouper.is_grouped():
+                    raise TypeError("Could not select one group: multiple groups returned")
+                else:
+                    raise TypeError("Could not select one column: multiple columns returned")
+            return out
+
+        if column is None:
+            if _self.get_ndim() == 2 and _self.get_shape_2d()[1] == 1:
+                column = 0
+        if column is not None:
+            if _self.grouper.is_grouped():
+                if _self.grouped_ndim == 1:
+                    raise TypeError("This object already contains one group of data")
+                if obj_ungrouped:
+                    mask = _self.grouper.group_by == column
+                    if not mask.any():
+                        raise KeyError(f"Group '{column}' not found")
+                    if isinstance(obj, pd.DataFrame):
+                        return obj.loc[:, mask]
+                    return obj.loc[mask]
+                else:
+                    if column not in _self.get_columns():
+                        if isinstance(column, int):
+                            if isinstance(obj, pd.DataFrame):
+                                return _check_out_dim(obj.iloc[:, column], True)
+                            return _check_out_dim(obj.iloc[column], False)
+                        raise KeyError(f"Group '{column}' not found")
+            else:
+                if _self.ndim == 1:
+                    raise TypeError("This object already contains one column of data")
+                if column not in _self.columns:
+                    if isinstance(column, int):
+                        if isinstance(obj, pd.DataFrame):
+                            return _check_out_dim(obj.iloc[:, column], True)
+                        return _check_out_dim(obj.iloc[column], False)
+                    raise KeyError(f"Column '{column}' not found")
+            if isinstance(obj, pd.DataFrame):
+                return _check_out_dim(obj[column], True)
+            return _check_out_dim(obj[column], False)
+        if not _self.grouper.is_grouped():
+            if _self.ndim == 1:
+                return obj
+            raise TypeError("Only one column is allowed. Use indexing or column argument.")
+        if _self.grouped_ndim == 1:
+            return obj
+        raise TypeError("Only one group is allowed. Use indexing or column argument.")
+
     # ############# Splitting ############# #
 
     def split(self, *args, splitter_cls: tp.Optional[tp.Type[SplitterT]] = None, **kwargs) -> tp.Any:
@@ -1997,6 +2133,8 @@ class Wrapping(Configured, IndexApplier, ExtPandasIndexer, AttrResolverMixin, It
                 return self_copy
         return self
 
+    # ############# Selection ############# #
+
     def select_col(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
         """Select one column/group.
 
@@ -2053,74 +2191,22 @@ class Wrapping(Configured, IndexApplier, ExtPandasIndexer, AttrResolverMixin, It
         column: tp.Any = None,
         obj_ungrouped: bool = False,
         wrapper: tp.Optional[ArrayWrapper] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
     ) -> tp.MaybeSeries:
-        """Select one column/group from a pandas object.
-
-        `column` can be a label-based position as well as an integer position (if label fails)."""
-        if wrapper is None:
-            if isinstance(cls_or_self, type):
-                raise ValueError("Must provide wrapper")
-            wrapper = cls_or_self.wrapper
-        if obj is None:
-            return None
-
-        def _check_out_dim(out: tp.SeriesFrame, from_df: bool) -> tp.Series:
-            bad_shape = False
-            if from_df and isinstance(out, pd.DataFrame):
-                if len(out.columns) == 1:
-                    return out.iloc[:, 0]
-                bad_shape = True
-            if not from_df and isinstance(out, pd.Series):
-                if len(out) == 1:
-                    return out.iloc[0]
-                bad_shape = True
-            if bad_shape:
-                if wrapper.grouper.is_grouped():
-                    raise TypeError("Could not select one group: multiple groups returned")
-                else:
-                    raise TypeError("Could not select one column: multiple columns returned")
-            return out
-
-        if column is None:
-            if wrapper.get_ndim() == 2 and wrapper.get_shape_2d()[1] == 1:
-                column = 0
-        if column is not None:
-            if wrapper.grouper.is_grouped():
-                if wrapper.grouped_ndim == 1:
-                    raise TypeError("This object already contains one group of data")
-                if obj_ungrouped:
-                    mask = wrapper.grouper.group_by == column
-                    if not mask.any():
-                        raise KeyError(f"Group '{column}' not found")
-                    if isinstance(obj, pd.DataFrame):
-                        return obj.loc[:, mask]
-                    return obj.loc[mask]
-                else:
-                    if column not in wrapper.get_columns():
-                        if isinstance(column, int):
-                            if isinstance(obj, pd.DataFrame):
-                                return _check_out_dim(obj.iloc[:, column], True)
-                            return _check_out_dim(obj.iloc[column], False)
-                        raise KeyError(f"Group '{column}' not found")
-            else:
-                if wrapper.ndim == 1:
-                    raise TypeError("This object already contains one column of data")
-                if column not in wrapper.columns:
-                    if isinstance(column, int):
-                        if isinstance(obj, pd.DataFrame):
-                            return _check_out_dim(obj.iloc[:, column], True)
-                        return _check_out_dim(obj.iloc[column], False)
-                    raise KeyError(f"Column '{column}' not found")
-            if isinstance(obj, pd.DataFrame):
-                return _check_out_dim(obj[column], True)
-            return _check_out_dim(obj[column], False)
-        if not wrapper.grouper.is_grouped():
-            if wrapper.ndim == 1:
-                return obj
-            raise TypeError("Only one column is allowed. Use indexing or column argument.")
-        if wrapper.grouped_ndim == 1:
-            return obj
-        raise TypeError("Only one group is allowed. Use indexing or column argument.")
+        """See `ArrayWrapper.select_col_from_obj`."""
+        if not isinstance(cls_or_self, type):
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(wrapper, arg_name="wrapper")
+        return wrapper.select_col_from_obj(
+            obj,
+            column=column,
+            obj_ungrouped=obj_ungrouped,
+            group_by=group_by,
+            **kwargs,
+        )
 
     # ############# Splitting ############# #
 

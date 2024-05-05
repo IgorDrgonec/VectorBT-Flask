@@ -12,7 +12,6 @@ __all__ = [
     "MA",
 ]
 
-
 MA = IndicatorFactory(
     class_name="MA",
     module_name=__name__,

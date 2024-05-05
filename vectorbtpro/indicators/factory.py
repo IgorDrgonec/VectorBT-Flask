@@ -242,7 +242,7 @@ def build_columns(
             param_values = apply_mapping(param_values, dtype)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
-        
+
         if per_column:
             param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
             repeat_index = False
@@ -261,7 +261,7 @@ def build_columns(
         else:
             param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
             repeat_index = True
-            
+
         if _post_index_func is not None:
             param_index = _post_index_func(param_index)
         if repeat_index:
@@ -364,21 +364,21 @@ class IndicatorBase(Analyzable):
         output_names = object.__getattribute__(self, "output_names")
         if len(output_names) == 1:
             if k.startswith("output") and "output" not in output_names:
-                new_k = k[len("output"):]
+                new_k = k[len("output") :]
                 if len(new_k) == 0 or not new_k[0].isalnum():
                     try:
                         return object.__getattribute__(self, output_names[0] + new_k)
                     except AttributeError:
                         pass
             if k.startswith(short_name) and short_name not in output_names:
-                new_k = k[len(short_name):]
+                new_k = k[len(short_name) :]
                 if len(new_k) == 0 or not new_k[0].isalnum():
                     try:
                         return object.__getattribute__(self, output_names[0] + new_k)
                     except AttributeError:
                         pass
             if k.lower().startswith(short_name.lower()) and short_name.lower() not in output_names:
-                new_k = k[len(short_name):].lower()
+                new_k = k[len(short_name) :].lower()
                 if len(new_k) == 0 or not new_k[0].isalnum():
                     try:
                         return object.__getattribute__(self, output_names[0] + new_k)
@@ -1857,11 +1857,13 @@ class IndicatorFactory(Configured):
                 attr_stats.__name__ = f"{attr_name}_stats"
                 attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
-                attr_stats.__doc__ = inspect.cleandoc("""Stats of `{attr_name}` based on the following mapping: 
+                attr_stats.__doc__ = inspect.cleandoc(
+                    """Stats of `{attr_name}` based on the following mapping: 
 
                     ```python
                     {dtype}
-                    ```""").format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
+                    ```"""
+                ).format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
 
             elif np.issubdtype(dtype, np.number):

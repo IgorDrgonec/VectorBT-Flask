@@ -114,6 +114,8 @@ def _import_more_stuff():
     X = T = True
     O = F = False
     N = None
+    nan = float("nan")
+    inf = float("inf")
     return locals()
 
 

@@ -26,7 +26,6 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 SQLDataT = tp.TypeVar("SQLDataT", bound="SQLData")
 
 

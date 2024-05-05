@@ -1354,8 +1354,8 @@ def between_two_ranges_nb(
 
     for col in prange(source_mask.shape[1]):
         _, _, source_idxs, target_idsx = relation_idxs_1d_nb(
-            source_mask[:, col], 
-            target_mask[:, col], 
+            source_mask[:, col],
+            target_mask[:, col],
             relation=relation,
         )
         for i in range(len(source_idxs)):
@@ -1516,7 +1516,7 @@ def unravel_nb(
 
 @register_jitted(cache=True)
 def unravel_between_nb(
-    mask: tp.Array2d, 
+    mask: tp.Array2d,
     incl_open_source: bool = False,
     incl_empty_cols: bool = True,
 ) -> tp.Tuple[

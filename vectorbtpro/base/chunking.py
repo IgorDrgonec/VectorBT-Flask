@@ -84,7 +84,7 @@ class ChunkedGroupLens(Chunked):
         return self.take_spec
 
 
-def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice:
+def get_group_lens_slice(group_lens: tp.GroupLens, chunk_meta: ChunkMeta) -> slice:
     """Get slice of each chunk in group lengths."""
     group_lens_cumsum = np.cumsum(group_lens[: chunk_meta.end])
     start = group_lens_cumsum[chunk_meta.start] - group_lens[chunk_meta.start]

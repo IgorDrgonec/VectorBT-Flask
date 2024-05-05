@@ -55,7 +55,6 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
 
 

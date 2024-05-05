@@ -132,13 +132,16 @@ def talib_func(func_name: str) -> tp.Callable:
                             stacklevel=2,
                         )
                 new_inputs = ()
-                _resample_map = merge_dicts(resample_map, {
-                    "open": "first",
-                    "high": "max",
-                    "low": "min",
-                    "close": "last",
-                    "volume": "sum",
-                })
+                _resample_map = merge_dicts(
+                    resample_map,
+                    {
+                        "open": "first",
+                        "high": "max",
+                        "low": "min",
+                        "close": "last",
+                        "volume": "sum",
+                    },
+                )
                 source_wrapper = ArrayWrapper(index=wrapper.index, freq=wrapper.freq)
                 for i, input in enumerate(inputs):
                     _resample_kwargs = resolve_dict(resample_kwargs, i=i)
@@ -189,13 +192,16 @@ def talib_func(func_name: str) -> tp.Callable:
                         new_outputs = ()
                         target_wrapper = ArrayWrapper(index=target_index)
                         for i, output in enumerate(outputs):
-                            _realign_kwargs = merge_dicts(dict(
-                                source_rbound=True,
-                                target_rbound=True,
-                                nan_value=np.nan,
-                                ffill=True,
-                                silence_warnings=True,
-                            ), resolve_dict(realign_kwargs, i=i))
+                            _realign_kwargs = merge_dicts(
+                                dict(
+                                    source_rbound=True,
+                                    target_rbound=True,
+                                    nan_value=np.nan,
+                                    ffill=True,
+                                    silence_warnings=True,
+                                ),
+                                resolve_dict(realign_kwargs, i=i),
+                            )
                             new_output = GenericAccessor(target_wrapper, output).realign(
                                 wrapper.index,
                                 freq=wrapper.freq,

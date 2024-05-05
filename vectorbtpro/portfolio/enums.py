@@ -1101,21 +1101,21 @@ __pdoc__[
     "SimulationOutput.sim_start"
 ] = """Start of the simulation per column.
 
-Use `vectorbtpro.portfolio.nb.core.prepare_sim_range_out_nb` to ungroup the array.
+Use `vectorbtpro.generic.nb.base.prepare_ungrouped_sim_range_nb` to ungroup the array.
 
 If not tracked, becomes None."""
 __pdoc__[
     "SimulationOutput.sim_end"
 ] = """End of the simulation per column.
 
-Use `vectorbtpro.portfolio.nb.core.prepare_sim_range_out_nb` to ungroup the array.
+Use `vectorbtpro.generic.nb.base.prepare_ungrouped_sim_range_nb` to ungroup the array.
 
 If not tracked, becomes None."""
 
 
 class SimulationContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -1609,7 +1609,7 @@ Changing in-place will apply to the current simulation if it's lower than the in
 
 class GroupContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -1714,7 +1714,7 @@ If columns are not grouped, equals to `from_col + 1`.
 
 class RowContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -1783,7 +1783,7 @@ Has range `[0, target_shape[0])`.
 
 class SegmentContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -1872,7 +1872,7 @@ Example:
 
 class OrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -1978,7 +1978,7 @@ __pdoc__["OrderContext.pos_info_now"] = "`SimulationContext.last_pos_info` for t
 
 class PostOrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -2106,7 +2106,7 @@ __pdoc__["PostOrderContext.pos_info_now"] = "`OrderContext.pos_info_now` after e
 
 class FlexOrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray1d
@@ -2347,7 +2347,7 @@ __pdoc__["OrderResult.status_info"] = "See `OrderStatusInfo`."
 
 class SignalSegmentContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
@@ -2462,7 +2462,7 @@ Accessible via `c.last_dt_info[field][col]`."""
 
 class SignalContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
@@ -2529,7 +2529,7 @@ __pdoc__["SignalContext.col"] = "See `OrderContext.col`."
 
 class PostSignalContext(tp.NamedTuple):
     target_shape: tp.Shape
-    group_lens: tp.Array1d
+    group_lens: tp.GroupLens
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]

@@ -17,7 +17,6 @@ __all__ = [
     "flex_select_2d_col_nb",
 ]
 
-
 _rotate_rows = settings["indexing"]["rotate_rows"]
 _rotate_cols = settings["indexing"]["rotate_cols"]
 

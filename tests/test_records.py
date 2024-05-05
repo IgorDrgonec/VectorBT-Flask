@@ -1430,7 +1430,19 @@ class TestMappedArray:
 
     def test_stats(self):
         stats_index = pd.Index(
-            ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max", "Min Index", "Max Index"],
+            [
+                "Start Index",
+                "End Index",
+                "Total Duration",
+                "Count",
+                "Mean",
+                "Std",
+                "Min",
+                "Median",
+                "Max",
+                "Min Index",
+                "Max Index",
+            ],
             dtype="object",
         )
         assert_series_equal(
@@ -1494,9 +1506,9 @@ class TestMappedArray:
     def test_stats_mapping(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Count",
                 "Value Counts: test_10.0",
                 "Value Counts: test_11.0",
@@ -2284,7 +2296,7 @@ class TestRecords:
         assert filtered_records["d"].count() == 0.0
 
     def test_stats(self):
-        stats_index = pd.Index(["Start", "End", "Period", "Count"], dtype="object")
+        stats_index = pd.Index(["Start Index", "End Index", "Total Duration", "Count"], dtype="object")
         assert_series_equal(
             records.stats(),
             pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 2.25], index=stats_index, name="agg_stats"),
@@ -3078,9 +3090,9 @@ class TestRanges:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Coverage",
                 "Overlap Coverage",
@@ -4377,9 +4389,9 @@ class TestPatternRanges:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Coverage",
                 "Overlap Coverage",
@@ -4639,9 +4651,7 @@ class TestDrawdowns:
             pd.Series(
                 np.array([-0.6388888888888888, -0.5833333333333333, -0.6666666666666666, np.nan]),
                 index=wrapper.columns,
-            ).rename(
-                "avg_drawdown"
-            ),
+            ).rename("avg_drawdown"),
         )
         assert_series_equal(
             drawdowns_grouped.avg_drawdown,
@@ -4666,9 +4676,7 @@ class TestDrawdowns:
             pd.Series(
                 np.array([-0.75, -0.6666666666666666, -0.6666666666666666, np.nan]),
                 index=wrapper.columns,
-            ).rename(
-                "max_drawdown"
-            ),
+            ).rename("max_drawdown"),
         )
         assert_series_equal(
             drawdowns_grouped.max_drawdown,
@@ -4979,9 +4987,9 @@ class TestDrawdowns:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Coverage [%]",
                 "Total Records",
                 "Total Recovered Drawdowns",
@@ -5116,9 +5124,9 @@ class TestDrawdowns:
                 ],
                 index=pd.Index(
                     [
-                        "Start",
-                        "End",
-                        "Period",
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
                         "Coverage [%]",
                         "Total Records",
                         "Total Recovered Drawdowns",
@@ -5565,9 +5573,9 @@ class TestOrders:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Side Counts: Buy",
                 "Side Counts: Sell",
@@ -5837,9 +5845,9 @@ class TestFSOrders:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Side Counts: Buy",
                 "Side Counts: Sell",
@@ -7796,9 +7804,9 @@ class TestExitTrades:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "First Trade Start",
                 "Last Trade End",
                 "Coverage",
@@ -10252,9 +10260,9 @@ class TestLogs:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Status Counts: Filled",
                 "Status Counts: Ignored",

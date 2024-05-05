@@ -38,7 +38,6 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 base_arg_config = ReadonlyConfig(
     dict(
         broadcast_named_args=dict(is_dict=True),
@@ -53,7 +52,9 @@ base_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["base_arg_config"] = f"""Argument config for `BasePreparer`.
+__pdoc__[
+    "base_arg_config"
+] = f"""Argument config for `BasePreparer`.
 
 ```python
 {base_arg_config.prettify()}

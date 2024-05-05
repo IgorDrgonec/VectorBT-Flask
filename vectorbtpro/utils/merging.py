@@ -17,7 +17,6 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 
 
