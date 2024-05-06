@@ -101,6 +101,16 @@ if settings["importing"]["auto_import"]:
 
 
 def _import_more_stuff():
+    from functools import partial
+    from itertools import combinations, product
+    from collections import namedtuple
+    from time import sleep, time as utc_time
+    from pathlib import Path
+
+    import numpy as np
+    import pandas as pd
+    from numba import njit, prange
+
     X = T = True
     O = F = False
     N = None
