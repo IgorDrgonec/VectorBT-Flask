@@ -21,30 +21,30 @@ invalid_price_msg = "Encountered an order with price less than 0"
 @register_jitted(cache=True)
 def records_within_sim_range_nb(
     target_shape: tp.Shape,
+    records: tp.RecordArray,
     col_arr: tp.Array1d,
     idx_arr: tp.Array1d,
     sim_start: tp.Optional[tp.FlexArray1dLike] = None,
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.RecordArray:
-    """Return the mask of records being within a simulation range."""
-    out = np.empty(len(col_arr), dtype=np.bool_)
+    """Return records within simulation range."""
+    out = np.empty(len(records), dtype=records.dtype)
+    k = 0
 
     sim_start_, sim_end_ = prepare_sim_range_nb(
         sim_shape=target_shape,
         sim_start=sim_start,
         sim_end=sim_end,
     )
-    for r in range(len(col_arr)):
+    for r in range(len(records)):
         _sim_start = sim_start_[col_arr[r]]
         _sim_end = sim_end_[col_arr[r]]
         if _sim_start >= _sim_end:
-            out[r] = False
             continue
-        if idx_arr[r] < _sim_start or idx_arr[r] >= _sim_end:
-            out[r] = False
-        else:
-            out[r] = True
-    return out
+        if _sim_start <= idx_arr[r] < _sim_end:
+            out[k] = records[r]
+            k += 1
+    return out[:k]
 
 
 @register_jitted(cache=True)

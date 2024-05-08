@@ -1859,10 +1859,16 @@ def prepare_sim_range_nb(
 ) -> tp.Tuple[tp.Optional[tp.Array1d], tp.Optional[tp.Array1d]]:
     """Prepare simulation start and end."""
     new_sim_start = prepare_sim_start_nb(
-        sim_shape=sim_shape, sim_start=sim_start, allow_none=allow_none, check_bounds=check_bounds
+        sim_shape=sim_shape,
+        sim_start=sim_start,
+        allow_none=allow_none,
+        check_bounds=check_bounds,
     )
     new_sim_end = prepare_sim_end_nb(
-        sim_shape=sim_shape, sim_end=sim_end, allow_none=allow_none, check_bounds=check_bounds
+        sim_shape=sim_shape,
+        sim_end=sim_end,
+        allow_none=allow_none,
+        check_bounds=check_bounds,
     )
     return new_sim_start, new_sim_end
 
@@ -1888,6 +1894,7 @@ def prepare_grouped_sim_start_nb(
         return prepare_sim_start_nb(
             (target_shape[0], len(group_lens)),
             sim_start=sim_start_,
+            allow_none=allow_none,
             check_bounds=check_bounds,
         )
 
@@ -1938,6 +1945,7 @@ def prepare_grouped_sim_end_nb(
         return prepare_sim_end_nb(
             (target_shape[0], len(group_lens)),
             sim_end=sim_end_,
+            allow_none=allow_none,
             check_bounds=check_bounds,
         )
 
@@ -2015,6 +2023,7 @@ def prepare_ungrouped_sim_start_nb(
         return prepare_sim_start_nb(
             target_shape,
             sim_start=sim_start_,
+            allow_none=allow_none,
             check_bounds=check_bounds,
         )
 
@@ -2062,6 +2071,7 @@ def prepare_ungrouped_sim_end_nb(
         return prepare_sim_end_nb(
             target_shape,
             sim_end=sim_end_,
+            allow_none=allow_none,
             check_bounds=check_bounds,
         )
 

@@ -7,7 +7,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.indexing import AutoIdxr
-from vectorbtpro.base.reshaping import broadcast_array_to, to_1d_array
+from vectorbtpro.base.reshaping import broadcast_array_to
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb
 from vectorbtpro.utils import checks
@@ -54,7 +54,8 @@ class SimRangeMixin:
         objs = list(objs)
 
         if objs[-1]._sim_end is not None:
-            new_sim_end = broadcast_array_to(objs[-1]._sim_end, len(new_wrapper.columns))
+            new_sim_end = len(new_wrapper.index) - len(objs[-1].wrapper.index) + objs[-1]._sim_end
+            new_sim_end = broadcast_array_to(new_sim_end, len(new_wrapper.columns))
         else:
             new_sim_end = None
         for obj in objs[:-1]:
@@ -79,7 +80,21 @@ class SimRangeMixin:
                 stack_sim_start_objs = True
                 break
         if stack_sim_start_objs:
-            new_sim_start = to_1d_array(new_wrapper.concat_arrs(*[obj._sim_start for obj in objs], wrap=False))
+            obj_sim_starts = []
+            for obj in objs:
+                obj_sim_start = np.empty(len(obj._sim_start), dtype=np.int_)
+                for i in range(len(obj._sim_start)):
+                    if obj._sim_start[i] == 0:
+                        obj_sim_start[i] = 0
+                    elif obj._sim_start[i] == len(obj.wrapper.index):
+                        obj_sim_start[i] = len(new_wrapper.index)
+                    else:
+                        _obj_sim_start = new_wrapper.index.get_indexer([obj.wrapper.index[obj._sim_start[i]]])[0]
+                        if _obj_sim_start == -1:
+                            _obj_sim_start = 0
+                        obj_sim_start[i] = _obj_sim_start
+                obj_sim_starts.append(obj_sim_start)
+            new_sim_start = new_wrapper.concat_arrs(*obj_sim_starts, wrap=False)
         else:
             new_sim_start = None
         return new_sim_start
@@ -101,7 +116,21 @@ class SimRangeMixin:
                 stack_sim_end_objs = True
                 break
         if stack_sim_end_objs:
-            new_sim_end = to_1d_array(new_wrapper.concat_arrs(*[obj._sim_end for obj in objs], wrap=False))
+            obj_sim_ends = []
+            for obj in objs:
+                obj_sim_end = np.empty(len(obj._sim_end), dtype=np.int_)
+                for i in range(len(obj._sim_end)):
+                    if obj._sim_end[i] == 0:
+                        obj_sim_end[i] = 0
+                    elif obj._sim_end[i] == len(obj.wrapper.index):
+                        obj_sim_end[i] = len(new_wrapper.index)
+                    else:
+                        _obj_sim_end = new_wrapper.index.get_indexer([obj.wrapper.index[obj._sim_end[i]]])[0]
+                        if _obj_sim_end == -1:
+                            _obj_sim_end = 0
+                        obj_sim_end[i] = _obj_sim_end
+                obj_sim_ends.append(obj_sim_end)
+            new_sim_end = new_wrapper.concat_arrs(*obj_sim_ends, wrap=False)
         else:
             new_sim_end = None
         return new_sim_end
@@ -111,8 +140,8 @@ class SimRangeMixin:
         sim_start: tp.Optional[tp.Array1d] = None,
         sim_end: tp.Optional[tp.Array1d] = None,
     ) -> None:
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = type(self).prepare_sim_start(sim_start=sim_start, wrapper=self.wrapper, group_by=False)
+        sim_end = type(self).prepare_sim_end(sim_end=sim_end, wrapper=self.wrapper, group_by=False)
 
         self._sim_start = sim_start
         self._sim_end = sim_end
@@ -143,7 +172,7 @@ class SimRangeMixin:
             if checks.is_int(wrapper_meta["row_idxs"]):
                 new_sim_end = self._sim_end - wrapper_meta["row_idxs"]
             elif isinstance(wrapper_meta["row_idxs"], slice):
-                new_sim_end = self._sim_end - wrapper_meta["row_idxs"].end
+                new_sim_end = self._sim_end - wrapper_meta["row_idxs"].start
             else:
                 new_sim_end = self._sim_end - wrapper_meta["row_idxs"][0]
             new_sim_end = np.clip(new_sim_end, 0, len(wrapper_meta["new_wrapper"].index))
@@ -228,12 +257,15 @@ class SimRangeMixin:
         cls_or_self,
         sim_start: tp.Optional[tp.ArrayLike] = None,
         allow_none: bool = True,
-        check_bounds: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
     ) -> tp.Optional[tp.ArrayLike]:
         """Prepare simulation start."""
+        already_prepared = False
         if not isinstance(cls_or_self, type):
+            if sim_start is None:
+                sim_start = cls_or_self._sim_start
+                already_prepared = True
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -241,7 +273,7 @@ class SimRangeMixin:
 
         if allow_none and sim_start is None:
             return None
-        if sim_start is not None:
+        if not already_prepared and sim_start is not None:
             sim_start_arr = np.asarray(sim_start)
             if not np.issubdtype(sim_start_arr.dtype, np.integer):
                 if sim_start_arr.ndim == 0:
@@ -258,14 +290,23 @@ class SimRangeMixin:
                 group_lens,
                 sim_start=sim_start,
                 allow_none=allow_none,
-                check_bounds=check_bounds,
+                check_bounds=not already_prepared,
+            )
+        elif not already_prepared and wrapper.grouper.is_grouped():
+            group_lens = wrapper.grouper.get_group_lens()
+            sim_start = nb.prepare_ungrouped_sim_start_nb(
+                wrapper.shape_2d,
+                group_lens,
+                sim_start=sim_start,
+                allow_none=allow_none,
+                check_bounds=not already_prepared,
             )
         else:
             sim_start = nb.prepare_sim_start_nb(
                 wrapper.shape_2d,
                 sim_start=sim_start,
                 allow_none=allow_none,
-                check_bounds=check_bounds,
+                check_bounds=not already_prepared,
             )
         return sim_start
 
@@ -274,12 +315,15 @@ class SimRangeMixin:
         cls_or_self,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         allow_none: bool = True,
-        check_bounds: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
     ) -> tp.Optional[tp.ArrayLike]:
         """Prepare simulation end."""
+        already_prepared = False
         if not isinstance(cls_or_self, type):
+            if sim_end is None:
+                sim_end = cls_or_self._sim_end
+                already_prepared = True
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -287,7 +331,7 @@ class SimRangeMixin:
 
         if allow_none and sim_end is None:
             return None
-        if sim_end is not None:
+        if not already_prepared and sim_end is not None:
             sim_end_arr = np.asarray(sim_end)
             if not np.issubdtype(sim_end_arr.dtype, np.integer):
                 if sim_end_arr.ndim == 0:
@@ -304,68 +348,23 @@ class SimRangeMixin:
                 group_lens,
                 sim_end=sim_end,
                 allow_none=allow_none,
-                check_bounds=check_bounds,
+                check_bounds=not already_prepared,
+            )
+        elif not already_prepared and wrapper.grouper.is_grouped():
+            group_lens = wrapper.grouper.get_group_lens()
+            sim_end = nb.prepare_ungrouped_sim_end_nb(
+                wrapper.shape_2d,
+                group_lens,
+                sim_end=sim_end,
+                allow_none=allow_none,
+                check_bounds=not already_prepared,
             )
         else:
             sim_end = nb.prepare_sim_end_nb(
                 wrapper.shape_2d,
                 sim_end=sim_end,
                 allow_none=allow_none,
-                check_bounds=check_bounds,
-            )
-        return sim_end
-
-    @class_or_instancemethod
-    def resolve_flex_sim_start(
-        cls_or_self,
-        sim_start: tp.Optional[tp.ArrayLike] = None,
-        allow_none: bool = True,
-        wrapper: tp.Optional[ArrayWrapper] = None,
-        group_by: tp.GroupByLike = None,
-    ) -> tp.Optional[tp.ArrayLike]:
-        """Resolve flexible simulation start."""
-        if not isinstance(cls_or_self, type) and sim_start is None:
-            sim_start = cls_or_self.prepare_sim_start(
-                sim_start=cls_or_self._sim_start,
-                allow_none=allow_none,
-                check_bounds=False,
-                wrapper=wrapper,
-                group_by=group_by,
-            )
-        elif sim_start is not None:
-            sim_start = cls_or_self.prepare_sim_start(
-                sim_start=sim_start,
-                allow_none=allow_none,
-                check_bounds=True,
-                wrapper=wrapper,
-                group_by=group_by,
-            )
-        return sim_start
-
-    @class_or_instancemethod
-    def resolve_flex_sim_end(
-        cls_or_self,
-        sim_end: tp.Optional[tp.ArrayLike] = None,
-        allow_none: bool = True,
-        wrapper: tp.Optional[ArrayWrapper] = None,
-        group_by: tp.GroupByLike = None,
-    ) -> tp.Optional[tp.ArrayLike]:
-        """Resolve flexible simulation end."""
-        if not isinstance(cls_or_self, type) and sim_end is None:
-            sim_end = cls_or_self.prepare_sim_end(
-                sim_end=cls_or_self._sim_end,
-                allow_none=allow_none,
-                check_bounds=False,
-                wrapper=wrapper,
-                group_by=group_by,
-            )
-        elif sim_end is not None:
-            sim_end = cls_or_self.prepare_sim_end(
-                sim_end=sim_end,
-                allow_none=allow_none,
-                check_bounds=True,
-                wrapper=wrapper,
-                group_by=group_by,
+                check_bounds=not already_prepared,
             )
         return sim_end
 
@@ -378,14 +377,14 @@ class SimRangeMixin:
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
     ) -> tp.Union[None, tp.Array1d, tp.Series]:
-        """Simulation start."""
+        """Get simulation start."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_start = cls_or_self.resolve_flex_sim_start(
+        sim_start = cls_or_self.prepare_sim_start(
             sim_start=sim_start,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -406,14 +405,14 @@ class SimRangeMixin:
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
     ) -> tp.Union[None, tp.Array1d, tp.Series]:
-        """Simulation end."""
+        """Get simulation end."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_end = cls_or_self.resolve_flex_sim_end(
+        sim_end = cls_or_self.prepare_sim_end(
             sim_end=sim_end,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -434,14 +433,14 @@ class SimRangeMixin:
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Optional[tp.Series]:
-        """Index of simulation start."""
+        """Get index of simulation start."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_start = cls_or_self.resolve_flex_sim_start(
+        sim_start = cls_or_self.prepare_sim_start(
             sim_start=sim_start,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -476,14 +475,14 @@ class SimRangeMixin:
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Optional[tp.Series]:
-        """Index of simulation end."""
+        """Get index of simulation end."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_end = cls_or_self.resolve_flex_sim_end(
+        sim_end = cls_or_self.prepare_sim_end(
             sim_end=sim_end,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -526,20 +525,20 @@ class SimRangeMixin:
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Optional[tp.Series]:
-        """Duration of simulation range."""
+        """Get duration of simulation range."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_start = cls_or_self.resolve_flex_sim_start(
+        sim_start = cls_or_self.prepare_sim_start(
             sim_start=sim_start,
             allow_none=False,
             wrapper=wrapper,
             group_by=group_by,
         )
-        sim_end = cls_or_self.resolve_flex_sim_end(
+        sim_end = cls_or_self.prepare_sim_end(
             sim_end=sim_end,
             allow_none=False,
             wrapper=wrapper,

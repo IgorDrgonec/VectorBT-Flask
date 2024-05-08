@@ -111,9 +111,9 @@ def _import_more_stuff():
     import pandas as pd
     from numba import njit, prange
 
-    X = T = True
-    O = F = False
-    N = None
+    X = T = true = True
+    O = F = false = False
+    N = none = None
     nan = float("nan")
     inf = float("inf")
     return locals()

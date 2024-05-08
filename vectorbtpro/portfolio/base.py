@@ -337,7 +337,7 @@ shortcut_config = ReadonlyConfig(
         "locked_cash": dict(method_name=None, group_by_aware=False),
         "free_cash": dict(method_name="get_cash", method_kwargs=dict(free=True)),
         "init_price": dict(obj_type="red_array", group_by_aware=False),
-        "init_position_value": dict(obj_type="red_array", group_by_aware=False),
+        "init_position_value": dict(obj_type="red_array"),
         "init_value": dict(obj_type="red_array"),
         "input_value": dict(obj_type="red_array"),
         "asset_value": dict(),
@@ -5119,18 +5119,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if orders_cls is None:
                 orders_cls = Orders
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         if sim_start is not None or sim_end is not None:
-            within_sim_range_mask = nb.records_within_sim_range_nb(
+            order_records = nb.records_within_sim_range_nb(
                 wrapper.shape_2d,
+                order_records,
                 order_records["col"],
                 order_records["idx"],
                 sim_start=sim_start,
                 sim_end=sim_end,
             )
-            order_records = order_records[within_sim_range_mask]
         return orders_cls(
             wrapper,
             order_records,
@@ -5185,18 +5185,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if logs_cls is None:
                 logs_cls = Logs
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         if sim_start is not None or sim_end is not None:
-            within_sim_range_mask = nb.records_within_sim_range_nb(
+            log_records = nb.records_within_sim_range_nb(
                 wrapper.shape_2d,
+                log_records,
                 log_records["col"],
                 log_records["idx"],
                 sim_start=sim_start,
                 sim_end=sim_end,
             )
-            log_records = log_records[within_sim_range_mask]
         return logs_cls(
             wrapper,
             log_records,
@@ -5246,8 +5246,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 init_position = 0.0
             if entry_trades_cls is None:
                 entry_trades_cls = EntryTrades
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, group_by=False)
 
         return entry_trades_cls.from_orders(
             orders,
@@ -5297,8 +5297,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 init_position = 0.0
             if exit_trades_cls is None:
                 exit_trades_cls = ExitTrades
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, group_by=False)
 
         return exit_trades_cls.from_orders(
             orders,
@@ -5468,6 +5468,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         trade_history = pd.concat((entry_trade_history, exit_trade_history), axis=0)
         trade_history = pd.merge(order_history, trade_history, on=["Column", "Order Id"])
         trade_history = trade_history.sort_values(by=["Column", "Order Id", "Position Id"])
+        trade_history = trade_history.reset_index(drop=True)
         trade_history["Entry Trade Id"] = trade_history["Entry Trade Id"].fillna(-1).astype(int)
         trade_history["Exit Trade Id"] = trade_history["Exit Trade Id"].fillna(-1).astype(int)
         trade_history["Entry Trade Id"] = trade_history.pop("Entry Trade Id")
@@ -5508,8 +5509,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(value, arg_name="value")
             if drawdowns_cls is None:
                 drawdowns_cls = Drawdowns
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, group_by=False)
 
         if wrapper is not None:
             wrapper = wrapper.resolve(group_by=group_by)
@@ -5581,8 +5582,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 init_position = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.asset_flow_nb, jitted)
@@ -5637,8 +5638,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if init_position is None:
                 init_position = 0.0
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.assets_nb, jitted)
@@ -5686,8 +5687,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         else:
             checks.assert_not_none(assets, arg_name="assets")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -5744,8 +5745,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         else:
             checks.assert_not_none(assets, arg_name="assets")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -5810,8 +5811,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 init_price = np.nan
             if wrapper is None:
                 wrapper = orders.wrapper
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         func = jit_reg.resolve_option(nb.get_position_feature_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -5870,8 +5871,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 init_price = np.nan
             if wrapper is None:
                 wrapper = orders.wrapper
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         func = jit_reg.resolve_option(nb.get_position_feature_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -5923,8 +5924,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_deposits_raw = 0.0
             checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         cash_deposits_arr = to_2d_array(cash_deposits_raw)
         if keep_flex and not cash_deposits_arr.any():
@@ -6028,8 +6029,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if cash_earnings_raw is None:
                 cash_earnings_raw = 0.0
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         cash_earnings_arr = to_2d_array(cash_earnings_raw)
         if keep_flex and not cash_earnings_arr.any():
@@ -6141,8 +6142,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_earnings_raw = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         func = jit_reg.resolve_option(nb.cash_flow_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6225,8 +6226,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     cash_deposits = 0.0
             checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         if checks.is_int(init_cash_raw) and init_cash_raw in enums.InitCashMode:
             func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
@@ -6314,8 +6315,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_deposits = 0.0
             checks.assert_not_none(cash_flow, arg_name="cash_flow")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.cash_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6358,6 +6359,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         init_price: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
+        group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """Get initial position value per column."""
@@ -6374,14 +6376,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(init_price, arg_name="init_price")
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        func = jit_reg.resolve_option(nb.init_position_value_nb, jitted)
-        init_position_value = func(
-            n_cols=wrapper.shape_2d[1],
-            init_position=to_1d_array(init_position),
-            init_price=to_1d_array(init_price),
-        )
+        if wrapper.grouper.is_grouped(group_by=group_by):
+            group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+            func = jit_reg.resolve_option(nb.init_position_value_grouped_nb, jitted)
+            init_position_value = func(
+                group_lens,
+                init_position=to_1d_array(init_position),
+                init_price=to_1d_array(init_price),
+            )
+        else:
+            func = jit_reg.resolve_option(nb.init_position_value_nb, jitted)
+            init_position_value = func(
+                wrapper.shape_2d[1],
+                init_position=to_1d_array(init_position),
+                init_price=to_1d_array(init_price),
+            )
         wrap_kwargs = merge_dicts(dict(name_or_index="init_position_value"), wrap_kwargs)
-        return wrapper.wrap_reduced(init_position_value, group_by=False, **wrap_kwargs)
+        return wrapper.wrap_reduced(init_position_value, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
     def get_init_value(
@@ -6403,7 +6414,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         Includes initial cash and the value of initial position."""
         if not isinstance(cls_or_self, type):
             if init_position_value is None:
-                init_position_value = cls_or_self.init_position_value
+                init_position_value = cls_or_self.resolve_shortcut_attr(
+                    "init_position_value",
+                    jitted=jitted,
+                    wrapper=wrapper,
+                    group_by=group_by,
+                )
             if init_cash is None:
                 init_cash = cls_or_self.resolve_shortcut_attr(
                     "init_cash",
@@ -6423,13 +6439,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(init_cash, arg_name="init_cash")
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        if wrapper.grouper.is_grouped(group_by=group_by):
-            group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_reg.resolve_option(nb.init_value_grouped_nb, jitted)
-            init_value = func(group_lens, to_1d_array(init_position_value), to_1d_array(init_cash))
-        else:
-            func = jit_reg.resolve_option(nb.init_value_nb, jitted)
-            init_value = func(to_1d_array(init_position_value), to_1d_array(init_cash))
+        func = jit_reg.resolve_option(nb.init_value_nb, jitted)
+        init_value = func(to_1d_array(init_position_value), to_1d_array(init_cash))
         wrap_kwargs = merge_dicts(dict(name_or_index="init_value"), wrap_kwargs)
         return wrapper.wrap_reduced(init_value, group_by=group_by, **wrap_kwargs)
 
@@ -6524,8 +6535,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(close, arg_name="close")
             checks.assert_not_none(assets, arg_name="assets")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         func = jit_reg.resolve_option(nb.asset_value_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6595,8 +6606,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(cash, arg_name="cash")
             checks.assert_not_none(asset_value, arg_name="asset_value")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.value_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6673,6 +6684,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     "value",
                     sim_start=sim_start if strict_sim_range else None,
                     sim_end=sim_end if strict_sim_range else None,
+                    strict_sim_range=strict_sim_range,
                     jitted=jitted,
                     chunked=chunked,
                     wrapper=wrapper,
@@ -6684,8 +6696,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(asset_value, arg_name="asset_value")
             checks.assert_not_none(value, arg_name="value")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.gross_exposure_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6743,8 +6755,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(long_exposure, arg_name="long_exposure")
             checks.assert_not_none(short_exposure, arg_name="short_exposure")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.net_exposure_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6802,8 +6814,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(asset_value, arg_name="asset_value")
             checks.assert_not_none(value, arg_name="value")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         func = jit_reg.resolve_option(nb.allocations_nb, jitted)
@@ -6873,8 +6885,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_earnings = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         func = jit_reg.resolve_option(nb.total_profit_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -7060,8 +7072,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_deposits_as_input = False
             checks.assert_not_none(value, arg_name="value")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -7097,7 +7109,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         """Get asset (realized and unrealized) PnL series per column or group."""
         if not isinstance(cls_or_self, type):
             if init_position_value is None:
-                init_position_value = cls_or_self.init_position_value
+                init_position_value = cls_or_self.resolve_shortcut_attr(
+                    "init_position_value",
+                    jitted=jitted,
+                    wrapper=wrapper,
+                    group_by=group_by,
+                )
             if asset_value is None:
                 asset_value = cls_or_self.resolve_shortcut_attr(
                     "asset_value",
@@ -7127,8 +7144,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(asset_value, arg_name="asset_value")
             checks.assert_not_none(cash_flow, arg_name="cash_flow")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.asset_pnl_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -7166,7 +7183,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         all in and keeping available cash at zero."""
         if not isinstance(cls_or_self, type):
             if init_position_value is None:
-                init_position_value = cls_or_self.init_position_value
+                init_position_value = cls_or_self.resolve_shortcut_attr(
+                    "init_position_value",
+                    jitted=jitted,
+                    wrapper=wrapper,
+                    group_by=group_by,
+                )
             if asset_value is None:
                 asset_value = cls_or_self.resolve_shortcut_attr(
                     "asset_value",
@@ -7196,8 +7218,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(asset_value, arg_name="asset_value")
             checks.assert_not_none(cash_flow, arg_name="cash_flow")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.asset_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -7277,8 +7299,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         wrapper=wrapper,
                         group_by=False,
                     )
-            sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-            sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+            sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+            sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.market_value_grouped_nb, jitted)
@@ -7316,8 +7338,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         wrapper=wrapper,
                         group_by=False,
                     )
-            sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-            sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+            sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+            sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
             func = jit_reg.resolve_option(nb.market_value_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -7396,8 +7418,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_deposits_as_input = False
             checks.assert_not_none(market_value, arg_name="market_value")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -7459,8 +7481,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(input_value, arg_name="input_value")
             checks.assert_not_none(market_value, arg_name="market_value")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        sim_start = cls_or_self.resolve_flex_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
-        sim_end = cls_or_self.resolve_flex_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         func = jit_reg.resolve_option(nb.total_market_return_nb, jitted)
         total_market_return = func(

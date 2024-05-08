@@ -71,7 +71,7 @@ def asset_flow_nb(
     Returns the total transacted amount of assets at each time step."""
     init_position_ = to_1d_array_nb(np.asarray(init_position))
 
-    out = np.empty(target_shape, dtype=np.float_)
+    out = np.full(target_shape, np.nan, dtype=np.float_)
 
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -83,11 +83,9 @@ def asset_flow_nb(
     for col in prange(col_lens.shape[0]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
+        out[_sim_start:_sim_end, col] = 0.0
         if _sim_start >= _sim_end:
             continue
-        out[_sim_start:_sim_end, col] = 0.0
         col_len = col_lens[col]
         if col_len == 0:
             continue
@@ -145,7 +143,7 @@ def assets_nb(
     Returns the current position at each time step."""
     init_position_ = to_1d_array_nb(np.asarray(init_position))
 
-    out = np.empty(asset_flow.shape, dtype=np.float_)
+    out = np.full(asset_flow.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=asset_flow.shape,
@@ -155,8 +153,6 @@ def assets_nb(
     for col in prange(asset_flow.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
         position_now = flex_select_1d_pc_nb(init_position_, col)
@@ -399,7 +395,7 @@ def cash_deposits_nb(
     """Get cash deposit series per column."""
     cash_deposits_raw_ = to_2d_array_nb(np.asarray(cash_deposits_raw))
 
-    out = np.empty(target_shape, dtype=np.float_)
+    out = np.full(target_shape, np.nan, dtype=np.float_)
 
     if not cash_sharing:
         sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
@@ -410,8 +406,6 @@ def cash_deposits_nb(
         for col in prange(target_shape[1]):
             _sim_start = sim_start_[col]
             _sim_end = sim_end_[col]
-            out[:_sim_start] = np.nan
-            out[_sim_end:] = np.nan
             if _sim_start >= _sim_end:
                 continue
 
@@ -432,8 +426,6 @@ def cash_deposits_nb(
             for col in range(from_col, to_col):
                 _sim_start = sim_start_[col]
                 _sim_end = sim_end_[col]
-                out[:_sim_start] = np.nan
-                out[_sim_end:] = np.nan
                 if _sim_start >= _sim_end:
                     continue
 
@@ -513,7 +505,7 @@ def cash_deposits_grouped_nb(
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         cash_earnings_raw=base_ch.FlexArraySlicer(axis=1),
@@ -532,7 +524,7 @@ def cash_earnings_nb(
     """Get cash earning series per column."""
     cash_earnings_raw_ = to_2d_array_nb(np.asarray(cash_earnings_raw))
 
-    out = np.empty(target_shape, dtype=np.float_)
+    out = np.full(target_shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=target_shape,
@@ -542,8 +534,6 @@ def cash_earnings_nb(
     for col in prange(target_shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
 
@@ -897,7 +887,7 @@ def cash_nb(
     """Get cash series per column or group."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty(cash_flow.shape, dtype=np.float_)
+    out = np.full(cash_flow.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=cash_flow.shape,
@@ -907,8 +897,6 @@ def cash_nb(
     for col in prange(cash_flow.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
         cash_now = flex_select_1d_pc_nb(init_cash, col)
@@ -946,34 +934,39 @@ def init_position_value_nb(
 
 
 @register_jitted(cache=True)
+def init_position_value_grouped_nb(
+    group_lens: tp.GroupLens,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+) -> tp.Array1d:
+    """Get initial position value per group."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
+    out = np.full(len(group_lens), 0.0, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+
+        for col in range(from_col, to_col):
+            _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+            _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+            if _init_position != 0:
+                out[group] += _init_position * _init_price
+    return out
+
+
+@register_jitted(cache=True)
 def init_value_nb(init_position_value: tp.Array1d, init_cash: tp.FlexArray1d) -> tp.Array1d:
-    """Get initial value per column."""
+    """Get initial value per column or group."""
     out = np.empty(len(init_position_value), dtype=np.float_)
 
     for col in range(len(init_position_value)):
         _init_cash = flex_select_1d_pc_nb(init_cash, col)
         out[col] = _init_cash + init_position_value[col]
-    return out
-
-
-@register_jitted(cache=True)
-def init_value_grouped_nb(
-    group_lens: tp.GroupLens,
-    init_position_value: tp.Array1d,
-    init_cash_grouped: tp.FlexArray1d,
-) -> tp.Array1d:
-    """Get initial value per group."""
-    out = np.empty(len(group_lens), dtype=np.float_)
-
-    from_col = 0
-    for group in range(len(group_lens)):
-        to_col = from_col + group_lens[group]
-        group_value = flex_select_1d_pc_nb(init_cash_grouped, group)
-
-        for col in range(from_col, to_col):
-            group_value += init_position_value[col]
-        out[group] = group_value
-        from_col = to_col
     return out
 
 
@@ -995,7 +988,7 @@ def asset_value_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get asset value series per column."""
-    out = np.empty(close.shape, dtype=np.float_)
+    out = np.full(close.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=close.shape,
@@ -1005,8 +998,6 @@ def asset_value_nb(
     for col in prange(close.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
 
@@ -1081,7 +1072,7 @@ def value_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get value series per column or group."""
-    out = np.empty(cash.shape, dtype=np.float_)
+    out = np.full(cash.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=cash.shape,
@@ -1091,8 +1082,6 @@ def value_nb(
     for col in prange(cash.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
 
@@ -1119,7 +1108,7 @@ def gross_exposure_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get gross exposure series per column."""
-    out = np.empty(asset_value.shape, dtype=np.float_)
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=asset_value.shape,
@@ -1129,8 +1118,6 @@ def gross_exposure_nb(
     for col in prange(asset_value.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
 
@@ -1160,7 +1147,7 @@ def net_exposure_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get net exposure series per column."""
-    out = np.empty(long_exposure.shape, dtype=np.float_)
+    out = np.full(long_exposure.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=long_exposure.shape,
@@ -1170,8 +1157,6 @@ def net_exposure_nb(
     for col in prange(long_exposure.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
 
@@ -1200,7 +1185,7 @@ def allocations_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get allocations per column."""
-    out = np.empty(asset_value.shape, dtype=np.float_)
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -1216,8 +1201,6 @@ def allocations_nb(
         for col in range(from_col, to_col):
             _sim_start = sim_start_[col]
             _sim_end = sim_end_[col]
-            out[:_sim_start] = np.nan
-            out[_sim_end:] = np.nan
             if _sim_start >= _sim_end:
                 continue
 
@@ -1367,7 +1350,7 @@ def returns_nb(
     """Get return series per column or group."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty(value.shape, dtype=np.float_)
+    out = np.full(value.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=value.shape,
@@ -1377,8 +1360,6 @@ def returns_nb(
     for col in prange(value.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
         input_value = flex_select_1d_pc_nb(init_value, col)
@@ -1428,7 +1409,7 @@ def asset_pnl_nb(
     """Get asset (realized and unrealized) PnL series per column or group."""
     init_position_value_ = to_1d_array_nb(np.asarray(init_position_value))
 
-    out = np.empty(asset_value.shape, dtype=np.float_)
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=asset_value.shape,
@@ -1438,23 +1419,19 @@ def asset_pnl_nb(
     for col in prange(asset_value.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
         _init_position_value = flex_select_1d_pc_nb(init_position_value_, col)
 
         for i in range(_sim_start, _sim_end):
             if i == _sim_start:
-                input_asset_value = 0.0
-                _cash_flow = cash_flow[i, col] - _init_position_value
+                input_asset_value = _init_position_value
             else:
                 input_asset_value = asset_value[i - 1, col]
-                _cash_flow = cash_flow[i, col]
             out[i, col] = get_asset_pnl_nb(
                 input_asset_value,
                 asset_value[i, col],
-                _cash_flow,
+                cash_flow[i, col],
             )
     return out
 
@@ -1506,7 +1483,7 @@ def asset_returns_nb(
     """Get asset return series per column or group."""
     init_position_value_ = to_1d_array_nb(np.asarray(init_position_value))
 
-    out = np.empty(asset_value.shape, dtype=np.float_)
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=asset_value.shape,
@@ -1516,23 +1493,19 @@ def asset_returns_nb(
     for col in prange(asset_value.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
         _init_position_value = flex_select_1d_pc_nb(init_position_value_, col)
 
         for i in range(_sim_start, _sim_end):
             if i == _sim_start:
-                input_asset_value = 0.0
-                _cash_flow = cash_flow[i, col] - _init_position_value
+                input_asset_value = _init_position_value
             else:
                 input_asset_value = asset_value[i - 1, col]
-                _cash_flow = cash_flow[i, col]
             out[i, col] = get_asset_return_nb(
                 input_asset_value,
                 asset_value[i, col],
-                _cash_flow,
+                cash_flow[i, col],
                 log_returns=log_returns,
             )
     return out
@@ -1560,7 +1533,7 @@ def market_value_nb(
     """Get market value per column."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty(close.shape, dtype=np.float_)
+    out = np.full(close.shape, np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=close.shape,
@@ -1570,8 +1543,6 @@ def market_value_nb(
     for col in prange(close.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
-        out[:_sim_start] = np.nan
-        out[_sim_end:] = np.nan
         if _sim_start >= _sim_end:
             continue
         curr_value = flex_select_1d_pc_nb(init_value, col)
