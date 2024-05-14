@@ -14,9 +14,7 @@ day_dt = np.timedelta64(86400000000000)
 
 df = pd.DataFrame(
     {"a": [1, 2, 3, 4, np.nan], "b": [np.nan, 4, 3, 2, 1], "c": [1, 2, np.nan, 2, 1]},
-    index=pd.DatetimeIndex(
-        [datetime(2018, 1, 1), datetime(2018, 1, 2), datetime(2018, 1, 3), datetime(2018, 1, 4), datetime(2018, 1, 5)],
-    ),
+    index=pd.date_range("2018", periods=5),
 )
 group_by = np.array(["g1", "g1", "g2"])
 
@@ -1140,7 +1138,11 @@ class TestAccessors:
                     [1.0, 0.19999999999999996, np.nan],
                     [np.nan, 0.19999999999999996, np.nan],
                 ],
-                index=pd.DatetimeIndex(["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"]),
+                index=pd.DatetimeIndex(
+                    ["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"],
+                    dtype="datetime64[ns]",
+                    freq="D",
+                ),
                 columns=pd.Index(["a", "b", "c"], dtype="object"),
             ),
         )
@@ -1154,7 +1156,11 @@ class TestAccessors:
                     [1.0, np.nan, np.nan],
                     [np.nan, 0.19999999999999996, np.nan],
                 ],
-                index=pd.DatetimeIndex(["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"]),
+                index=pd.DatetimeIndex(
+                    ["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"],
+                    dtype="datetime64[ns]",
+                    freq="D",
+                ),
                 columns=pd.Index(["a", "b", "c"], dtype="object"),
             ),
         )

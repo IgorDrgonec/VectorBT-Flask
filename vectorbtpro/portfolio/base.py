@@ -173,11 +173,6 @@ __pdoc__[
 
 shortcut_config = ReadonlyConfig(
     {
-        "sim_start": dict(obj_type="red_array"),
-        "sim_end": dict(obj_type="red_array"),
-        "start_index": dict(obj_type="red_array"),
-        "end_index": dict(obj_type="red_array"),
-        "total_duration": dict(obj_type="red_array"),
         "filled_close": dict(group_by_aware=False, decorator=cached_property),
         "filled_bm_close": dict(group_by_aware=False, decorator=cached_property),
         "orders": dict(
@@ -479,18 +474,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         cash_earnings (array_like of float): Earnings added at each timestamp.
 
             Can be provided in a format suitable for flexible indexing.
+        sim_start (int, datetime_like, or array_like): Simulation start per column. Defaults to None.
+        sim_end (int, datetime_like, or array_like): Simulation end per column. Defaults to None.
         call_seq (array_like of int): Sequence of calls per row and group. Defaults to None.
         in_outputs (namedtuple): Named tuple with in-output objects.
 
             To substitute `Portfolio` attributes, provide already broadcasted and grouped objects.
             Also see `Portfolio.in_outputs_indexing_func` on how in-output objects are indexed.
         use_in_outputs (bool): Whether to return in-output objects when calling properties.
-        sim_start (array_like of int): Simulation start per column.
-
-            If None, started as usual.
-        sim_end (array_like of int): Simulation end per column.
-
-            If None, ended as usual.
         bm_close (array_like): Last benchmark asset price at each time step.
         fillna_close (bool): Whether to forward and backward fill NaN values in `close`.
 
@@ -1278,11 +1269,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         "cash_deposits",
         "cash_deposits_as_input",
         "cash_earnings",
+        "sim_start",
+        "sim_end",
         "call_seq",
         "in_outputs",
         "use_in_outputs",
-        "sim_start",
-        "sim_end",
         "bm_close",
         "fillna_close",
         "year_freq",
@@ -1314,11 +1305,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         cash_deposits: tp.ArrayLike = 0.0,
         cash_deposits_as_input: tp.Optional[bool] = None,
         cash_earnings: tp.ArrayLike = 0.0,
+        sim_start: tp.Optional[tp.Array1d] = None,
+        sim_end: tp.Optional[tp.Array1d] = None,
         call_seq: tp.Optional[tp.Array2d] = None,
         in_outputs: tp.Optional[tp.NamedTuple] = None,
         use_in_outputs: tp.Optional[bool] = None,
-        sim_start: tp.Optional[tp.Array1d] = None,
-        sim_end: tp.Optional[tp.Array1d] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         fillna_close: tp.Optional[bool] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
@@ -1346,10 +1337,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             log_records = sim_out.log_records
             cash_deposits = sim_out.cash_deposits
             cash_earnings = sim_out.cash_earnings
-            call_seq = sim_out.call_seq
-            in_outputs = sim_out.in_outputs
             sim_start = sim_out.sim_start
             sim_end = sim_out.sim_end
+            call_seq = sim_out.call_seq
+            in_outputs = sim_out.in_outputs
         Analyzable.__init__(
             self,
             wrapper,
@@ -1366,11 +1357,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             cash_deposits=cash_deposits,
             cash_deposits_as_input=cash_deposits_as_input,
             cash_earnings=cash_earnings,
+            sim_start=sim_start,
+            sim_end=sim_end,
             call_seq=call_seq,
             in_outputs=in_outputs,
             use_in_outputs=use_in_outputs,
-            sim_start=sim_start,
-            sim_end=sim_end,
             bm_close=bm_close,
             fillna_close=fillna_close,
             year_freq=year_freq,
@@ -7616,8 +7607,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         "asset_returns",
                         log_returns=log_returns,
                         daily_returns=daily_returns,
-                        sim_start=sim_start,
-                        sim_end=sim_end,
+                        sim_start=sim_start if strict_sim_range else None,
+                        sim_end=sim_end if strict_sim_range else None,
                         strict_sim_range=strict_sim_range,
                         jitted=jitted,
                         chunked=chunked,
@@ -7629,8 +7620,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         "returns",
                         log_returns=log_returns,
                         daily_returns=daily_returns,
-                        sim_start=sim_start,
-                        sim_end=sim_end,
+                        sim_start=sim_start if strict_sim_range else None,
+                        sim_end=sim_end if strict_sim_range else None,
                         strict_sim_range=strict_sim_range,
                         jitted=jitted,
                         chunked=chunked,
@@ -7642,8 +7633,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     "bm_returns",
                     log_returns=log_returns,
                     daily_returns=daily_returns,
-                    sim_start=sim_start,
-                    sim_end=sim_end,
+                    sim_start=sim_start if strict_sim_range else None,
+                    sim_end=sim_end if strict_sim_range else None,
                     strict_sim_range=strict_sim_range,
                     jitted=jitted,
                     chunked=chunked,
@@ -7661,6 +7652,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(returns, arg_name="returns")
+        sim_start = cls_or_self.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
+        sim_end = cls_or_self.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
 
         if daily_returns:
             freq = "D"
@@ -7673,6 +7666,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             freq=freq,
             year_freq=year_freq,
             defaults=defaults,
+            sim_start=sim_start,
+            sim_end=sim_end,
             **kwargs,
         )
 
@@ -8128,8 +8123,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         strict_sim_range: bool = False,
         fit_sim_range: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
-        xref: tp.Optional[str] = None,
-        yref: tp.Optional[str] = None,
+        xref: str = "x",
+        yref: str = "y",
         **kwargs,
     ) -> tp.BaseFigure:
         """Plot one column of trades.
@@ -8148,10 +8143,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         else:
             checks.assert_not_none(trades, arg_name="trades")
 
-        if xref is None:
-            xref = "x"
-        if yref is None:
-            yref = "y"
         fig = trades.plot(column=column, xref=xref, yref=yref, **kwargs)
         if fit_sim_range:
             fig = cls_or_self.fit_fig_to_sim_range(
@@ -8177,8 +8168,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         fit_sim_range: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         pct_scale: bool = False,
-        xref: tp.Optional[str] = None,
-        yref: tp.Optional[str] = None,
+        xref: str = "x",
+        yref: str = "y",
         **kwargs,
     ) -> tp.BaseFigure:
         """Plot one column of trade P&L.
@@ -8197,10 +8188,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         else:
             checks.assert_not_none(trades, arg_name="trades")
 
-        if xref is None:
-            xref = "x"
-        if yref is None:
-            yref = "y"
         fig = trades.plot_pnl(column=column, pct_scale=pct_scale, xref=xref, yref=yref, **kwargs)
         if fit_sim_range:
             fig = cls_or_self.fit_fig_to_sim_range(
@@ -8993,8 +8980,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
         pct_scale: bool = False,
-        xref: tp.Optional[str] = None,
-        yref: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.BaseFigure:
         """Plot one column or group of cumulative returns.
@@ -9016,8 +9001,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     wrapper=wrapper,
                     group_by=group_by,
                 )
-            if wrapper is None:
-                wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(returns_acc, arg_name="returns_acc")
         kwargs = merge_dicts(
@@ -9041,21 +9024,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             ),
             kwargs,
         )
-        if xref is None:
-            xref = "x"
-        if yref is None:
-            yref = "y"
-        fig = returns_acc.plot_cumulative(column=column, pct_scale=pct_scale, xref=xref, yref=yref, **kwargs)
-        if fit_sim_range:
-            fig = cls_or_self.fit_fig_to_sim_range(
-                fig,
-                column=column,
-                sim_start=sim_start,
-                sim_end=sim_end,
-                wrapper=wrapper,
-                group_by=group_by,
-                xref=xref,
-            )
+        fig = returns_acc.plot_cumulative(
+            column=column,
+            fit_sim_range=fit_sim_range,
+            pct_scale=pct_scale,
+            **kwargs,
+        )
         return fig
 
     @class_or_instancemethod
@@ -9069,8 +9043,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         fit_sim_range: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
-        xref: tp.Optional[str] = None,
-        yref: tp.Optional[str] = None,
+        xref: str = "x",
+        yref: str = "y",
         **kwargs,
     ) -> tp.BaseFigure:
         """Plot one column or group of drawdowns.
@@ -9104,10 +9078,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             ),
             kwargs,
         )
-        if xref is None:
-            xref = "x"
-        if yref is None:
-            yref = "y"
         fig = drawdowns.plot(column=column, xref=xref, yref=yref, **kwargs)
         if fit_sim_range:
             fig = cls_or_self.fit_fig_to_sim_range(
@@ -9134,8 +9104,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
         pct_scale: bool = False,
-        xref: tp.Optional[str] = None,
-        yref: tp.Optional[str] = None,
+        xref: str = "x",
+        yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.BaseFigure:
@@ -9194,10 +9164,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 name="Drawdown",
             )
         )
-        if xref is None:
-            xref = "x"
-        if yref is None:
-            yref = "y"
         if pct_scale:
             yaxis = "yaxis" + yref[1:]
             default_kwargs[yaxis] = dict(tickformat=".2%")

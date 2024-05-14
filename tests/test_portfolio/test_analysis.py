@@ -18,9 +18,7 @@ except:
 
 price = pd.Series(
     [1.0, 2.0, 3.0, 4.0, 5.0],
-    index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 
 
@@ -8635,7 +8633,7 @@ class TestPortfolio:
                         np.inf,
                         0.4141600000000001,
                         1.4651010643478568,
-                        104.44254493914563,
+                        28.178717025259605,
                         4.506828421607624,
                         10.1075418640978,
                     ]
@@ -9048,6 +9046,52 @@ class TestPortfolio:
         assert stats_df.shape == (3, 30)
         assert_index_equal(stats_df.index, pf.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
+        assert_series_equal(
+            pf.replace(sim_start=1, sim_end=4).stats(),
+            pd.Series(
+                np.array(
+                    [
+                        pd.Timestamp("2020-01-02 00:00:00"),
+                        pd.Timestamp("2020-01-04 00:00:00"),
+                        pd.Timedelta("3 days 00:00:00"),
+                        100.33333333333333,
+                        99.54010666666666,
+                        166.87609333333336,
+                        165.74820666666668,
+                        66.66666666666667,
+                        -0.8254011695440902,
+                        -50.0,
+                        88.88888888888887,
+                        2.817923261077409,
+                        0.7463284432878199,
+                        pd.Timedelta("2 days 08:00:00"),
+                        2.6666666666666665,
+                        0.29246,
+                        2.0,
+                        33.333333333333336,
+                        -114.54501584928978,
+                        -115.87880331522986,
+                        39.25363306085381,
+                        -192.44468090381665,
+                        pd.Timedelta("3 days 12:00:00"),
+                        pd.Timedelta("2 days 12:00:00"),
+                        np.inf,
+                        -0.0047439393939394,
+                        -8.927839596805114,
+                        516.1769753863151,
+                        2.904509055725145,
+                        19.988554313695975,
+                    ]
+                ),
+                index=stats_index,
+                name="agg_stats",
+                dtype=object,
+            ),
+        )
+        assert_series_equal(
+            pf.replace(sim_start=1, sim_end=4).stats(),
+            pf.stats(settings=dict(sim_start=1, sim_end=4, strict_sim_range=True)),
+        )
 
     def test_returns_stats(self):
         stats_index = pd.Index(

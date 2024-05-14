@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 
 import pytest
 from numba import njit
@@ -58,7 +57,7 @@ class TestAccessors:
     def test_freq(self):
         ts = pd.Series(
             [1, 2, 3],
-            index=pd.DatetimeIndex([datetime(2018, 1, 1), datetime(2018, 1, 2), datetime(2018, 1, 3)]),
+            index=pd.date_range("2020", periods=3),
         )
         assert ts.vbt.wrapper.freq == day_dt
         assert ts.vbt(freq="2D").wrapper.freq == day_dt * 2

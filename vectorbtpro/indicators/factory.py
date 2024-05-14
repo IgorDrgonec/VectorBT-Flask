@@ -10,13 +10,7 @@ Run for the examples below:
 >>> price = pd.DataFrame({
 ...     'a': [1, 2, 3, 4, 5],
 ...     'b': [5, 4, 3, 2, 1]
-... }, index=pd.Index([
-...     datetime(2020, 1, 1),
-...     datetime(2020, 1, 2),
-...     datetime(2020, 1, 3),
-...     datetime(2020, 1, 4),
-...     datetime(2020, 1, 5),
-... ])).astype(float)
+... }, index=pd.date_range("2020", periods=5)).astype(float)
 >>> price
             a    b
 2020-01-01  1.0  5.0
@@ -33,7 +27,6 @@ import itertools
 import re
 import warnings
 from collections import Counter, OrderedDict
-from datetime import datetime, timedelta
 from types import ModuleType
 
 import numpy as np
@@ -3715,7 +3708,7 @@ Other keyword arguments are passed to `{0}.run`.
         # To get output names, we need to run the indicator
         test_df = pd.DataFrame(
             {c: np.random.uniform(1, 10, size=(test_index_len,)) for c in input_names},
-            index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(test_index_len)],
+            index=pd.date_range("2020", periods=test_index_len),
         )
         new_args = merge_dicts({c: test_df[c] for c in input_names}, kwargs)
         result = suppress_stdout(func)(**new_args)

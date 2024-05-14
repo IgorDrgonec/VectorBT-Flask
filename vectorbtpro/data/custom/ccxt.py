@@ -309,6 +309,7 @@ class CCXTData(RemoteData):
         assert_can_import("ccxt")
         import ccxt
 
+        exchange = cls.resolve_custom_setting(exchange, "exchange")
         if exchange is None and ":" in symbol:
             exchange, symbol = symbol.split(":")
         if exchange_config is None:

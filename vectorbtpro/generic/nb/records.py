@@ -753,7 +753,7 @@ def drawdown_1d_nb(arr: tp.Array1d) -> tp.Array1d:
     for i in range(arr.shape[0]):
         if np.isnan(max_val) or arr[i] > max_val:
             max_val = arr[i]
-        if max_val == 0:
+        if np.isnan(max_val) or max_val == 0:
             out[i] = np.nan
         else:
             out[i] = arr[i] / max_val - 1

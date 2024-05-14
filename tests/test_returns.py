@@ -16,9 +16,7 @@ day_dt = np.timedelta64(86400000000000)
 
 ts = pd.DataFrame(
     {"a": [101, 102, 103, 104, 105], "b": [105, 104, 103, 102, 101], "c": [101, 102, 103, 102, 101]},
-    index=pd.DatetimeIndex(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 rets = ts.pct_change()
 
@@ -37,6 +35,24 @@ ret_acc = rets.vbt.returns(bm_returns=bm_returns)
 log_ret_acc = np.log(rets + 1).vbt.returns(bm_returns=log_bm_returns, log_returns=True)
 
 
+def prepare_sim_range_obj(df):
+    return pd.concat(
+        (
+            df["a"].iloc[sim_start[0] : sim_end[0]].reset_index(drop=True),
+            df["b"].iloc[sim_start[1] : sim_end[1]].reset_index(drop=True),
+            df["c"].iloc[sim_start[2] : sim_end[2]].reset_index(drop=True),
+        ),
+        axis=1,
+    )
+
+
+sim_start = [0, 1, 2]
+sim_end = [3, 4, 5]
+sim_range_rets = prepare_sim_range_obj(rets)
+sim_range_bm_returns = prepare_sim_range_obj(bm_returns)
+sim_range_ret_acc = sim_range_rets.vbt.returns(bm_returns=sim_range_bm_returns, freq="daily")
+
+
 # ############# Global ############# #
 
 
@@ -53,6 +69,7 @@ def setup_module():
         levy_alpha=2.0,
         required_return=0.01,
         cutoff=0.05,
+        period="dt_period",
     )
 
 
@@ -143,6 +160,20 @@ class TestAccessors:
         )
         assert pd.Series.vbt.returns.from_value(ts["a"], year_freq="365 days").year_freq == pd.to_timedelta("365 days")
         assert pd.DataFrame.vbt.returns.from_value(ts, year_freq="365 days").year_freq == pd.to_timedelta("365 days")
+        assert_frame_equal(
+            pd.DataFrame.vbt.returns.from_value(ts, sim_start=sim_start, sim_end=sim_end).obj,
+            pd.DataFrame(
+                [
+                    [0.0, np.nan, np.nan],
+                    [0.009900990099009901, 0.0, np.nan],
+                    [0.00980392156862745, -0.009615384615384616, 0.0],
+                    [np.nan, -0.009708737864077669, -0.009708737864077669],
+                    [np.nan, np.nan, -0.00980392156862745],
+                ],
+                index=ts.index,
+                columns=ts.columns,
+            ),
+        )
 
     def test_daily(self):
         ret_12h = pd.DataFrame(
@@ -191,7 +222,10 @@ class TestAccessors:
             ret_12h.vbt.returns.daily(jitted=dict(parallel=True)),
             ret_12h.vbt.returns.daily(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_12h.vbt.returns.daily(chunked=True), ret_12h.vbt.returns.daily(chunked=False))
+        assert_frame_equal(
+            ret_12h.vbt.returns.daily(chunked=True),
+            ret_12h.vbt.returns.daily(chunked=False),
+        )
 
     def test_annual(self):
         assert_series_equal(
@@ -222,7 +256,10 @@ class TestAccessors:
             ret_acc.annual(jitted=dict(parallel=True)),
             ret_acc.annual(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.annual(chunked=True), ret_acc.annual(chunked=False))
+        assert_frame_equal(
+            ret_acc.annual(chunked=True),
+            ret_acc.annual(chunked=False),
+        )
 
     def test_cumulative(self):
         assert_series_equal(
@@ -263,7 +300,14 @@ class TestAccessors:
             ret_acc.cumulative(jitted=dict(parallel=True)),
             ret_acc.cumulative(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.cumulative(chunked=True), ret_acc.cumulative(chunked=False))
+        assert_frame_equal(
+            ret_acc.cumulative(chunked=True),
+            ret_acc.cumulative(chunked=False),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.cumulative(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.cumulative(),
+        )
 
     def test_total(self):
         assert isclose(ret_acc["a"].total(), 0.03960396039603964)
@@ -279,7 +323,10 @@ class TestAccessors:
             ret_acc.total(jitted=dict(parallel=True)),
             ret_acc.total(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.total(chunked=True), ret_acc.total(chunked=False))
+        assert_series_equal(
+            ret_acc.total(chunked=True),
+            ret_acc.total(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_total(),
             pd.DataFrame(
@@ -298,7 +345,18 @@ class TestAccessors:
             ret_acc.rolling_total(jitted=dict(parallel=True)),
             ret_acc.rolling_total(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.rolling_total(chunked=True), ret_acc.rolling_total(chunked=False))
+        assert_frame_equal(
+            ret_acc.rolling_total(chunked=True),
+            ret_acc.rolling_total(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.total(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.total(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_total(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_total(),
+        )
 
     def test_annualized(self):
         assert isclose(ret_acc["a"].annualized(), 16.03564361105591)
@@ -314,7 +372,10 @@ class TestAccessors:
             ret_acc.annualized(jitted=dict(parallel=True)),
             ret_acc.annualized(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.annualized(chunked=True), ret_acc.annualized(chunked=False))
+        assert_series_equal(
+            ret_acc.annualized(chunked=True),
+            ret_acc.annualized(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_annualized(),
             pd.DataFrame(
@@ -340,6 +401,14 @@ class TestAccessors:
         assert_frame_equal(
             ret_acc.rolling_annualized(chunked=True),
             ret_acc.rolling_annualized(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.annualized(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.annualized(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_annualized(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_annualized(),
         )
 
     def test_annualized_volatility(self):
@@ -382,6 +451,14 @@ class TestAccessors:
             ret_acc.rolling_annualized_volatility(chunked=True),
             ret_acc.rolling_annualized_volatility(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.annualized_volatility(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.annualized_volatility(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_annualized_volatility(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_annualized_volatility(),
+        )
 
     def test_calmar_ratio(self):
         assert isclose(ret_acc["a"].calmar_ratio(), np.nan)
@@ -397,7 +474,10 @@ class TestAccessors:
             ret_acc.calmar_ratio(jitted=dict(parallel=True)),
             ret_acc.calmar_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.calmar_ratio(chunked=True), ret_acc.calmar_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.calmar_ratio(chunked=True),
+            ret_acc.calmar_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_calmar_ratio(),
             pd.DataFrame(
@@ -424,6 +504,14 @@ class TestAccessors:
             ret_acc.rolling_calmar_ratio(chunked=True),
             ret_acc.rolling_calmar_ratio(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.calmar_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.calmar_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_calmar_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_calmar_ratio(),
+        )
 
     def test_omega_ratio(self):
         assert isclose(ret_acc["a"].omega_ratio(), np.inf)
@@ -435,7 +523,10 @@ class TestAccessors:
             ret_acc.omega_ratio(jitted=dict(parallel=True)),
             ret_acc.omega_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.omega_ratio(chunked=True), ret_acc.omega_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.omega_ratio(chunked=True),
+            ret_acc.omega_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_omega_ratio(),
             pd.DataFrame(
@@ -458,6 +549,14 @@ class TestAccessors:
             ret_acc.rolling_omega_ratio(chunked=True),
             ret_acc.rolling_omega_ratio(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.omega_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.omega_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_omega_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_omega_ratio(),
+        )
 
     def test_sharpe_ratio(self):
         assert isclose(ret_acc["a"].sharpe_ratio(), 1361.2461777659016)
@@ -473,7 +572,10 @@ class TestAccessors:
             ret_acc.sharpe_ratio(jitted=dict(parallel=True)),
             ret_acc.sharpe_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.sharpe_ratio(chunked=True), ret_acc.sharpe_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.sharpe_ratio(chunked=True),
+            ret_acc.sharpe_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_sharpe_ratio(),
             pd.DataFrame(
@@ -495,6 +597,14 @@ class TestAccessors:
         assert_frame_equal(
             ret_acc.rolling_sharpe_ratio(chunked=True),
             ret_acc.rolling_sharpe_ratio(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.sharpe_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.sharpe_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_sharpe_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_sharpe_ratio(),
         )
 
     def test_sharpe_ratio_std(self):
@@ -529,7 +639,10 @@ class TestAccessors:
             ret_acc.downside_risk(jitted=dict(parallel=True)),
             ret_acc.downside_risk(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.downside_risk(chunked=True), ret_acc.downside_risk(chunked=False))
+        assert_series_equal(
+            ret_acc.downside_risk(chunked=True),
+            ret_acc.downside_risk(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_downside_risk(),
             pd.DataFrame(
@@ -552,6 +665,14 @@ class TestAccessors:
             ret_acc.rolling_downside_risk(chunked=True),
             ret_acc.rolling_downside_risk(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.downside_risk(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.downside_risk(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_downside_risk(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_downside_risk(),
+        )
 
     def test_sortino_ratio(self):
         assert isclose(ret_acc["a"].sortino_ratio(), -17.496762611302145)
@@ -567,7 +688,10 @@ class TestAccessors:
             ret_acc.sortino_ratio(jitted=dict(parallel=True)),
             ret_acc.sortino_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.sortino_ratio(chunked=True), ret_acc.sortino_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.sortino_ratio(chunked=True),
+            ret_acc.sortino_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_sortino_ratio(),
             pd.DataFrame(
@@ -589,6 +713,14 @@ class TestAccessors:
         assert_frame_equal(
             ret_acc.rolling_sortino_ratio(chunked=True),
             ret_acc.rolling_sortino_ratio(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.sortino_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.sortino_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_sortino_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_sortino_ratio(),
         )
 
     def test_information_ratio(self):
@@ -631,6 +763,14 @@ class TestAccessors:
             ret_acc.rolling_information_ratio(chunked=True),
             ret_acc.rolling_information_ratio(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.information_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.information_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_information_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_information_ratio(),
+        )
 
     def test_beta(self):
         assert isclose(ret_acc["a"].beta(), 0.00973323097108315)
@@ -642,7 +782,10 @@ class TestAccessors:
             ret_acc.beta(jitted=dict(parallel=True)),
             ret_acc.beta(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.beta(chunked=True), ret_acc.beta(chunked=False))
+        assert_series_equal(
+            ret_acc.beta(chunked=True),
+            ret_acc.beta(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_beta(),
             pd.DataFrame(
@@ -661,7 +804,18 @@ class TestAccessors:
             ret_acc.rolling_beta(jitted=dict(parallel=True)),
             ret_acc.rolling_beta(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.rolling_beta(chunked=True), ret_acc.rolling_beta(chunked=False))
+        assert_frame_equal(
+            ret_acc.rolling_beta(chunked=True),
+            ret_acc.rolling_beta(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.beta(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.beta(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_beta(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_beta(),
+        )
 
     def test_alpha(self):
         assert isclose(ret_acc["a"].alpha(), 23.18752973476371)
@@ -677,7 +831,10 @@ class TestAccessors:
             ret_acc.alpha(jitted=dict(parallel=True)),
             ret_acc.alpha(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.alpha(chunked=True), ret_acc.alpha(chunked=False))
+        assert_series_equal(
+            ret_acc.alpha(chunked=True),
+            ret_acc.alpha(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_alpha(),
             pd.DataFrame(
@@ -696,7 +853,18 @@ class TestAccessors:
             ret_acc.rolling_alpha(jitted=dict(parallel=True)),
             ret_acc.rolling_alpha(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.rolling_alpha(chunked=True), ret_acc.rolling_alpha(chunked=False))
+        assert_frame_equal(
+            ret_acc.rolling_alpha(chunked=True),
+            ret_acc.rolling_alpha(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.alpha(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.alpha(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_alpha(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_alpha(),
+        )
 
     def test_tail_ratio(self):
         assert isclose(ret_acc["a"].tail_ratio(), 1.0266935164903142)
@@ -712,7 +880,10 @@ class TestAccessors:
             ret_acc.tail_ratio(jitted=dict(parallel=True)),
             ret_acc.tail_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.tail_ratio(chunked=True), ret_acc.tail_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.tail_ratio(chunked=True),
+            ret_acc.tail_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_tail_ratio(),
             pd.DataFrame(
@@ -735,6 +906,14 @@ class TestAccessors:
             ret_acc.rolling_tail_ratio(chunked=True),
             ret_acc.rolling_tail_ratio(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.tail_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.tail_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_tail_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_tail_ratio(),
+        )
 
     def test_value_at_risk(self):
         assert isclose(ret_acc["a"].value_at_risk(), 0.009629387602688543)
@@ -750,7 +929,10 @@ class TestAccessors:
             ret_acc.value_at_risk(jitted=dict(parallel=True)),
             ret_acc.value_at_risk(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.value_at_risk(chunked=True), ret_acc.value_at_risk(chunked=False))
+        assert_series_equal(
+            ret_acc.value_at_risk(chunked=True),
+            ret_acc.value_at_risk(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_value_at_risk(),
             pd.DataFrame(
@@ -772,6 +954,14 @@ class TestAccessors:
         assert_frame_equal(
             ret_acc.rolling_value_at_risk(chunked=True),
             ret_acc.rolling_value_at_risk(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.value_at_risk(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.value_at_risk(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_value_at_risk(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_value_at_risk(),
         )
 
     def test_cond_value_at_risk(self):
@@ -814,6 +1004,14 @@ class TestAccessors:
             ret_acc.rolling_cond_value_at_risk(chunked=True),
             ret_acc.rolling_cond_value_at_risk(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.cond_value_at_risk(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.cond_value_at_risk(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_cond_value_at_risk(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_cond_value_at_risk(),
+        )
 
     def test_capture_ratio(self):
         assert isclose(ret_acc["a"].capture_ratio(), np.inf)
@@ -829,7 +1027,10 @@ class TestAccessors:
             ret_acc.capture_ratio(jitted=dict(parallel=True)),
             ret_acc.capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.capture_ratio(chunked=True), ret_acc.capture_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.capture_ratio(chunked=True),
+            ret_acc.capture_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_capture_ratio(),
             pd.DataFrame(
@@ -852,7 +1053,18 @@ class TestAccessors:
             ret_acc.rolling_capture_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.rolling_capture_ratio(chunked=True), ret_acc.rolling_capture_ratio(chunked=False))
+        assert_frame_equal(
+            ret_acc.rolling_capture_ratio(chunked=True),
+            ret_acc.rolling_capture_ratio(chunked=False),
+        )
+        assert_series_equal(
+            ret_acc.capture_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.capture_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_capture_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_capture_ratio(),
+        )
 
     def test_up_capture_ratio(self):
         assert isclose(ret_acc["a"].up_capture_ratio(), 5.035323109391956)
@@ -868,7 +1080,10 @@ class TestAccessors:
             ret_acc.up_capture_ratio(jitted=dict(parallel=True)),
             ret_acc.up_capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.up_capture_ratio(chunked=True), ret_acc.up_capture_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.up_capture_ratio(chunked=True),
+            ret_acc.up_capture_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_up_capture_ratio(),
             pd.DataFrame(
@@ -895,6 +1110,14 @@ class TestAccessors:
             ret_acc.rolling_up_capture_ratio(chunked=True),
             ret_acc.rolling_up_capture_ratio(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.up_capture_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.up_capture_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_up_capture_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_up_capture_ratio(),
+        )
 
     def test_down_capture_ratio(self):
         assert isclose(ret_acc["a"].down_capture_ratio(), np.nan)
@@ -910,7 +1133,10 @@ class TestAccessors:
             ret_acc.down_capture_ratio(jitted=dict(parallel=True)),
             ret_acc.down_capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.down_capture_ratio(chunked=True), ret_acc.down_capture_ratio(chunked=False))
+        assert_series_equal(
+            ret_acc.down_capture_ratio(chunked=True),
+            ret_acc.down_capture_ratio(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_down_capture_ratio(),
             pd.DataFrame(
@@ -937,6 +1163,14 @@ class TestAccessors:
             ret_acc.rolling_down_capture_ratio(chunked=True),
             ret_acc.rolling_down_capture_ratio(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.down_capture_ratio(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.down_capture_ratio(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_down_capture_ratio(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_down_capture_ratio(),
+        )
 
     def test_drawdown(self):
         assert_series_equal(
@@ -958,7 +1192,7 @@ class TestAccessors:
                 index=pd.DatetimeIndex(
                     ["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"],
                     dtype="datetime64[ns]",
-                    freq=None,
+                    freq="D",
                 ),
                 columns=rets.columns,
             ),
@@ -967,7 +1201,14 @@ class TestAccessors:
             ret_acc.drawdown(jitted=dict(parallel=True)),
             ret_acc.drawdown(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.drawdown(chunked=True), ret_acc.drawdown(chunked=False))
+        assert_frame_equal(
+            ret_acc.drawdown(chunked=True),
+            ret_acc.drawdown(chunked=False),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.drawdown(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.drawdown(),
+        )
 
     def test_max_drawdown(self):
         assert isclose(ret_acc["a"].max_drawdown(), ret_acc["a"].drawdowns.get_max_drawdown(fill_value=0.0))
@@ -980,7 +1221,10 @@ class TestAccessors:
             ret_acc.max_drawdown(jitted=dict(parallel=True)),
             ret_acc.max_drawdown(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.max_drawdown(chunked=True), ret_acc.max_drawdown(chunked=False))
+        assert_series_equal(
+            ret_acc.max_drawdown(chunked=True),
+            ret_acc.max_drawdown(chunked=False),
+        )
         assert_frame_equal(
             ret_acc.rolling_max_drawdown(),
             pd.DataFrame(
@@ -1007,6 +1251,14 @@ class TestAccessors:
             ret_acc.rolling_max_drawdown(chunked=True),
             ret_acc.rolling_max_drawdown(chunked=False),
         )
+        assert_series_equal(
+            ret_acc.max_drawdown(sim_start=sim_start, sim_end=sim_end),
+            sim_range_ret_acc.max_drawdown(),
+        )
+        assert_frame_equal(
+            prepare_sim_range_obj(ret_acc.rolling_max_drawdown(sim_start=sim_start, sim_end=sim_end)),
+            sim_range_ret_acc.rolling_max_drawdown(),
+        )
 
     def test_drawdowns(self):
         assert type(ret_acc["a"].drawdowns) is vbt.Drawdowns
@@ -1015,6 +1267,10 @@ class TestAccessors:
         assert ret_acc.drawdowns.wrapper.ndim == rets.ndim
         assert isclose(ret_acc["a"].drawdowns.get_max_drawdown(fill_value=0.0), ret_acc["a"].max_drawdown())
         assert_series_equal(ret_acc.drawdowns.get_max_drawdown(fill_value=0.0), ret_acc.max_drawdown())
+        assert_series_equal(
+            ret_acc.get_drawdowns(sim_start=sim_start, sim_end=sim_end).get_max_drawdown(),
+            sim_range_ret_acc.drawdowns.get_max_drawdown(),
+        )
 
     def test_stats(self):
         stats_index = pd.Index(
@@ -1195,6 +1451,39 @@ class TestAccessors:
         assert stats_df.shape == (3, 20)
         assert_index_equal(stats_df.index, ret_acc.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
+        assert_series_equal(
+            ret_acc.replace(sim_start=sim_start, sim_end=sim_end).stats(),
+            pd.Series(
+                [
+                    pd.Timestamp("2020-01-02 00:00:00"),
+                    pd.Timestamp("2020-01-04 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
+                    -0.6191123314012023,
+                    0.6886265549631935,
+                    273.2541148409902,
+                    7.294482567980012,
+                    1.9324122479462216,
+                    pd.Timedelta("3 days 00:00:00"),
+                    87.80842141139925,
+                    -34.969658476787785,
+                    np.inf,
+                    -17.643087229802163,
+                    0.00011764488982174458,
+                    -1.9997596731600706,
+                    0.93116546551751,
+                    np.inf,
+                    -0.0032283435807447525,
+                    3.8022060744258976e117,
+                    35.2084282383429,
+                ],
+                index=stats_index,
+                name="agg_stats",
+            ),
+        )
+        assert_series_equal(
+            ret_acc.stats(settings=dict(sim_start=sim_start, sim_end=sim_end)),
+            ret_acc.replace(sim_start=sim_start, sim_end=sim_end).stats(),
+        )
 
     def test_qs(self):
         if qs_available:

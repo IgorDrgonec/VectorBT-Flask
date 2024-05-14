@@ -229,7 +229,8 @@ class BaseIDXAccessor(Configured, IndexApplier):
         wrapping_cfg = settings["wrapping"]
 
         if not isinstance(cls_or_self, type):
-            index = cls_or_self.obj
+            if index is None:
+                index = cls_or_self.obj
             if freq is None:
                 freq = cls_or_self._freq
         else:
@@ -266,7 +267,8 @@ class BaseIDXAccessor(Configured, IndexApplier):
     def get_period(cls_or_self, index: tp.Optional[tp.Index] = None) -> int:
         """Get the period of the index, without taking into account its datetime-like properties."""
         if not isinstance(cls_or_self, type):
-            index = cls_or_self.obj
+            if index is None:
+                index = cls_or_self.obj
         else:
             checks.assert_not_none(index, arg_name="index")
         return len(index)
@@ -288,7 +290,8 @@ class BaseIDXAccessor(Configured, IndexApplier):
         wrapping_cfg = settings["wrapping"]
 
         if not isinstance(cls_or_self, type):
-            index = cls_or_self.obj
+            if index is None:
+                index = cls_or_self.obj
         else:
             checks.assert_not_none(index, arg_name="index")
 

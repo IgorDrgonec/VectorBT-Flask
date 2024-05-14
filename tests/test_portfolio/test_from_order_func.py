@@ -19,9 +19,7 @@ day_dt = np.timedelta64(86400000000000)
 
 price = pd.Series(
     [1.0, 2.0, 3.0, 4.0, 5.0],
-    index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 price_wide = price.vbt.tile(3, keys=["a", "b", "c"])
 

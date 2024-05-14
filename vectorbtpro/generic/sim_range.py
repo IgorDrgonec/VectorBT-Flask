@@ -271,6 +271,8 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
+        if sim_start is False:
+            sim_start = None
         if allow_none and sim_start is None:
             return None
         if not already_prepared and sim_start is not None:
@@ -329,6 +331,8 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
+        if sim_end is False:
+            sim_end = None
         if allow_none and sim_end is None:
             return None
         if not already_prepared and sim_end is not None:
@@ -373,9 +377,10 @@ class SimRangeMixin:
         cls_or_self,
         sim_start: tp.Optional[tp.ArrayLike] = None,
         keep_flex: bool = False,
-        allow_none: bool = True,
+        allow_none: bool = False,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Union[None, tp.Array1d, tp.Series]:
         """Get simulation start."""
         if not isinstance(cls_or_self, type):
@@ -394,16 +399,23 @@ class SimRangeMixin:
             return None
         if keep_flex:
             return sim_start
-        return wrapper.wrap_reduced(sim_start, group_by=group_by)
+        wrap_kwargs = merge_dicts(dict(name_or_index="sim_end"), wrap_kwargs)
+        return wrapper.wrap_reduced(sim_start, group_by=group_by, **wrap_kwargs)
+
+    @property
+    def sim_start(self) -> tp.Series:
+        """`SimRangeMixin.get_sim_start` with default arguments."""
+        return self.get_sim_start()
 
     @class_or_instancemethod
     def get_sim_end(
         cls_or_self,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         keep_flex: bool = False,
-        allow_none: bool = True,
+        allow_none: bool = False,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Union[None, tp.Array1d, tp.Series]:
         """Get simulation end."""
         if not isinstance(cls_or_self, type):
@@ -422,7 +434,13 @@ class SimRangeMixin:
             return None
         if keep_flex:
             return sim_end
-        return wrapper.wrap_reduced(sim_end, group_by=group_by)
+        wrap_kwargs = merge_dicts(dict(name_or_index="sim_start"), wrap_kwargs)
+        return wrapper.wrap_reduced(sim_end, group_by=group_by, **wrap_kwargs)
+
+    @property
+    def sim_end(self) -> tp.Series:
+        """`SimRangeMixin.get_sim_end` with default arguments."""
+        return self.get_sim_end()
 
     @class_or_instancemethod
     def get_sim_start_index(
@@ -464,6 +482,11 @@ class SimRangeMixin:
                 start_index.append(wrapper.index[_sim_start])
         wrap_kwargs = merge_dicts(dict(name_or_index="sim_start_index"), wrap_kwargs)
         return wrapper.wrap_reduced(pd.Index(start_index), group_by=group_by, **wrap_kwargs)
+
+    @property
+    def sim_start_index(self) -> tp.Series:
+        """`SimRangeMixin.get_sim_start_index` with default arguments."""
+        return self.get_sim_start_index()
 
     @class_or_instancemethod
     def get_sim_end_index(
@@ -516,6 +539,11 @@ class SimRangeMixin:
         wrap_kwargs = merge_dicts(dict(name_or_index="sim_end_index"), wrap_kwargs)
         return wrapper.wrap_reduced(pd.Index(end_index), group_by=group_by, **wrap_kwargs)
 
+    @property
+    def sim_end_index(self) -> tp.Series:
+        """`SimRangeMixin.get_sim_end_index` with default arguments."""
+        return self.get_sim_end_index()
+
     @class_or_instancemethod
     def get_sim_duration(
         cls_or_self,
@@ -548,6 +576,11 @@ class SimRangeMixin:
         wrap_kwargs = merge_dicts(dict(name_or_index="sim_duration"), wrap_kwargs)
         return wrapper.wrap_reduced(total_duration, group_by=group_by, **wrap_kwargs)
 
+    @property
+    def sim_duration(self) -> tp.Series:
+        """`SimRangeMixin.get_sim_duration` with default arguments."""
+        return self.get_sim_duration()
+
     @class_or_instancemethod
     def fit_fig_to_sim_range(
         cls_or_self,
@@ -568,11 +601,13 @@ class SimRangeMixin:
 
         sim_start = cls_or_self.get_sim_start(
             sim_start=sim_start,
+            allow_none=True,
             wrapper=wrapper,
             group_by=group_by,
         )
         sim_end = cls_or_self.get_sim_end(
             sim_end=sim_end,
+            allow_none=True,
             wrapper=wrapper,
             group_by=group_by,
         )

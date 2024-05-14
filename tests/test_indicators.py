@@ -54,9 +54,7 @@ def teardown_module():
 
 ts = pd.DataFrame(
     {"a": [1.0, 2.0, 3.0, 4.0, 5.0], "b": [5.0, 4.0, 3.0, 2.0, 1.0], "c": [1.0, 2.0, 3.0, 2.0, 1.0]},
-    index=pd.DatetimeIndex(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 
 
