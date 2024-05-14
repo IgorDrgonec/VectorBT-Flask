@@ -6,7 +6,6 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.iter_ import *
@@ -890,7 +889,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -1580,7 +1579,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
@@ -1930,7 +1929,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -2622,7 +2621,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
@@ -3030,7 +3029,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -3710,7 +3709,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
@@ -3967,7 +3966,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -4649,7 +4648,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,

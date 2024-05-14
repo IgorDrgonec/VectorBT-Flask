@@ -17,6 +17,7 @@ from vectorbtpro.base.reshaping import to_2d_array, broadcast_array_to, broadcas
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.data.base import OHLCDataMixin, Data
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.sim_range import SimRangeMixin
 from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.orders import FSOrders
@@ -381,16 +382,6 @@ class BasePFPreparer(BasePreparer):
             require_kwargs=self.broadcast_kwargs.get("require_kwargs", {}),
         )
 
-    def prepare_sim_start_value(self, value: tp.Scalar) -> int:
-        """Prepare a single value of `sim_start`."""
-        auto_idxr = AutoIdxr(value, indexer_method="bfill", below_to_zero=True)
-        return auto_idxr.get(self.wrapper.index, freq=self.wrapper.freq)
-
-    def prepare_sim_end_value(self, value: tp.Scalar) -> int:
-        """Prepare a single value of `sim_end`."""
-        auto_idxr = AutoIdxr(value, indexer_method="bfill", above_to_len=True)
-        return auto_idxr.get(self.wrapper.index, freq=self.wrapper.freq)
-
     @cachedproperty
     def auto_sim_start(self) -> tp.Optional[tp.ArrayLike]:
         """Get automatic `sim_start`"""
@@ -418,10 +409,10 @@ class BasePFPreparer(BasePreparer):
             new_sim_start = sim_start_arr
         else:
             if sim_start_arr.ndim == 0:
-                return self.prepare_sim_start_value(sim_start)
+                return SimRangeMixin.resolve_sim_start_value(sim_start, wrapper=self.wrapper)
             new_sim_start = np.empty(len(sim_start), dtype=np.int_)
             for i in range(len(sim_start)):
-                new_sim_start[i] = self.prepare_sim_start_value(sim_start[i])
+                new_sim_start[i] = SimRangeMixin.resolve_sim_start_value(sim_start[i], wrapper=self.wrapper)
         return self.align_pc_arr(
             new_sim_start,
             group_lens=self.sim_group_lens,
@@ -448,10 +439,10 @@ class BasePFPreparer(BasePreparer):
             new_sim_end = sim_end_arr
         else:
             if sim_end_arr.ndim == 0:
-                return self.prepare_sim_end_value(sim_end)
+                return SimRangeMixin.resolve_sim_end_value(sim_end, wrapper=self.wrapper)
             new_sim_end = np.empty(len(sim_end), dtype=np.int_)
             for i in range(len(sim_end)):
-                new_sim_end[i] = self.prepare_sim_end_value(sim_end[i])
+                new_sim_end[i] = SimRangeMixin.resolve_sim_end_value(sim_end[i], wrapper=self.wrapper)
         return self.align_pc_arr(
             new_sim_end,
             group_lens=self.sim_group_lens,

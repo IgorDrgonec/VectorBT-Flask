@@ -27,5 +27,6 @@ from vectorbtpro.generic.nb.iter_ import *
 from vectorbtpro.generic.nb.patterns import *
 from vectorbtpro.generic.nb.records import *
 from vectorbtpro.generic.nb.rolling import *
+from vectorbtpro.generic.nb.sim_range import *
 
 __all__ = []

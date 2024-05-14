@@ -190,8 +190,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             wrapper = wrapper.replace(**wrapper_kwargs)
         value = to_2d_array(value)
         init_value = broadcast_array_to(init_value, value.shape[1])
-        sim_start = cls.prepare_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
-        sim_end = cls.prepare_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        sim_start = cls.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
+        sim_end = cls.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -400,8 +400,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         if bm_returns is None:
             return None
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
         return self.replace(
             obj=bm_returns,
             bm_returns=None,
@@ -608,13 +608,13 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             else:
                 checks.assert_not_none(wrapper, arg_name="wrapper")
 
-            sim_start = cls_or_self.prepare_sim_start(
+            sim_start = cls_or_self.resolve_sim_start(
                 sim_start=sim_start,
                 allow_none=True,
                 wrapper=wrapper,
                 group_by=group_by,
             )
-            sim_end = cls_or_self.prepare_sim_end(
+            sim_end = cls_or_self.resolve_sim_end(
                 sim_end=sim_end,
                 allow_none=True,
                 wrapper=wrapper,
@@ -622,14 +622,14 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             )
             if sim_start is not None or sim_end is not None:
                 if sim_start is None:
-                    sim_start = cls_or_self.prepare_sim_start(
+                    sim_start = cls_or_self.resolve_sim_start(
                         sim_start=sim_start,
                         allow_none=False,
                         wrapper=wrapper,
                         group_by=group_by,
                     )
                 if sim_end is None:
-                    sim_end = cls_or_self.prepare_sim_end(
+                    sim_end = cls_or_self.resolve_sim_end(
                         sim_end=sim_end,
                         allow_none=False,
                         wrapper=wrapper,
@@ -772,8 +772,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.cumulative_returns_nb`."""
         if start_value is None:
             start_value = self.defaults["start_value"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.cumulative_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -800,8 +800,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.final_value_nb`."""
         if start_value is None:
             start_value = self.defaults["start_value"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.final_value_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -836,8 +836,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             minp = self.defaults["minp"]
         if start_value is None:
             start_value = self.defaults["start_value"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_final_value_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -863,8 +863,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         """Total return.
 
         See `vectorbtpro.returns.nb.total_return_nb`."""
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.total_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -895,8 +895,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_total_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -923,8 +923,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
 
         See `vectorbtpro.returns.nb.annualized_return_nb`."""
         period = self.get_period(period=period, sim_start=sim_start, sim_end=sim_end)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.annualized_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -957,8 +957,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_annualized_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -990,8 +990,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             levy_alpha = self.defaults["levy_alpha"]
         if ddof is None:
             ddof = self.defaults["ddof"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.annualized_volatility_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1030,8 +1030,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             levy_alpha = self.defaults["levy_alpha"]
         if ddof is None:
             ddof = self.defaults["ddof"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_annualized_volatility_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1060,8 +1060,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
 
         See `vectorbtpro.returns.nb.calmar_ratio_nb`."""
         period = self.get_period(period=period, sim_start=sim_start, sim_end=sim_end)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.calmar_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1094,8 +1094,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_calmar_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1127,8 +1127,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             risk_free = self.defaults["risk_free"]
         if required_return is None:
             required_return = self.defaults["required_return"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.deannualized_return_nb, jitted)
         required_return = func(required_return, self.ann_factor)
@@ -1166,8 +1166,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             risk_free = self.defaults["risk_free"]
         if required_return is None:
             required_return = self.defaults["required_return"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.deannualized_return_nb, jitted)
         required_return = func(required_return, self.ann_factor)
@@ -1200,8 +1200,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             risk_free = self.defaults["risk_free"]
         if ddof is None:
             ddof = self.defaults["ddof"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.sharpe_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1245,8 +1245,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             risk_free = self.defaults["risk_free"]
         if ddof is None:
             ddof = self.defaults["ddof"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_sharpe_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1368,8 +1368,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.downside_risk_nb`."""
         if required_return is None:
             required_return = self.defaults["required_return"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.downside_risk_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1403,8 +1403,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             minp = self.defaults["minp"]
         if required_return is None:
             required_return = self.defaults["required_return"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_downside_risk_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1432,8 +1432,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.sortino_ratio_nb`."""
         if required_return is None:
             required_return = self.defaults["required_return"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.sortino_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1467,8 +1467,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             minp = self.defaults["minp"]
         if required_return is None:
             required_return = self.defaults["required_return"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_sortino_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1501,8 +1501,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.information_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1541,8 +1541,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_information_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1575,8 +1575,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.beta_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1616,8 +1616,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_beta_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1651,8 +1651,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.alpha_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1692,8 +1692,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_alpha_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1720,8 +1720,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         """Tail ratio.
 
         See `vectorbtpro.returns.nb.tail_ratio_nb`."""
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.tail_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1753,8 +1753,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_tail_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1779,8 +1779,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         """Profit factor.
 
         See `vectorbtpro.returns.nb.profit_factor_nb`."""
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.profit_factor_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1810,8 +1810,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_profit_factor_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1835,8 +1835,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         """Common Sense Ratio (CSR).
 
         See `vectorbtpro.returns.nb.common_sense_ratio_nb`."""
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.common_sense_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1866,8 +1866,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_common_sense_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1895,8 +1895,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.value_at_risk_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1932,8 +1932,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             minp = self.defaults["minp"]
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_value_at_risk_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1963,8 +1963,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.cond_value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.cond_value_at_risk_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2000,8 +2000,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             minp = self.defaults["minp"]
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_cond_value_at_risk_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2034,8 +2034,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         period = self.get_period(period=period, sim_start=sim_start, sim_end=sim_end)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2074,8 +2074,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2109,8 +2109,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         period = self.get_period(period=period, sim_start=sim_start, sim_end=sim_end)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.up_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2149,8 +2149,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_up_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2184,8 +2184,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         period = self.get_period(period=period, sim_start=sim_start, sim_end=sim_end)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.down_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2224,8 +2224,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_down_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2275,8 +2275,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         See `vectorbtpro.returns.nb.max_drawdown_nb`.
 
         Yields the same out as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.max_drawdown_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2307,8 +2307,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         func = jit_reg.resolve_option(nb.rolling_max_drawdown_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -2338,8 +2338,8 @@ class ReturnsAccessor(GenericAccessor, SimRangeMixin):
         """Generate drawdown records of cumulative returns.
 
         See `vectorbtpro.generic.drawdowns.Drawdowns`."""
-        sim_start = self.prepare_sim_start(sim_start=sim_start, group_by=False)
-        sim_end = self.prepare_sim_end(sim_end=sim_end, group_by=False)
+        sim_start = self.resolve_sim_start(sim_start=sim_start, group_by=False)
+        sim_end = self.resolve_sim_end(sim_end=sim_end, group_by=False)
 
         return Drawdowns.from_price(
             self.cumulative(

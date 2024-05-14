@@ -6,7 +6,6 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -31,7 +30,7 @@ def records_within_sim_range_nb(
     out = np.empty(len(records), dtype=records.dtype)
     k = 0
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=target_shape,
         sim_start=sim_start,
         sim_end=sim_end,
@@ -313,7 +312,7 @@ def get_entry_trades_nb(
     new_records = np.empty((max_records, len(col_lens)), dtype=trade_dt)
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(close_.shape[0], col_lens.shape[0]),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -600,7 +599,7 @@ def get_exit_trades_nb(
     new_records = np.empty((max_records, len(col_lens)), dtype=trade_dt)
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(close_.shape[0], col_lens.shape[0]),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -1016,7 +1015,7 @@ def get_position_feature_nb(
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(close.shape[0], col_lens.shape[0]),
         sim_start=sim_start,
         sim_end=sim_end,

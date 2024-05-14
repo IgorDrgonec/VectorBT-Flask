@@ -140,8 +140,8 @@ class SimRangeMixin:
         sim_start: tp.Optional[tp.Array1d] = None,
         sim_end: tp.Optional[tp.Array1d] = None,
     ) -> None:
-        sim_start = type(self).prepare_sim_start(sim_start=sim_start, wrapper=self.wrapper, group_by=False)
-        sim_end = type(self).prepare_sim_end(sim_end=sim_end, wrapper=self.wrapper, group_by=False)
+        sim_start = type(self).resolve_sim_start(sim_start=sim_start, wrapper=self.wrapper, group_by=False)
+        sim_end = type(self).resolve_sim_end(sim_end=sim_end, wrapper=self.wrapper, group_by=False)
 
         self._sim_start = sim_start
         self._sim_end = sim_end
@@ -221,12 +221,12 @@ class SimRangeMixin:
         return new_sim_end
 
     @class_or_instancemethod
-    def prepare_sim_start_value(
+    def resolve_sim_start_value(
         cls_or_self,
         value: tp.Scalar,
         wrapper: tp.Optional[ArrayWrapper] = None,
     ) -> int:
-        """Prepare a single value of simulation start."""
+        """Resolve a single value of simulation start."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -237,12 +237,12 @@ class SimRangeMixin:
         return auto_idxr.get(wrapper.index, freq=wrapper.freq)
 
     @class_or_instancemethod
-    def prepare_sim_end_value(
+    def resolve_sim_end_value(
         cls_or_self,
         value: tp.Scalar,
         wrapper: tp.Optional[ArrayWrapper] = None,
     ) -> int:
-        """Prepare a single value of simulation end."""
+        """Resolve a single value of simulation end."""
         if not isinstance(cls_or_self, type):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -253,19 +253,19 @@ class SimRangeMixin:
         return auto_idxr.get(wrapper.index, freq=wrapper.freq)
 
     @class_or_instancemethod
-    def prepare_sim_start(
+    def resolve_sim_start(
         cls_or_self,
         sim_start: tp.Optional[tp.ArrayLike] = None,
         allow_none: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
     ) -> tp.Optional[tp.ArrayLike]:
-        """Prepare simulation start."""
-        already_prepared = False
+        """Resolve simulation start."""
+        already_resolved = False
         if not isinstance(cls_or_self, type):
             if sim_start is None:
                 sim_start = cls_or_self._sim_start
-                already_prepared = True
+                already_resolved = True
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -275,57 +275,57 @@ class SimRangeMixin:
             sim_start = None
         if allow_none and sim_start is None:
             return None
-        if not already_prepared and sim_start is not None:
+        if not already_resolved and sim_start is not None:
             sim_start_arr = np.asarray(sim_start)
             if not np.issubdtype(sim_start_arr.dtype, np.integer):
                 if sim_start_arr.ndim == 0:
-                    sim_start = cls_or_self.prepare_sim_start_value(sim_start, wrapper=wrapper)
+                    sim_start = cls_or_self.resolve_sim_start_value(sim_start, wrapper=wrapper)
                 else:
                     new_sim_start = np.empty(len(sim_start), dtype=np.int_)
                     for i in range(len(sim_start)):
-                        new_sim_start[i] = cls_or_self.prepare_sim_start_value(sim_start[i], wrapper=wrapper)
+                        new_sim_start[i] = cls_or_self.resolve_sim_start_value(sim_start[i], wrapper=wrapper)
                     sim_start = new_sim_start
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            sim_start = nb.prepare_grouped_sim_start_nb(
+            sim_start = nb.resolve_grouped_sim_start_nb(
                 wrapper.shape_2d,
                 group_lens,
                 sim_start=sim_start,
                 allow_none=allow_none,
-                check_bounds=not already_prepared,
+                check_bounds=not already_resolved,
             )
-        elif not already_prepared and wrapper.grouper.is_grouped():
+        elif not already_resolved and wrapper.grouper.is_grouped():
             group_lens = wrapper.grouper.get_group_lens()
-            sim_start = nb.prepare_ungrouped_sim_start_nb(
+            sim_start = nb.resolve_ungrouped_sim_start_nb(
                 wrapper.shape_2d,
                 group_lens,
                 sim_start=sim_start,
                 allow_none=allow_none,
-                check_bounds=not already_prepared,
+                check_bounds=not already_resolved,
             )
         else:
-            sim_start = nb.prepare_sim_start_nb(
+            sim_start = nb.resolve_sim_start_nb(
                 wrapper.shape_2d,
                 sim_start=sim_start,
                 allow_none=allow_none,
-                check_bounds=not already_prepared,
+                check_bounds=not already_resolved,
             )
         return sim_start
 
     @class_or_instancemethod
-    def prepare_sim_end(
+    def resolve_sim_end(
         cls_or_self,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         allow_none: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
     ) -> tp.Optional[tp.ArrayLike]:
-        """Prepare simulation end."""
-        already_prepared = False
+        """Resolve simulation end."""
+        already_resolved = False
         if not isinstance(cls_or_self, type):
             if sim_end is None:
                 sim_end = cls_or_self._sim_end
-                already_prepared = True
+                already_resolved = True
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -335,40 +335,40 @@ class SimRangeMixin:
             sim_end = None
         if allow_none and sim_end is None:
             return None
-        if not already_prepared and sim_end is not None:
+        if not already_resolved and sim_end is not None:
             sim_end_arr = np.asarray(sim_end)
             if not np.issubdtype(sim_end_arr.dtype, np.integer):
                 if sim_end_arr.ndim == 0:
-                    sim_end = cls_or_self.prepare_sim_end_value(sim_end, wrapper=wrapper)
+                    sim_end = cls_or_self.resolve_sim_end_value(sim_end, wrapper=wrapper)
                 else:
                     new_sim_end = np.empty(len(sim_end), dtype=np.int_)
                     for i in range(len(sim_end)):
-                        new_sim_end[i] = cls_or_self.prepare_sim_end_value(sim_end[i], wrapper=wrapper)
+                        new_sim_end[i] = cls_or_self.resolve_sim_end_value(sim_end[i], wrapper=wrapper)
                     sim_end = new_sim_end
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            sim_end = nb.prepare_grouped_sim_end_nb(
+            sim_end = nb.resolve_grouped_sim_end_nb(
                 wrapper.shape_2d,
                 group_lens,
                 sim_end=sim_end,
                 allow_none=allow_none,
-                check_bounds=not already_prepared,
+                check_bounds=not already_resolved,
             )
-        elif not already_prepared and wrapper.grouper.is_grouped():
+        elif not already_resolved and wrapper.grouper.is_grouped():
             group_lens = wrapper.grouper.get_group_lens()
-            sim_end = nb.prepare_ungrouped_sim_end_nb(
+            sim_end = nb.resolve_ungrouped_sim_end_nb(
                 wrapper.shape_2d,
                 group_lens,
                 sim_end=sim_end,
                 allow_none=allow_none,
-                check_bounds=not already_prepared,
+                check_bounds=not already_resolved,
             )
         else:
-            sim_end = nb.prepare_sim_end_nb(
+            sim_end = nb.resolve_sim_end_nb(
                 wrapper.shape_2d,
                 sim_end=sim_end,
                 allow_none=allow_none,
-                check_bounds=not already_prepared,
+                check_bounds=not already_resolved,
             )
         return sim_end
 
@@ -389,7 +389,7 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_start = cls_or_self.prepare_sim_start(
+        sim_start = cls_or_self.resolve_sim_start(
             sim_start=sim_start,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -424,7 +424,7 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_end = cls_or_self.prepare_sim_end(
+        sim_end = cls_or_self.resolve_sim_end(
             sim_end=sim_end,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -458,7 +458,7 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_start = cls_or_self.prepare_sim_start(
+        sim_start = cls_or_self.resolve_sim_start(
             sim_start=sim_start,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -505,7 +505,7 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_end = cls_or_self.prepare_sim_end(
+        sim_end = cls_or_self.resolve_sim_end(
             sim_end=sim_end,
             allow_none=allow_none,
             wrapper=wrapper,
@@ -560,13 +560,13 @@ class SimRangeMixin:
         else:
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
-        sim_start = cls_or_self.prepare_sim_start(
+        sim_start = cls_or_self.resolve_sim_start(
             sim_start=sim_start,
             allow_none=False,
             wrapper=wrapper,
             group_by=group_by,
         )
-        sim_end = cls_or_self.prepare_sim_end(
+        sim_end = cls_or_self.resolve_sim_end(
             sim_end=sim_end,
             allow_none=False,
             wrapper=wrapper,

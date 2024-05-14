@@ -7,7 +7,6 @@ from numba import prange
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.generic.enums import BarZone
-from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.from_order_func import no_post_func_nb
@@ -617,7 +616,7 @@ def from_basic_signals_nb(
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -1069,7 +1068,7 @@ def from_basic_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
@@ -1521,7 +1520,7 @@ def from_signals_nb(
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -3390,7 +3389,7 @@ def from_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,
@@ -3953,7 +3952,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -6079,7 +6078,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
             if i >= sim_end_[group] - 1:
                 break
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,

@@ -6,7 +6,6 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.generic.nb.base import prepare_sim_range_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -254,7 +253,7 @@ def from_orders_nb(
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
-    sim_start_, sim_end_ = prepare_sim_range_nb(
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=(target_shape[0], len(group_lens)),
         sim_start=sim_start,
         sim_end=sim_end,
@@ -499,7 +498,7 @@ def from_orders_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    sim_start_out, sim_end_out = generic_nb.prepare_ungrouped_sim_range_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
         target_shape=target_shape,
         group_lens=group_lens,
         sim_start=sim_start_,

@@ -436,10 +436,6 @@ def annualized_return_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """2-dim version of `annualized_return_1d_nb`."""
-    if period is None:
-        period_ = None
-    else:
-        period_ = to_1d_array_nb(np.asarray(period))
     out = np.full(returns.shape[1], np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
@@ -447,15 +443,16 @@ def annualized_return_nb(
         sim_start=sim_start,
         sim_end=sim_end,
     )
+    if period is None:
+        period_ = sim_end_ - sim_start_
+    else:
+        period_ = to_1d_array_nb(np.asarray(period).astype(np.int_))
     for col in prange(returns.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
         if _sim_start >= _sim_end:
             continue
-        if period_ is None:
-            _period = None
-        else:
-            _period = flex_select_1d_pc_nb(period_, col)
+        _period = flex_select_1d_pc_nb(period_, col)
 
         out[col] = annualized_return_1d_nb(
             returns[_sim_start:_sim_end, col],
@@ -772,11 +769,6 @@ def calmar_ratio_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """2-dim version of `calmar_ratio_1d_nb`."""
-    if period is None:
-        period_ = None
-    else:
-        period_ = to_1d_array_nb(np.asarray(period))
-
     out = np.full(returns.shape[1], np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
@@ -784,15 +776,16 @@ def calmar_ratio_nb(
         sim_start=sim_start,
         sim_end=sim_end,
     )
+    if period is None:
+        period_ = sim_end_ - sim_start_
+    else:
+        period_ = to_1d_array_nb(np.asarray(period).astype(np.int_))
     for col in prange(returns.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
         if _sim_start >= _sim_end:
             continue
-        if period_ is None:
-            _period = None
-        else:
-            _period = flex_select_1d_pc_nb(period_, col)
+        _period = flex_select_1d_pc_nb(period_, col)
 
         out[col] = calmar_ratio_1d_nb(
             returns[_sim_start:_sim_end, col],
@@ -2232,11 +2225,6 @@ def capture_ratio_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """2-dim version of `capture_ratio_1d_nb`."""
-    if period is None:
-        period_ = None
-    else:
-        period_ = to_1d_array_nb(np.asarray(period))
-
     out = np.full(returns.shape[1], np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
@@ -2244,15 +2232,16 @@ def capture_ratio_nb(
         sim_start=sim_start,
         sim_end=sim_end,
     )
+    if period is None:
+        period_ = sim_end_ - sim_start_
+    else:
+        period_ = to_1d_array_nb(np.asarray(period).astype(np.int_))
     for col in prange(returns.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
         if _sim_start >= _sim_end:
             continue
-        if period_ is None:
-            _period = None
-        else:
-            _period = flex_select_1d_pc_nb(period_, col)
+        _period = flex_select_1d_pc_nb(period_, col)
 
         out[col] = capture_ratio_1d_nb(
             returns[_sim_start:_sim_end, col],
@@ -2380,11 +2369,6 @@ def up_capture_ratio_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """2-dim version of `up_capture_ratio_1d_nb`."""
-    if period is None:
-        period_ = None
-    else:
-        period_ = to_1d_array_nb(np.asarray(period))
-
     out = np.full(returns.shape[1], np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
@@ -2392,15 +2376,16 @@ def up_capture_ratio_nb(
         sim_start=sim_start,
         sim_end=sim_end,
     )
+    if period is None:
+        period_ = sim_end_ - sim_start_
+    else:
+        period_ = to_1d_array_nb(np.asarray(period).astype(np.int_))
     for col in prange(returns.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
         if _sim_start >= _sim_end:
             continue
-        if period_ is None:
-            _period = None
-        else:
-            _period = flex_select_1d_pc_nb(period_, col)
+        _period = flex_select_1d_pc_nb(period_, col)
 
         out[col] = up_capture_ratio_1d_nb(
             returns[_sim_start:_sim_end, col],
@@ -2528,11 +2513,6 @@ def down_capture_ratio_nb(
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """2-dim version of `down_capture_ratio_1d_nb`."""
-    if period is None:
-        period_ = None
-    else:
-        period_ = to_1d_array_nb(np.asarray(period))
-
     out = np.full(returns.shape[1], np.nan, dtype=np.float_)
 
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
@@ -2540,15 +2520,16 @@ def down_capture_ratio_nb(
         sim_start=sim_start,
         sim_end=sim_end,
     )
+    if period is None:
+        period_ = sim_end_ - sim_start_
+    else:
+        period_ = to_1d_array_nb(np.asarray(period).astype(np.int_))
     for col in prange(returns.shape[1]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
         if _sim_start >= _sim_end:
             continue
-        if period_ is None:
-            _period = None
-        else:
-            _period = flex_select_1d_pc_nb(period_, col)
+        _period = flex_select_1d_pc_nb(period_, col)
 
         out[col] = down_capture_ratio_1d_nb(
             returns[_sim_start:_sim_end, col],
