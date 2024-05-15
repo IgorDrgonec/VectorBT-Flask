@@ -2824,8 +2824,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (OHLCDataMixin, str)):
-                local_kwargs["data"] = close
+            parsed_data = BasePFPreparer.parse_data(close, all_ohlc=True)
+            if parsed_data is not None:
+                local_kwargs["data"] = parsed_data
                 local_kwargs["close"] = None
             preparer = FOPreparer(**local_kwargs)
             if not return_preparer:
@@ -3725,8 +3726,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (OHLCDataMixin, str)):
-                local_kwargs["data"] = close
+            parsed_data = BasePFPreparer.parse_data(close, all_ohlc=True)
+            if parsed_data is not None:
+                local_kwargs["data"] = parsed_data
                 local_kwargs["close"] = None
             preparer = FSPreparer(**local_kwargs)
             if not return_preparer:
@@ -3890,10 +3892,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
 
         portfolio_cfg = settings["portfolio"]
 
-        if isinstance(close, (OHLCDataMixin, str)):
-            if isinstance(close, str):
-                close = Data.from_data_str(close)
-            data = close
+        parsed_data = BasePFPreparer.parse_data(close, all_ohlc=True)
+        if parsed_data is not None:
+            data = parsed_data
             close = data.close
             if close is None:
                 raise ValueError("Column for close couldn't be found in data")
@@ -4657,8 +4658,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (OHLCDataMixin, str)):
-                local_kwargs["data"] = close
+            parsed_data = BasePFPreparer.parse_data(close, all_ohlc=True)
+            if parsed_data is not None:
+                local_kwargs["data"] = parsed_data
                 local_kwargs["close"] = None
             preparer = FOFPreparer(**local_kwargs)
             if not return_preparer:
@@ -4809,8 +4811,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (OHLCDataMixin, str)):
-                local_kwargs["data"] = close
+            parsed_data = BasePFPreparer.parse_data(close, all_ohlc=True)
+            if parsed_data is not None:
+                local_kwargs["data"] = parsed_data
                 local_kwargs["close"] = None
             preparer = FDOFPreparer(**local_kwargs)
             if not return_preparer:

@@ -494,7 +494,7 @@ def fix_timedelta_precision(freq: pd.Timedelta) -> pd.Timedelta:
     return freq
 
 
-def to_timedelta(freq: tp.FrequencyLike, approximate: bool = False) -> pd.Timedelta:
+def to_timedelta(freq: tp.FrequencyLike = 1, approximate: bool = False) -> pd.Timedelta:
     """Convert a frequency-like object to `pd.Timedelta`."""
     if not isinstance(freq, pd.Timedelta):
         if isinstance(freq, str):
@@ -528,7 +528,7 @@ def to_timedelta(freq: tp.FrequencyLike, approximate: bool = False) -> pd.Timede
     return fix_timedelta_precision(freq)
 
 
-def to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
+def to_timedelta64(freq: tp.FrequencyLike = 1) -> np.timedelta64:
     """Convert a frequency-like object to `np.timedelta64`."""
     if not isinstance(freq, np.timedelta64):
         if not isinstance(freq, pd.Timedelta):

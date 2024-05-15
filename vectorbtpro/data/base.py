@@ -313,6 +313,16 @@ class OHLCDataMixin(BaseDataMixin):
         return (open + high + low + close) / 4
 
     @property
+    def has_any_ohlc(self) -> bool:
+        """Whether the instance has any of the OHLC features."""
+        return (
+            self.has_feature("Open")
+            or self.has_feature("High")
+            or self.has_feature("Low")
+            or self.has_feature("Close")
+        )
+
+    @property
     def has_ohlc(self) -> bool:
         """Whether the instance has all the OHLC features."""
         return (
@@ -321,6 +331,11 @@ class OHLCDataMixin(BaseDataMixin):
             and self.has_feature("Low")
             and self.has_feature("Close")
         )
+
+    @property
+    def has_any_ohlcv(self) -> bool:
+        """Whether the instance has any of the OHLCV features."""
+        return self.has_any_ohlc or self.has_feature("Volume")
 
     @property
     def has_ohlcv(self) -> bool:

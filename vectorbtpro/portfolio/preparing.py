@@ -7,6 +7,7 @@ from collections import namedtuple
 from functools import cached_property as cachedproperty
 
 import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
@@ -165,15 +166,31 @@ class BasePFPreparer(BasePreparer):
         call_seq = self["call_seq"]
         return checks.is_int(call_seq) and call_seq == enums.CallSeqType.Auto
 
+    @classmethod
+    def parse_data(
+        cls,
+        data: tp.Union[None, OHLCDataMixin, str, tp.ArrayLike],
+        all_ohlc: bool = False,
+    ) -> tp.Optional[OHLCDataMixin]:
+        """Parse an instance with OHLC features."""
+        if data is None:
+            return None
+        if isinstance(data, OHLCDataMixin):
+            return data
+        if isinstance(data, str):
+            return Data.from_data_str(data)
+        if isinstance(data, pd.DataFrame):
+            ohlcv_acc = data.vbt.ohlcv
+            if all_ohlc and ohlcv_acc.has_ohlc:
+                return ohlcv_acc
+            if not all_ohlc and ohlcv_acc.has_any_ohlc:
+                return ohlcv_acc
+        return None
+
     @cachedproperty
     def data(self) -> tp.Optional[OHLCDataMixin]:
         """Argument `data`."""
-        data = self["data"]
-        if data is None:
-            return None
-        if isinstance(data, str):
-            return Data.from_data_str(data)
-        return data
+        return self.parse_data(self["data"])
 
     # ############# Before broadcasting ############# #
 
