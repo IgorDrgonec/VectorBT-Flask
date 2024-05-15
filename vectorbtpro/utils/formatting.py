@@ -340,4 +340,4 @@ def pdir(*args, **kwargs) -> None:
     """Print the output of `vectorbtpro.utils.attr_.parse_attrs`."""
     from vectorbtpro.utils.attr_ import parse_attrs
 
-    print(parse_attrs(*args, **kwargs).to_string())
+    ptable(parse_attrs(*args, **kwargs))

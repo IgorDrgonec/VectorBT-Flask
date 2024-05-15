@@ -139,6 +139,29 @@ elif star_import.lower() == "none":
 else:
     raise ValueError(f"Invalid option '{star_import}'")
 
+
+def whats_imported():
+    """Print references and their values that got imported when running `from vectorbtpro import *`."""
+    import pandas as pd
+
+    from vectorbtpro.utils.formatting import ptable
+    from vectorbtpro.utils.module_ import get_refname
+
+    values = {}
+    for k, v in imported_stuff.items():
+        refname = get_refname(v)
+        if refname is not None and str(v).startswith("<"):
+            values[k] = refname
+        else:
+            values[k] = str(v)
+    sr = pd.Series(values, name="value")
+    sr.index.name = "reference"
+    ptable(sr)
+
+
+if "__all__" in globals():
+    __all__.append("whats_imported")
+
 __pdoc__ = dict()
 __pdoc__["_settings"] = True
 __pdoc__["_opt_deps"] = True
