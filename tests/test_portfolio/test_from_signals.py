@@ -6848,39 +6848,23 @@ class TestFromHolding:
         @njit
         def post_signal_func_nb(c):
             _ = vbt.pf_nb.get_position_nb(c)
-            _ = vbt.pf_nb.get_position_nb(c, col=1)
             _ = vbt.pf_nb.in_position_nb(c)
-            _ = vbt.pf_nb.in_position_nb(c, col=1)
             _ = vbt.pf_nb.in_long_position_nb(c)
-            _ = vbt.pf_nb.in_long_position_nb(c, col=1)
             _ = vbt.pf_nb.in_short_position_nb(c)
-            _ = vbt.pf_nb.in_short_position_nb(c, col=1)
             _ = vbt.pf_nb.get_n_active_positions_nb(c)
             _ = vbt.pf_nb.get_n_active_positions_nb(c, all_groups=True)
             _ = vbt.pf_nb.get_cash_nb(c)
-            _ = vbt.pf_nb.get_cash_nb(c, col_or_group=1)
             _ = vbt.pf_nb.get_locked_cash_nb(c)
-            _ = vbt.pf_nb.get_locked_cash_nb(c, col=1)
             _ = vbt.pf_nb.get_free_cash_nb(c)
-            _ = vbt.pf_nb.get_free_cash_nb(c, col_or_group=1)
             _ = vbt.pf_nb.has_free_cash_nb(c)
-            _ = vbt.pf_nb.has_free_cash_nb(c, col_or_group=1)
             _ = vbt.pf_nb.get_val_price_nb(c)
-            _ = vbt.pf_nb.get_val_price_nb(c, col=1)
             _ = vbt.pf_nb.get_value_nb(c)
-            _ = vbt.pf_nb.get_value_nb(c, col_or_group=1)
             _ = vbt.pf_nb.get_leverage_nb(c)
-            _ = vbt.pf_nb.get_leverage_nb(c, col=1)
             _ = vbt.pf_nb.get_position_value_nb(c)
-            _ = vbt.pf_nb.get_position_value_nb(c, col=1)
             _ = vbt.pf_nb.get_allocation_nb(c)
-            _ = vbt.pf_nb.get_allocation_nb(c, col=1)
             _ = vbt.pf_nb.get_order_count_nb(c)
-            _ = vbt.pf_nb.get_order_count_nb(c, col=1)
             _ = vbt.pf_nb.get_order_records_nb(c)
-            _ = vbt.pf_nb.get_order_records_nb(c, col=1)
-            _ = vbt.pf_nb.any_order_nb(c)
-            _ = vbt.pf_nb.any_order_nb(c, col=1)
+            _ = vbt.pf_nb.has_orders_nb(c)
             _ = vbt.pf_nb.order_filled_nb(c)
             _ = vbt.pf_nb.order_opened_position_nb(c)
             _ = vbt.pf_nb.order_increased_position_nb(c)
@@ -6888,21 +6872,13 @@ class TestFromHolding:
             _ = vbt.pf_nb.order_closed_position_nb(c)
             _ = vbt.pf_nb.order_reversed_position_nb(c)
             _ = vbt.pf_nb.get_limit_target_price_nb(c)
-            _ = vbt.pf_nb.get_limit_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_sl_target_price_nb(c)
-            _ = vbt.pf_nb.get_sl_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_tsl_target_price_nb(c)
-            _ = vbt.pf_nb.get_tsl_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_tp_target_price_nb(c)
-            _ = vbt.pf_nb.get_tp_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_entry_trade_records_nb(c)
-            _ = vbt.pf_nb.get_entry_trade_records_nb(c, col=1)
             _ = vbt.pf_nb.get_exit_trade_records_nb(c)
-            _ = vbt.pf_nb.get_exit_trade_records_nb(c, col=1)
             _ = vbt.pf_nb.get_position_records_nb(c)
-            _ = vbt.pf_nb.get_position_records_nb(c, col=1)
-            _ = vbt.pf_nb.stop_group_sim_nb(c)
-            _ = vbt.pf_nb.stop_group_sim_nb(c, group=1)
+            _ = vbt.pf_nb.stop_sim_nb(c)
 
         _ = vbt.PF.from_signals(
             [1],
@@ -6910,6 +6886,54 @@ class TestFromHolding:
             short_entries=[[False, True]],
             init_cash=[100, 200],
             post_signal_func_nb=post_signal_func_nb,
+            sl_stop=0.1,
+            tsl_stop=0.2,
+            tp_stop=0.3,
+        )
+
+        @njit
+        def post_segment_func_nb(c):
+            for col in range(c.from_col, c.to_col):
+                _ = vbt.pf_nb.get_col_position_nb(c, col)
+                _ = vbt.pf_nb.col_in_position_nb(c, col)
+                _ = vbt.pf_nb.col_in_long_position_nb(c, col)
+                _ = vbt.pf_nb.col_in_short_position_nb(c, col)
+                _ = vbt.pf_nb.get_col_cash_nb(c, col)
+                _ = vbt.pf_nb.get_col_locked_cash_nb(c, col)
+                _ = vbt.pf_nb.get_col_free_cash_nb(c, col)
+                _ = vbt.pf_nb.col_has_free_cash_nb(c, col)
+                _ = vbt.pf_nb.get_col_val_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_value_nb(c, col)
+                _ = vbt.pf_nb.get_col_leverage_nb(c, col)
+                _ = vbt.pf_nb.get_col_position_value_nb(c, col)
+                _ = vbt.pf_nb.get_col_allocation_nb(c, col)
+                _ = vbt.pf_nb.get_col_order_count_nb(c, col)
+                _ = vbt.pf_nb.get_col_order_records_nb(c, col)
+                _ = vbt.pf_nb.col_has_orders_nb(c, col)
+                _ = vbt.pf_nb.get_col_limit_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_sl_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_tsl_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_tp_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_entry_trade_records_nb(c, col)
+                _ = vbt.pf_nb.get_col_exit_trade_records_nb(c, col)
+                _ = vbt.pf_nb.get_col_position_records_nb(c, col)
+
+            _ = vbt.pf_nb.get_n_active_positions_nb(c)
+            _ = vbt.pf_nb.get_n_active_positions_nb(c, all_groups=True)
+            _ = vbt.pf_nb.get_group_cash_nb(c, c.group)
+            _ = vbt.pf_nb.get_group_free_cash_nb(c, c.group)
+            _ = vbt.pf_nb.get_group_value_nb(c, c.group)
+            _ = vbt.pf_nb.get_group_position_value_nb(c, c.group)
+            _ = vbt.pf_nb.stop_group_sim_nb(c, c.group)
+            _ = vbt.pf_nb.stop_sim_nb(c)
+
+        _ = vbt.PF.from_signals(
+            [1],
+            long_entries=[[True, False]],
+            short_entries=[[False, True]],
+            init_cash=[100, 200],
+            post_segment_func_nb=post_segment_func_nb,
+            group_by=True,
             sl_stop=0.1,
             tsl_stop=0.2,
             tp_stop=0.3,

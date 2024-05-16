@@ -1587,24 +1587,6 @@ def is_grouped_nb(group_lens: tp.GroupLens) -> bool:
 
 
 @register_jitted(cache=True)
-def get_group_value_nb(
-    from_col: int,
-    to_col: int,
-    cash_now: float,
-    last_position: tp.Array1d,
-    last_val_price: tp.Array1d,
-) -> float:
-    """Get group value."""
-    group_value = cash_now
-    group_len = to_col - from_col
-    for k in range(group_len):
-        col = from_col + k
-        if last_position[col] != 0:
-            group_value += last_position[col] * last_val_price[col]
-    return group_value
-
-
-@register_jitted(cache=True)
 def prepare_records_nb(
     target_shape: tp.Shape,
     max_order_records: tp.Optional[int] = None,

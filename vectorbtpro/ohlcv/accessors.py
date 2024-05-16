@@ -476,7 +476,7 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
             >>> vbt.YFData.pull("BTC-USD").get().vbt.ohlcv.plot().show()
             ```
 
-            [=100% "100%"]{: .candystripe}
+            [=100% "100%"]{: .candystripe .candystripe-animate }
 
             ![](/assets/images/api/ohlcv_plot.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/ohlcv_plot.dark.svg#only-dark){: .iimg loading=lazy }

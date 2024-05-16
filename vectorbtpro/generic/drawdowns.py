@@ -21,7 +21,7 @@ Using `Drawdowns.from_price`, you can generate drawdown records for any time ser
 ... ).get('Close')
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> price = price.rename(None)

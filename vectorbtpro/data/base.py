@@ -5067,7 +5067,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             >>> data = vbt.YFData.pull(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
             ```
 
-            [=100% "100%"]{: .candystripe}
+            [=100% "100%"]{: .candystripe .candystripe-animate }
 
             ```pycon
             >>> data.plot(feature='Close', base=1).show()

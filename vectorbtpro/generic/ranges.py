@@ -21,7 +21,7 @@ are 0 and 20 (not 19!) respectively.
 >>> price = vbt.YFData.pull('BTC-USD', start=start, end=end).get('Close')
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> fast_ma = vbt.MA.run(price, 10)

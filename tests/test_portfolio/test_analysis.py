@@ -2298,27 +2298,27 @@ class TestPortfolio:
         assert_records_close(pf_grouped.get_orders(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(pf_shared.get_orders(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(
-            pf.get_orders(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_grouped.get_orders(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_shared.get_orders(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf.get_orders(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf.replace(sim_start=1, sim_end=4).orders.values,
         )
         assert_records_close(
-            pf_grouped.get_orders(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_grouped.replace(sim_start=1, sim_end=4).orders.values,
         )
         assert_records_close(
-            pf_shared.get_orders(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).orders.values,
         )
 
@@ -3794,27 +3794,27 @@ class TestPortfolio:
         assert_records_close(pf_grouped.get_logs(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(pf_shared.get_logs(sim_start=1, sim_end=4).values, sim_range_result_shared)
         assert_records_close(
-            pf.get_logs(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_logs(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_grouped.get_logs(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_logs(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_shared.get_logs(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_logs(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result_shared,
         )
         assert_records_close(
-            pf.get_logs(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_logs(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf.replace(sim_start=1, sim_end=4).logs.values,
         )
         assert_records_close(
-            pf_grouped.get_logs(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_logs(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_grouped.replace(sim_start=1, sim_end=4).logs.values,
         )
         assert_records_close(
-            pf_shared.get_logs(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_logs(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).logs.values,
         )
 
@@ -4098,27 +4098,27 @@ class TestPortfolio:
         assert_records_close(pf_grouped.get_entry_trades(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(pf_shared.get_entry_trades(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(
-            pf.get_entry_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_entry_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_grouped.get_entry_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_entry_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_shared.get_entry_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_entry_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf.get_entry_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_entry_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf.replace(sim_start=1, sim_end=4).entry_trades.values,
         )
         assert_records_close(
-            pf_grouped.get_entry_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_entry_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_grouped.replace(sim_start=1, sim_end=4).entry_trades.values,
         )
         assert_records_close(
-            pf_shared.get_entry_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_entry_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).entry_trades.values,
         )
 
@@ -4349,27 +4349,27 @@ class TestPortfolio:
         assert_records_close(pf_grouped.get_exit_trades(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(pf_shared.get_exit_trades(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(
-            pf.get_exit_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_exit_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_grouped.get_exit_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_exit_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_shared.get_exit_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_exit_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf.get_exit_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_exit_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf.replace(sim_start=1, sim_end=4).exit_trades.values,
         )
         assert_records_close(
-            pf_grouped.get_exit_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_exit_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_grouped.replace(sim_start=1, sim_end=4).exit_trades.values,
         )
         assert_records_close(
-            pf_shared.get_exit_trades(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_exit_trades(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).exit_trades.values,
         )
 
@@ -4748,27 +4748,27 @@ class TestPortfolio:
         assert_frame_equal(pf_grouped.get_trade_history(sim_start=1, sim_end=4), sim_range_result)
         assert_frame_equal(pf_shared.get_trade_history(sim_start=1, sim_end=4), sim_range_result)
         assert_frame_equal(
-            pf.get_trade_history(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_trade_history(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_grouped.get_trade_history(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_trade_history(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_shared.get_trade_history(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_trade_history(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf.get_trade_history(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_trade_history(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).trade_history,
         )
         assert_frame_equal(
-            pf_grouped.get_trade_history(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_trade_history(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).trade_history,
         )
         assert_frame_equal(
-            pf_shared.get_trade_history(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_trade_history(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).trade_history,
         )
 
@@ -4909,27 +4909,27 @@ class TestPortfolio:
         assert_records_close(pf_grouped.get_positions(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(pf_shared.get_positions(sim_start=1, sim_end=4).values, sim_range_result)
         assert_records_close(
-            pf.get_positions(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_positions(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_grouped.get_positions(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_positions(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_shared.get_positions(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_positions(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf.get_positions(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_positions(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf.replace(sim_start=1, sim_end=4).positions.values,
         )
         assert_records_close(
-            pf_grouped.get_positions(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_positions(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_grouped.replace(sim_start=1, sim_end=4).positions.values,
         )
         assert_records_close(
-            pf_shared.get_positions(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_positions(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).positions.values,
         )
 
@@ -4998,27 +4998,27 @@ class TestPortfolio:
             dtype=drawdown_dt,
         )
         assert_records_close(
-            pf.get_drawdowns(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_drawdowns(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result,
         )
         assert_records_close(
-            pf_grouped.get_drawdowns(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_drawdowns(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result_grouped,
         )
         assert_records_close(
-            pf_shared.get_drawdowns(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_drawdowns(sim_start=1, sim_end=4, rec_sim_range=True).values,
             sim_range_result_grouped,
         )
         assert_records_close(
-            pf.get_drawdowns(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf.get_drawdowns(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf.replace(sim_start=1, sim_end=4).drawdowns.values,
         )
         assert_records_close(
-            pf_grouped.get_drawdowns(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_grouped.get_drawdowns(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_grouped.replace(sim_start=1, sim_end=4).drawdowns.values,
         )
         assert_records_close(
-            pf_shared.get_drawdowns(sim_start=1, sim_end=4, strict_sim_range=True).values,
+            pf_shared.get_drawdowns(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).drawdowns.values,
         )
 
@@ -5086,27 +5086,27 @@ class TestPortfolio:
         assert_frame_equal(pf_grouped.get_asset_flow(sim_start=1, sim_end=4), sim_range_result)
         assert_frame_equal(pf_shared.get_asset_flow(sim_start=1, sim_end=4), sim_range_result)
         assert_frame_equal(
-            pf.get_asset_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_shared.get_asset_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf.get_asset_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).asset_flow,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).asset_flow,
         )
         assert_frame_equal(
-            pf_shared.get_asset_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).asset_flow,
         )
 
@@ -5176,27 +5176,27 @@ class TestPortfolio:
         assert_frame_equal(pf_grouped.get_assets(sim_start=1, sim_end=4), sim_range_result)
         assert_frame_equal(pf_shared.get_assets(sim_start=1, sim_end=4), sim_range_result)
         assert_frame_equal(
-            pf.get_assets(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_assets(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_grouped.get_assets(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_assets(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_shared.get_assets(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_assets(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf.get_assets(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_assets(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).assets,
         )
         assert_frame_equal(
-            pf_grouped.get_assets(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_assets(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).assets,
         )
         assert_frame_equal(
-            pf_shared.get_assets(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_assets(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).assets,
         )
 
@@ -5315,7 +5315,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_position_mask(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_position_mask(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -5324,23 +5324,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_position_mask(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_position_mask(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_position_mask(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_position_mask(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_position_mask(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_position_mask(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).position_mask,
         )
         assert_frame_equal(
-            pf_grouped.get_position_mask(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_position_mask(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).position_mask,
         )
         assert_frame_equal(
-            pf_shared.get_position_mask(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_position_mask(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).position_mask,
         )
 
@@ -5403,28 +5403,28 @@ class TestPortfolio:
         assert_series_equal(pf_shared.get_position_coverage(sim_start=1, sim_end=4), sim_range_result_grouped)
         sim_range_result = pd.Series([0.6666666666666666, 1.0, 1.0], index=close_na.columns).rename("position_coverage")
         assert_series_equal(
-            pf.get_position_coverage(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_position_coverage(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.Series([1.0, 1.0], index=group_columns).rename("position_coverage")
         assert_series_equal(
-            pf_grouped.get_position_coverage(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_position_coverage(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf_shared.get_position_coverage(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_position_coverage(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf.get_position_coverage(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_position_coverage(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).position_coverage,
         )
         assert_series_equal(
-            pf_grouped.get_position_coverage(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_position_coverage(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).position_coverage,
         )
         assert_series_equal(
-            pf_shared.get_position_coverage(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_position_coverage(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).position_coverage,
         )
 
@@ -5523,27 +5523,27 @@ class TestPortfolio:
         assert_frame_equal(pf_grouped.get_cash_flow(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_frame_equal(pf_shared.get_cash_flow(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_frame_equal(
-            pf.get_cash_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_cash_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_grouped.get_cash_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_cash_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_cash_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_cash_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_cash_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_cash_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).cash_flow,
         )
         assert_frame_equal(
-            pf_grouped.get_cash_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_cash_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).cash_flow,
         )
         assert_frame_equal(
-            pf_shared.get_cash_flow(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_cash_flow(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).cash_flow,
         )
 
@@ -5799,27 +5799,27 @@ class TestPortfolio:
         assert_frame_equal(pf_grouped.get_cash_deposits(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_frame_equal(pf_shared.get_cash_deposits(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_frame_equal(
-            pf.get_cash_deposits(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            pf_grouped.get_cash_deposits(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_cash_deposits(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_cash_deposits(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).cash_deposits,
         )
         assert_frame_equal(
-            pf_grouped.get_cash_deposits(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).cash_deposits,
         )
         assert_frame_equal(
-            pf_shared.get_cash_deposits(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).cash_deposits,
         )
 
@@ -5894,27 +5894,27 @@ class TestPortfolio:
         assert_frame_equal(new_pf_grouped.get_cash_earnings(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_frame_equal(new_pf_shared.get_cash_earnings(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_frame_equal(
-            new_pf.get_cash_earnings(sim_start=1, sim_end=4, strict_sim_range=True),
+            new_pf.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_frame_equal(
-            new_pf_grouped.get_cash_earnings(sim_start=1, sim_end=4, strict_sim_range=True),
+            new_pf_grouped.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            new_pf_shared.get_cash_earnings(sim_start=1, sim_end=4, strict_sim_range=True),
+            new_pf_shared.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            new_pf.get_cash_earnings(sim_start=1, sim_end=4, strict_sim_range=True),
+            new_pf.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             new_pf.replace(sim_start=1, sim_end=4).cash_earnings,
         )
         assert_frame_equal(
-            new_pf_grouped.get_cash_earnings(sim_start=1, sim_end=4, strict_sim_range=True),
+            new_pf_grouped.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             new_pf_grouped.replace(sim_start=1, sim_end=4).cash_earnings,
         )
         assert_frame_equal(
-            new_pf_shared.get_cash_earnings(sim_start=1, sim_end=4, strict_sim_range=True),
+            new_pf_shared.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             new_pf_shared.replace(sim_start=1, sim_end=4).cash_earnings,
         )
 
@@ -6045,7 +6045,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_cash(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_cash(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -6060,23 +6060,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_cash(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_cash(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_cash(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_cash(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_cash(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_cash(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).cash,
         )
         assert_frame_equal(
-            pf_grouped.get_cash(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_cash(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).cash,
         )
         assert_frame_equal(
-            pf_shared.get_cash(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_cash(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).cash,
         )
 
@@ -6229,27 +6229,27 @@ class TestPortfolio:
         assert_series_equal(pf_grouped.get_input_value(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(pf_shared.get_input_value(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(
-            pf.get_input_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_input_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_series_equal(
-            pf_grouped.get_input_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_input_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf_shared.get_input_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_input_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf.get_input_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_input_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).input_value,
         )
         assert_series_equal(
-            pf_grouped.get_input_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_input_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).input_value,
         )
         assert_series_equal(
-            pf_shared.get_input_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_input_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).input_value,
         )
 
@@ -6370,7 +6370,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_asset_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -6379,23 +6379,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_asset_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_asset_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).asset_value,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).asset_value,
         )
         assert_frame_equal(
-            pf_shared.get_asset_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).asset_value,
         )
 
@@ -6549,7 +6549,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_gross_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_gross_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -6564,23 +6564,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_gross_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_gross_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_gross_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_gross_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_gross_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_gross_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).gross_exposure,
         )
         assert_frame_equal(
-            pf_grouped.get_gross_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_gross_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).gross_exposure,
         )
         assert_frame_equal(
-            pf_shared.get_gross_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_gross_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).gross_exposure,
         )
 
@@ -6699,7 +6699,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_net_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_net_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -6714,23 +6714,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_net_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_net_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_net_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_net_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_net_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_net_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).net_exposure,
         )
         assert_frame_equal(
-            pf_grouped.get_net_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_net_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).net_exposure,
         )
         assert_frame_equal(
-            pf_shared.get_net_exposure(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_net_exposure(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).net_exposure,
         )
 
@@ -6837,7 +6837,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -6852,23 +6852,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).value,
         )
         assert_frame_equal(
-            pf_grouped.get_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).value,
         )
         assert_frame_equal(
-            pf_shared.get_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).value,
         )
 
@@ -7019,7 +7019,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_allocations(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_allocations(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -7034,23 +7034,23 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf_grouped.get_allocations(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_allocations(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_allocations(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_allocations(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_allocations(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_allocations(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).allocations,
         )
         assert_frame_equal(
-            pf_grouped.get_allocations(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_allocations(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).allocations,
         )
         assert_frame_equal(
-            pf_shared.get_allocations(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_allocations(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).allocations,
         )
 
@@ -7126,27 +7126,27 @@ class TestPortfolio:
         assert_series_equal(pf_grouped.get_total_profit(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(pf_shared.get_total_profit(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(
-            pf.get_total_profit(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_total_profit(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_series_equal(
-            pf_grouped.get_total_profit(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_total_profit(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf_shared.get_total_profit(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_total_profit(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf.get_total_profit(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_total_profit(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).total_profit,
         )
         assert_series_equal(
-            pf_grouped.get_total_profit(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_total_profit(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).total_profit,
         )
         assert_series_equal(
-            pf_shared.get_total_profit(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_total_profit(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).total_profit,
         )
 
@@ -7198,27 +7198,27 @@ class TestPortfolio:
         assert_series_equal(pf_grouped.get_final_value(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(pf_shared.get_final_value(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(
-            pf.get_final_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_final_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_series_equal(
-            pf_grouped.get_final_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_final_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf_shared.get_final_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_final_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf.get_final_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_final_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).final_value,
         )
         assert_series_equal(
-            pf_grouped.get_final_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_final_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).final_value,
         )
         assert_series_equal(
-            pf_shared.get_final_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_final_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).final_value,
         )
 
@@ -7296,27 +7296,27 @@ class TestPortfolio:
         assert_series_equal(pf_grouped.get_total_return(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(pf_shared.get_total_return(sim_start=1, sim_end=4), sim_range_result_grouped)
         assert_series_equal(
-            pf.get_total_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_total_return(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         assert_series_equal(
-            pf_grouped.get_total_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_total_return(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf_shared.get_total_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_total_return(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf.get_total_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_total_return(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).total_return,
         )
         assert_series_equal(
-            pf_grouped.get_total_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_total_return(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).total_return,
         )
         assert_series_equal(
-            pf_shared.get_total_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_total_return(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).total_return,
         )
 
@@ -7455,7 +7455,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -7470,23 +7470,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).returns,
         )
         assert_frame_equal(
-            pf_grouped.get_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).returns,
         )
         assert_frame_equal(
-            pf_shared.get_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).returns,
         )
 
@@ -7612,7 +7612,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_asset_pnl(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_pnl(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -7627,23 +7627,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_pnl(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_pnl(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_asset_pnl(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_pnl(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_asset_pnl(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_pnl(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).asset_pnl,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_pnl(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_pnl(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).asset_pnl,
         )
         assert_frame_equal(
-            pf_shared.get_asset_pnl(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_pnl(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).asset_pnl,
         )
 
@@ -7781,7 +7781,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_asset_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -7796,23 +7796,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_asset_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_asset_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_asset_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).asset_returns,
         )
         assert_frame_equal(
-            pf_grouped.get_asset_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_asset_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).asset_returns,
         )
         assert_frame_equal(
-            pf_shared.get_asset_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_asset_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).asset_returns,
         )
 
@@ -7939,7 +7939,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_market_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_market_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -7948,23 +7948,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_market_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_market_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_market_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_market_value(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_market_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_market_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).market_value,
         )
         assert_frame_equal(
-            pf_grouped.get_market_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_market_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).market_value,
         )
         assert_frame_equal(
-            pf_shared.get_market_value(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_market_value(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).market_value,
         )
 
@@ -8086,7 +8086,7 @@ class TestPortfolio:
             columns=close_na.columns,
         )
         assert_frame_equal(
-            pf.get_market_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_market_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.DataFrame(
@@ -8101,23 +8101,23 @@ class TestPortfolio:
             columns=group_columns,
         )
         assert_frame_equal(
-            pf_grouped.get_market_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_market_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf_shared.get_market_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_market_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_frame_equal(
-            pf.get_market_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_market_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).market_returns,
         )
         assert_frame_equal(
-            pf_grouped.get_market_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_market_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).market_returns,
         )
         assert_frame_equal(
-            pf_shared.get_market_returns(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_market_returns(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).market_returns,
         )
 
@@ -8205,30 +8205,30 @@ class TestPortfolio:
             "total_market_return"
         )
         assert_series_equal(
-            pf.get_total_market_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_total_market_return(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result,
         )
         sim_range_result_grouped = pd.Series([0.8337489609310056, 1.0], index=group_columns).rename(
             "total_market_return"
         )
         assert_series_equal(
-            pf_grouped.get_total_market_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_total_market_return(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf_shared.get_total_market_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_total_market_return(sim_start=1, sim_end=4, rec_sim_range=True),
             sim_range_result_grouped,
         )
         assert_series_equal(
-            pf.get_total_market_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf.get_total_market_return(sim_start=1, sim_end=4, rec_sim_range=True),
             pf.replace(sim_start=1, sim_end=4).total_market_return,
         )
         assert_series_equal(
-            pf_grouped.get_total_market_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_grouped.get_total_market_return(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_grouped.replace(sim_start=1, sim_end=4).total_market_return,
         )
         assert_series_equal(
-            pf_shared.get_total_market_return(sim_start=1, sim_end=4, strict_sim_range=True),
+            pf_shared.get_total_market_return(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).total_market_return,
         )
 
@@ -9090,7 +9090,7 @@ class TestPortfolio:
         )
         assert_series_equal(
             pf.replace(sim_start=1, sim_end=4).stats(),
-            pf.stats(settings=dict(sim_start=1, sim_end=4, strict_sim_range=True)),
+            pf.stats(settings=dict(sim_start=1, sim_end=4, rec_sim_range=True)),
         )
 
     def test_returns_stats(self):

@@ -582,7 +582,7 @@ def pypfopt_optimize(
         >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         ```
 
-        [=100% "100%"]{: .candystripe}
+        [=100% "100%"]{: .candystripe .candystripe-animate }
 
         ```pycon
         >>> vbt.pypfopt_optimize(prices=data.get("Close"))
@@ -1184,7 +1184,7 @@ def riskfolio_optimize(
         >>> returns = data.close.vbt.to_returns()
         ```
 
-        [=100% "100%"]{: .candystripe}
+        [=100% "100%"]{: .candystripe .candystripe-animate }
 
         ```pycon
         >>> vbt.riskfolio_optimize(

@@ -335,7 +335,7 @@ Get count and PnL of trades with duration of more than 2 days:
 ... ).get()
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> size = pd.DataFrame({

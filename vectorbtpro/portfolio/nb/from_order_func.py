@@ -16,9 +16,27 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.template import RepFunc
 
 
+@register_jitted(cache=True)
+def calc_group_value_nb(
+    from_col: int,
+    to_col: int,
+    cash_now: float,
+    last_position: tp.Array1d,
+    last_val_price: tp.Array1d,
+) -> float:
+    """Calculate group value."""
+    group_value = cash_now
+    group_len = to_col - from_col
+    for k in range(group_len):
+        col = from_col + k
+        if last_position[col] != 0:
+            group_value += last_position[col] * last_val_price[col]
+    return group_value
+
+
 @register_jitted
-def get_ctx_group_value_nb(seg_ctx: SegmentContext) -> float:
-    """Get group value from context.
+def calc_ctx_group_value_nb(seg_ctx: SegmentContext) -> float:
+    """Calculate group value from context.
 
     Accepts `vectorbtpro.portfolio.enums.SegmentContext`.
 
@@ -29,7 +47,7 @@ def get_ctx_group_value_nb(seg_ctx: SegmentContext) -> float:
         Cash sharing must be enabled."""
     if not seg_ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
-    return get_group_value_nb(
+    return calc_group_value_nb(
         seg_ctx.from_col,
         seg_ctx.to_col,
         seg_ctx.last_cash[seg_ctx.group],
@@ -67,7 +85,7 @@ def sort_call_seq_out_1d_nb(
     if not ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
 
-    group_value_now = get_ctx_group_value_nb(ctx)
+    group_value_now = calc_ctx_group_value_nb(ctx)
     group_len = ctx.to_col - ctx.from_col
     for c in range(group_len):
         if call_seq_out[c] != c:
@@ -133,7 +151,7 @@ def sort_call_seq_out_nb(
     if not ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
 
-    group_value_now = get_ctx_group_value_nb(ctx)
+    group_value_now = calc_ctx_group_value_nb(ctx)
     group_len = ctx.to_col - ctx.from_col
     for c in range(group_len):
         if call_seq_out[c] != c:
@@ -1012,7 +1030,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -1102,7 +1120,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -1403,7 +1421,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -2052,7 +2070,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -2142,7 +2160,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -2443,7 +2461,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -3145,7 +3163,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -3235,7 +3253,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -3533,7 +3551,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -4082,7 +4100,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -4172,7 +4190,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -4470,7 +4488,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],

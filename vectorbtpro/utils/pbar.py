@@ -109,6 +109,7 @@ class ProgressBar:
         self._bar = None
         self._open_time = None
         self._update_time = None
+        self._refresh_time = None
         self._close_time = None
 
     @property
@@ -179,6 +180,11 @@ class ProgressBar:
         return self._update_time
 
     @property
+    def refresh_time(self) -> tp.Optional[int]:
+        """Time the bar was refreshed."""
+        return self._refresh_time
+
+    @property
     def close_time(self) -> tp.Optional[int]:
         """Time the bar was closed."""
         return self._close_time
@@ -245,7 +251,7 @@ class ProgressBar:
                 self.remove_bar()
             else:
                 if reuse is None:
-                    if not self.should_display:
+                    if not self.displayed:
                         reuse = False
                     else:
                         reuse = self.reuse
@@ -290,6 +296,8 @@ class ProgressBar:
         """Whether the bar is displayed."""
         if self.disabled:
             return False
+        if self.refresh_time is not None:
+            return True
         if self.bar.delay == 0:
             return True
         delay_end_t = self.bar.start_t + self.bar.delay
@@ -303,8 +311,6 @@ class ProgressBar:
         if self.bar.delay == 0:
             return True
         delay_end_t = self.bar.start_t + self.bar.delay
-        if self.bar.last_print_t >= delay_end_t:
-            return True
         if utc_time() >= delay_end_t:
             return True
         return False
@@ -312,16 +318,18 @@ class ProgressBar:
     def refresh(self) -> None:
         """Refresh the bar."""
         self.bar.refresh()
+        self._refresh_time = utc_time()
 
     def before_update(self) -> None:
         """Do something before an update."""
         if self.disabled:
             return
-        should_display = self.should_display
         if self.registry is not None:
+            displayed = self.displayed
+            should_display = self.should_display
             for pbar in self.registry.get_parent_instances(self):
                 if not pbar.disabled and not pbar.displayed:
-                    if should_display or pbar.should_display:
+                    if (displayed or should_display) or pbar.should_display:
                         pbar.refresh()
 
     def update(self, n: int = 1) -> None:

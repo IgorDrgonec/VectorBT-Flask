@@ -16,7 +16,7 @@ a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`
 ... ).get()
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> size = pd.DataFrame({
