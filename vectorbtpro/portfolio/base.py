@@ -8132,7 +8132,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
     ) -> tp.BaseFigure:
         """Plot one column of trades.
 
-        `**kwargs` are passed to `vectorbtpro.generic.trades.Trades.plot`."""
+        `**kwargs` are passed to `vectorbtpro.portfolio.trades.Trades.plot`."""
         if not isinstance(cls_or_self, type):
             if trades is None:
                 trades = cls_or_self.resolve_shortcut_attr(
@@ -8177,7 +8177,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
     ) -> tp.BaseFigure:
         """Plot one column of trade P&L.
 
-        `**kwargs` are passed to `vectorbtpro.generic.trades.Trades.plot_pnl`."""
+        `**kwargs` are passed to `vectorbtpro.portfolio.trades.Trades.plot_pnl`."""
         if not isinstance(cls_or_self, type):
             if trades is None:
                 trades = cls_or_self.resolve_shortcut_attr(

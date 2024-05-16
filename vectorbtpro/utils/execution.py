@@ -1625,6 +1625,12 @@ class Executor(Configured):
                     pbar_kwargs["bar_id"] = ("chunk_calls", tuple(keys.names))
                 else:
                     pbar_kwargs["bar_id"] = ("chunk_calls", keys.name)
+        if cache_chunks and chunk_cache_dir is None:
+            if "bar_id" in pbar_kwargs:
+                import hashlib
+
+                chunk_cache_dir_hash = hashlib.md5(str(pbar_kwargs["bar_id"]).encode("utf-8")).hexdigest()
+                chunk_cache_dir = "chunk_cache_%s" % chunk_cache_dir_hash
 
         if warmup:
             if not hasattr(funcs_args, "__getitem__"):
