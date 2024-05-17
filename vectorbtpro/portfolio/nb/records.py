@@ -18,6 +18,35 @@ invalid_price_msg = "Encountered an order with price less than 0"
 
 
 @register_jitted(cache=True)
+def records_within_sim_range_nb(
+    target_shape: tp.Shape,
+    records: tp.RecordArray,
+    col_arr: tp.Array1d,
+    idx_arr: tp.Array1d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.RecordArray:
+    """Return records within simulation range."""
+    out = np.empty(len(records), dtype=records.dtype)
+    k = 0
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=target_shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for r in range(len(records)):
+        _sim_start = sim_start_[col_arr[r]]
+        _sim_end = sim_end_[col_arr[r]]
+        if _sim_start >= _sim_end:
+            continue
+        if _sim_start <= idx_arr[r] < _sim_end:
+            out[k] = records[r]
+            k += 1
+    return out[:k]
+
+
+@register_jitted(cache=True)
 def weighted_price_reduce_meta_nb(
     idxs: tp.Array1d,
     col: int,
@@ -86,6 +115,8 @@ def fill_entry_trades_in_position_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     col: int,
+    sim_start: int,
+    sim_end: int,
     first_c: int,
     last_c: int,
     init_price: float,
@@ -117,6 +148,8 @@ def fill_entry_trades_in_position_nb(
             entry_fees = first_entry_fees
         else:
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < sim_start or order_record["idx"] >= sim_end:
+                continue
             entry_order_id = order_record["id"]
             entry_idx = order_record["idx"]
             entry_price = order_record["price"]
@@ -145,7 +178,10 @@ def fill_entry_trades_in_position_nb(
         # Fill the record
         if status == TradeStatus.Closed:
             exit_order_record = order_records[col_idxs[col_start_idxs[col] + last_c]]
-            exit_order_id = exit_order_record["id"]
+            if exit_order_record["idx"] < sim_start or exit_order_record["idx"] >= sim_end:
+                exit_order_id = -1
+            else:
+                exit_order_id = exit_order_record["id"]
         else:
             exit_order_id = -1
         fill_trade_record_nb(
@@ -178,6 +214,8 @@ def fill_entry_trades_in_position_nb(
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(),
         init_price=base_ch.FlexArraySlicer(),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -189,6 +227,8 @@ def get_entry_trades_nb(
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
     init_price: tp.FlexArray1dLike = np.nan,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.RecordArray:
     """Fill entry trade records by aggregating order records.
 
@@ -272,9 +312,20 @@ def get_entry_trades_nb(
     new_records = np.empty((max_records, len(col_lens)), dtype=trade_dt)
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(close_.shape[0], col_lens.shape[0]),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
         _init_position = float(flex_select_1d_pc_nb(init_position_, col))
         _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+
         if _init_position != 0:
             # Prepare initial position
             first_c = -1
@@ -303,6 +354,8 @@ def get_entry_trades_nb(
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
 
             if order_record["id"] < last_id:
                 raise ValueError("Ids must come in ascending order per column")
@@ -361,6 +414,8 @@ def get_entry_trades_nb(
                         order_records,
                         col_map,
                         col,
+                        _sim_start,
+                        _sim_end,
                         first_c,
                         last_c,
                         _init_price,
@@ -394,6 +449,8 @@ def get_entry_trades_nb(
                         order_records,
                         col_map,
                         col,
+                        _sim_start,
+                        _sim_end,
                         first_c,
                         last_c,
                         _init_price,
@@ -431,26 +488,29 @@ def get_entry_trades_nb(
             last_c = col_len - 1
             remaining_size = add_nb(entry_size_sum, -exit_size_sum)
             exit_size_sum = entry_size_sum
-            last_close = flex_select_nb(close_, close.shape[0] - 1, col)
+            last_close = flex_select_nb(close_, _sim_end - 1, col)
             if np.isnan(last_close):
-                for ri in range(close.shape[0] - 1, -1, -1):
+                for ri in range(_sim_end - 1, -1, -1):
                     _close = flex_select_nb(close_, ri, col)
                     if not np.isnan(_close):
                         last_close = _close
                         break
             exit_gross_sum += remaining_size * last_close
+            exit_idx = _sim_end - 1
 
             # Fill trade records
             counts[col] = fill_entry_trades_in_position_nb(
                 order_records,
                 col_map,
                 col,
+                _sim_start,
+                _sim_end,
                 first_c,
                 last_c,
                 _init_price,
                 first_entry_size,
                 first_entry_fees,
-                close.shape[0] - 1,
+                exit_idx,
                 exit_size_sum,
                 exit_gross_sum,
                 exit_fees_sum,
@@ -472,6 +532,8 @@ def get_entry_trades_nb(
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(),
         init_price=base_ch.FlexArraySlicer(),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -483,6 +545,8 @@ def get_exit_trades_nb(
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
     init_price: tp.FlexArray1dLike = np.nan,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.RecordArray:
     """Fill exit trade records by aggregating order records.
 
@@ -535,9 +599,20 @@ def get_exit_trades_nb(
     new_records = np.empty((max_records, len(col_lens)), dtype=trade_dt)
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(close_.shape[0], col_lens.shape[0]),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
         _init_position = float(flex_select_1d_pc_nb(init_position_, col))
         _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+
         if _init_position != 0:
             # Prepare initial position
             in_position = True
@@ -562,12 +637,14 @@ def get_exit_trades_nb(
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
 
             if order_record["id"] < last_id:
                 raise ValueError("Ids must come in ascending order per column")
             last_id = order_record["id"]
 
-            i = order_record["idx"]
+            order_idx = order_record["idx"]
             order_id = order_record["id"]
             order_size = order_record["size"]
             order_price = order_record["price"]
@@ -583,7 +660,7 @@ def get_exit_trades_nb(
                 # Trade opened
                 in_position = True
                 entry_order_id = order_id
-                entry_idx = i
+                entry_idx = order_idx
                 if order_side == OrderSide.Buy:
                     direction = TradeDirection.Long
                 else:
@@ -613,7 +690,7 @@ def get_exit_trades_nb(
                     exit_price = order_price
                     exit_fees = order_fees
                     exit_order_id = order_id
-                    exit_idx = i
+                    exit_idx = order_idx
 
                     # Take a size-weighted average of entry price
                     entry_price = entry_gross_sum / entry_size_sum
@@ -660,7 +737,7 @@ def get_exit_trades_nb(
                     cl_exit_price = order_price
                     cl_exit_fees = cl_exit_size / order_size * order_fees
                     cl_exit_order_id = order_id
-                    cl_exit_idx = i
+                    cl_exit_idx = order_idx
 
                     # Take a size-weighted average of entry price
                     entry_price = entry_gross_sum / entry_size_sum
@@ -693,7 +770,7 @@ def get_exit_trades_nb(
                     entry_gross_sum = entry_size_sum * order_price
                     entry_fees_sum = order_fees - cl_exit_fees
                     entry_order_id = order_id
-                    entry_idx = i
+                    entry_idx = order_idx
                     if direction == TradeDirection.Long:
                         direction = TradeDirection.Short
                     else:
@@ -703,9 +780,9 @@ def get_exit_trades_nb(
         if in_position and is_less_nb(-entry_size_sum, 0):
             # Trade hasn't been closed
             exit_size = entry_size_sum
-            last_close = flex_select_nb(close_, close.shape[0] - 1, col)
+            last_close = flex_select_nb(close_, _sim_end - 1, col)
             if np.isnan(last_close):
-                for ri in range(close.shape[0] - 1, -1, -1):
+                for ri in range(_sim_end - 1, -1, -1):
                     _close = flex_select_nb(close_, ri, col)
                     if not np.isnan(_close):
                         last_close = _close
@@ -713,7 +790,7 @@ def get_exit_trades_nb(
             exit_price = last_close
             exit_fees = 0.0
             exit_order_id = -1
-            exit_idx = close.shape[0] - 1
+            exit_idx = _sim_end - 1
 
             # Take a size-weighted average of entry price
             entry_price = entry_gross_sum / entry_size_sum
@@ -903,6 +980,8 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
         init_price=base_ch.FlexArraySlicer(),
         fill_closed_position=None,
         fill_exit_price=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
@@ -916,6 +995,8 @@ def get_position_feature_nb(
     init_price: tp.FlexArray1dLike = np.nan,
     fill_closed_position: bool = False,
     fill_exit_price: bool = True,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get the position's feature at each time step.
 
@@ -934,9 +1015,20 @@ def get_position_feature_nb(
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
 
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(close.shape[0], col_lens.shape[0]),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
         _init_position = float(flex_select_1d_pc_nb(init_position_, col))
         _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+
         if _init_position != 0:
             # Prepare initial position
             in_position = True
@@ -961,6 +1053,8 @@ def get_position_feature_nb(
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
 
             if order_record["id"] < last_id:
                 raise ValueError("Ids must come in ascending order per column")
@@ -1054,11 +1148,11 @@ def get_position_feature_nb(
             if feature == PositionFeature.EntryPrice:
                 if entry_size_sum != 0:
                     entry_price = entry_gross_sum / entry_size_sum
-                    out[last_order_idx:close.shape[0], col] = entry_price
+                    out[last_order_idx:_sim_end, col] = entry_price
             elif feature == PositionFeature.ExitPrice:
                 if fill_exit_price:
                     remaining_size = add_nb(entry_size_sum, -exit_size_sum)
-                    for i in range(last_order_idx, close.shape[0]):
+                    for i in range(last_order_idx, _sim_end):
                         open_exit_size_sum = entry_size_sum
                         open_exit_gross_sum = exit_gross_sum + remaining_size * close[i, col]
                         exit_price = open_exit_gross_sum / open_exit_size_sum
@@ -1066,16 +1160,16 @@ def get_position_feature_nb(
                 else:
                     if exit_size_sum != 0:
                         exit_price = exit_gross_sum / exit_size_sum
-                        out[last_order_idx:close.shape[0], col] = exit_price
+                        out[last_order_idx:_sim_end, col] = exit_price
         elif was_in_position and fill_closed_position:
             if feature == PositionFeature.EntryPrice:
                 if entry_size_sum != 0:
                     entry_price = entry_gross_sum / entry_size_sum
-                    out[last_order_idx:close.shape[0], col] = entry_price
+                    out[last_order_idx:_sim_end, col] = entry_price
             elif feature == PositionFeature.ExitPrice:
                 if exit_size_sum != 0:
                     exit_price = exit_gross_sum / exit_size_sum
-                    out[last_order_idx:close.shape[0], col] = exit_price
+                    out[last_order_idx:_sim_end, col] = exit_price
 
     return out
 
@@ -1811,20 +1905,24 @@ def edge_ratio_nb(
                 exit_price_close=exit_price_close,
                 max_duration=max_duration,
             )
-            mfe = abs(trade_mfe_nb(
-                size=trade["size"],
-                direction=trade["direction"],
-                entry_price=trade["entry_price"],
-                best_price=best_price,
-                use_returns=False,
-            ))
-            mae = abs(trade_mae_nb(
-                size=trade["size"],
-                direction=trade["direction"],
-                entry_price=trade["entry_price"],
-                worst_price=worst_price,
-                use_returns=False,
-            ))
+            mfe = abs(
+                trade_mfe_nb(
+                    size=trade["size"],
+                    direction=trade["direction"],
+                    entry_price=trade["entry_price"],
+                    best_price=best_price,
+                    use_returns=False,
+                )
+            )
+            mae = abs(
+                trade_mae_nb(
+                    size=trade["size"],
+                    direction=trade["direction"],
+                    entry_price=trade["entry_price"],
+                    worst_price=worst_price,
+                    use_returns=False,
+                )
+            )
             _volatility = flex_select_nb(volatility, trade["entry_idx"], trade["col"])
             if _volatility == 0:
                 norm_mfe = np.nan
@@ -1910,20 +2008,24 @@ def running_edge_ratio_nb(
                     exit_price_close=exit_price_close,
                     max_duration=k + 1,
                 )
-                mfe = abs(trade_mfe_nb(
-                    size=trade["size"],
-                    direction=trade["direction"],
-                    entry_price=trade["entry_price"],
-                    best_price=best_price,
-                    use_returns=False,
-                ))
-                mae = abs(trade_mae_nb(
-                    size=trade["size"],
-                    direction=trade["direction"],
-                    entry_price=trade["entry_price"],
-                    worst_price=worst_price,
-                    use_returns=False,
-                ))
+                mfe = abs(
+                    trade_mfe_nb(
+                        size=trade["size"],
+                        direction=trade["direction"],
+                        entry_price=trade["entry_price"],
+                        best_price=best_price,
+                        use_returns=False,
+                    )
+                )
+                mae = abs(
+                    trade_mae_nb(
+                        size=trade["size"],
+                        direction=trade["direction"],
+                        entry_price=trade["entry_price"],
+                        worst_price=worst_price,
+                        use_returns=False,
+                    )
+                )
                 _volatility = flex_select_nb(volatility, trade["entry_idx"], trade["col"])
                 if _volatility == 0:
                     norm_mfe = np.nan

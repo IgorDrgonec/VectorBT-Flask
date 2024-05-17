@@ -4,10 +4,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import to_timezone
-
-from tests.utils import *
 
 seed = 42
 
@@ -2473,7 +2472,6 @@ class TestData:
             assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, 100, 200), data.open + 100 + 200)
             assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, x=100, y=200), data.open + 100 + 200)
             assert_frame_equal(data.run(lambda x, data: data.open + x, 100), data.open + 100)
-            assert_frame_equal(data.run(lambda x, y: x.open + y, 100, pass_as_first=True), data.open + 100)
             assert_frame_equal(data.run(lambda x, y: x.open + y, 100, rename_args={"x": "data"}), data.open + 100)
             assert_frame_equal(
                 data.run(["talib_sma", "talib_ema"], timeperiod=3, hide_params=True),
@@ -3081,9 +3079,9 @@ class TestData:
 
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Symbols",
                 "Null Counts: S1",
                 "Null Counts: S2",
@@ -3160,9 +3158,9 @@ class TestData:
 
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Features",
                 "Null Counts: F1",
                 "Null Counts: F2",

@@ -89,18 +89,17 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_df_vbt_accessor
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.data.base import OHLCDataMixin
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
-from vectorbtpro.utils.decorators import class_or_instanceproperty
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.data.base import OHLCDataMixin
+from vectorbtpro.utils.decorators import class_or_instanceproperty
 
 __all__ = [
     "OHLCVDFAccessor",
 ]
 
 __pdoc__ = {}
-
 
 OHLCVDFAccessorT = tp.TypeVar("OHLCVDFAccessorT", bound="OHLCVDFAccessor")
 
@@ -237,20 +236,20 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title="Start",
+            start_index=dict(
+                title="Start Index",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
                 tags="wrapper",
             ),
-            end=dict(
-                title="End",
+            end_index=dict(
+                title="End Index",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
                 tags="wrapper",
             ),
-            period=dict(
-                title="Period",
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -477,7 +476,7 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
             >>> vbt.YFData.pull("BTC-USD").get().vbt.ohlcv.plot().show()
             ```
 
-            [=100% "100%"]{: .candystripe}
+            [=100% "100%"]{: .candystripe .candystripe-animate }
 
             ![](/assets/images/api/ohlcv_plot.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/ohlcv_plot.dark.svg#only-dark){: .iimg loading=lazy }

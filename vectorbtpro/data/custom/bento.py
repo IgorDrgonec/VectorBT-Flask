@@ -3,10 +3,10 @@
 """Module with `BentoData`."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.data.custom.remote import RemoteData
 
 try:
     if not tp.TYPE_CHECKING:
@@ -200,7 +200,7 @@ class BentoData(RemoteData):
                     raise ValueError("Timeframe cannot be used together with schema")
         else:
             if schema.startswith("ohlcv-"):
-                freq = schema[len("ohlcv-"):]
+                freq = schema[len("ohlcv-") :]
             else:
                 freq = None
         if resolve_dates:
@@ -228,13 +228,16 @@ class BentoData(RemoteData):
             else:
                 end = end.isoformat()
 
-        params = merge_dicts(dict(
-            dataset=dataset,
-            start=start,
-            end=end,
-            symbols=symbol,
-            schema=schema,
-        ), params)
+        params = merge_dicts(
+            dict(
+                dataset=dataset,
+                start=start,
+                end=end,
+                symbols=symbol,
+                schema=schema,
+            ),
+            params,
+        )
         if return_params:
             return client, params
 

@@ -141,3 +141,4 @@ dmypy.json
 /work/
 /*.ipynb
 members
+.virtual_documents/

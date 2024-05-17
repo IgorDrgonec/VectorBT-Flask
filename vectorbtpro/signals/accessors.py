@@ -186,9 +186,9 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
+from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import RepEval, substitute_templates
-from vectorbtpro.utils.enum_ import map_enum_fields
 
 __all__ = [
     "SignalsAccessor",
@@ -328,7 +328,7 @@ class SignalsAccessor(GenericAccessor):
         )
 
         if wrapper is None:
-            wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
+            wrapper = ArrayWrapper.from_shape(shape, ndim=cls.ndim)
         if wrap_kwargs is None:
             wrap_kwargs = resolve_dict(wrap_kwargs)
         return wrapper.wrap(result, **wrap_kwargs)
@@ -483,7 +483,7 @@ class SignalsAccessor(GenericAccessor):
             exit_wait=exit_wait,
         )
         if wrapper is None:
-            wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
+            wrapper = ArrayWrapper.from_shape(shape, ndim=cls.ndim)
         if wrap_kwargs is None:
             wrap_kwargs = resolve_dict(wrap_kwargs)
         return wrapper.wrap(result1, **wrap_kwargs), wrapper.wrap(result2, **wrap_kwargs)
@@ -838,7 +838,7 @@ class SignalsAccessor(GenericAccessor):
             func = ch_reg.resolve_option(func, chunked)
             entries, exits = func(shape_2d, n, entry_wait, exit_wait)
             if wrapper is None:
-                wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
+                wrapper = ArrayWrapper.from_shape(shape, ndim=cls.ndim)
             if wrap_kwargs is None:
                 wrap_kwargs = resolve_dict(wrap_kwargs)
             return wrapper.wrap(entries, **wrap_kwargs), wrapper.wrap(exits, **wrap_kwargs)
@@ -2320,27 +2320,28 @@ class SignalsAccessor(GenericAccessor):
                 indexes_to_stack.append(pd.Index(signal_range, name=signal_index_name))
             else:
                 if not signal_index_type.startswith("target_"):
-                    indexes_to_stack.append(cls_or_self.index_from_unravel(
-                        source_range,
-                        source_idxs,
-                        wrapper.index,
-                        signal_index_type=signal_index_type.replace("source_", ""),
-                        signal_index_name="source_" + signal_index_name,
-                    ))
+                    indexes_to_stack.append(
+                        cls_or_self.index_from_unravel(
+                            source_range,
+                            source_idxs,
+                            wrapper.index,
+                            signal_index_type=signal_index_type.replace("source_", ""),
+                            signal_index_name="source_" + signal_index_name,
+                        )
+                    )
                 if not signal_index_type.startswith("source_"):
-                    indexes_to_stack.append(cls_or_self.index_from_unravel(
-                        target_range,
-                        target_idxs,
-                        wrapper.index,
-                        signal_index_type=signal_index_type.replace("target_", ""),
-                        signal_index_name="target_" + signal_index_name,
-                    ))
+                    indexes_to_stack.append(
+                        cls_or_self.index_from_unravel(
+                            target_range,
+                            target_idxs,
+                            wrapper.index,
+                            signal_index_type=signal_index_type.replace("target_", ""),
+                            signal_index_name="target_" + signal_index_name,
+                        )
+                    )
             if len(indexes_to_stack) == 1:
                 indexes_to_stack[0] = indexes_to_stack[0].rename(signal_index_name)
-            return indexes.stack_indexes((
-                *indexes_to_stack,
-                wrapper.columns[col_idxs]
-            ), **clean_index_kwargs)
+            return indexes.stack_indexes((*indexes_to_stack, wrapper.columns[col_idxs]), **clean_index_kwargs)
 
         if len(objs) == 1:
             obj = objs[0]
@@ -2381,7 +2382,7 @@ class SignalsAccessor(GenericAccessor):
                 relation=relation,
                 incl_open_source=incl_open_source,
                 incl_open_target=incl_open_target,
-                incl_empty_cols=incl_empty_cols
+                incl_empty_cols=incl_empty_cols,
             )
             if new_source_mask.shape == wrapper.shape_2d and incl_empty_cols and not force_signal_index:
                 return wrapper.wrap(new_source_mask), wrapper.wrap(new_target_mask)
@@ -2588,10 +2589,20 @@ class SignalsAccessor(GenericAccessor):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,

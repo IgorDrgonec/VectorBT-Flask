@@ -5,10 +5,10 @@
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.data.custom.remote import RemoteData
 
 try:
     if not tp.TYPE_CHECKING:
@@ -76,6 +76,7 @@ class AlpacaData(RemoteData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         status: tp.Optional[str] = None,
         asset_class: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
@@ -129,7 +130,9 @@ class AlpacaData(RemoteData):
                 if not cls.key_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        if sort:
+            return sorted(all_symbols)
+        return all_symbols
 
     @classmethod
     def resolve_client(
@@ -249,7 +252,7 @@ class AlpacaData(RemoteData):
             unit = TimeFrameUnit.Minute
         elif unit == "h":
             unit = TimeFrameUnit.Hour
-        elif unit == "d":
+        elif unit == "D":
             unit = TimeFrameUnit.Day
         elif unit == "W":
             unit = TimeFrameUnit.Week

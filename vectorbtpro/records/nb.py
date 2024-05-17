@@ -85,7 +85,7 @@ def record_col_lens_select_nb(
         col_records = np.copy(records[from_r:to_r])
         col_records["col"][:] = c  # don't forget to assign new column indices
         rang = np.arange(from_r, to_r)
-        indices_out[j: j + rang.shape[0]] = rang
+        indices_out[j : j + rang.shape[0]] = rang
         records_arr_out[j : j + rang.shape[0]] = col_records
         j += col_records.shape[0]
     return indices_out, records_arr_out
@@ -137,7 +137,7 @@ def record_col_map_select_nb(
         idxs = col_idxs[col_start_idx : col_start_idx + col_len]
         col_records = np.copy(records[idxs])
         col_records["col"][:] = new_col_i
-        indices_out[j: j + col_len] = idxs
+        indices_out[j : j + col_len] = idxs
         records_arr_out[j : j + col_len] = col_records
         j += col_len
     return indices_out, records_arr_out

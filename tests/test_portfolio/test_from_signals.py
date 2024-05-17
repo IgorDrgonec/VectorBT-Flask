@@ -1,14 +1,12 @@
 import os
-from functools import partial
 
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import *
-
-from tests.utils import *
 
 seed = 42
 
@@ -5480,12 +5478,12 @@ class TestFromSignals:
             ).order_records,
             np.array(
                 [
-                    (0, 0, 0, 0, 0, 16.528926, 6.05, 0.0, 0, 0, -1),
-                    (1, 0, 0, 1, 1, 16.528926, 4.25, 0.0, 1, 0, 0),
-                    (0, 1, 0, 0, 0, 16.528926, 6.05, 0.0, 0, 0, -1),
-                    (1, 1, 0, 2, 2, 16.528926, 2.5, 0.0, 1, 0, 0),
-                    (0, 2, 0, 0, 0, 16.528926, 6.05, 0.0, 0, 0, -1),
-                    (1, 2, 0, 4, 4, 16.528926, 1.25, 0.0, 1, 0, 0),
+                    (0, 0, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 0, 0, 1, 1, 16.52892561983471, 4.25, 0.0, 1, 0, 0),
+                    (0, 1, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 1, 0, 2, 2, 16.52892561983471, 2.5, 0.0, 1, 0, 0),
+                    (0, 2, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 2, 0, 4, 4, 16.52892561983471, 1.25, 0.0, 1, 0, 0),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -5530,12 +5528,12 @@ class TestFromSignals:
             ).order_records,
             np.array(
                 [
-                    (0, 0, 0, 0, 0, 16.528926, 6.05, 0.0, 0, 0, -1),
-                    (1, 0, 0, 1, 1, 16.528926, 3.6, 0.0, 1, 0, 0),
-                    (0, 1, 0, 0, 0, 16.528926, 6.05, 0.0, 0, 0, -1),
-                    (1, 1, 0, 2, 2, 16.528926, 2.7, 0.0, 1, 0, 0),
-                    (0, 2, 0, 0, 0, 16.528926, 6.05, 0.0, 0, 0, -1),
-                    (1, 2, 0, 4, 4, 16.528926, 0.9, 0.0, 1, 0, 0),
+                    (0, 0, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 0, 0, 1, 1, 16.52892561983471, 3.6, 0.0, 1, 0, 0),
+                    (0, 1, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 1, 0, 2, 2, 16.52892561983471, 2.7, 0.0, 1, 0, 0),
+                    (0, 2, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 2, 0, 4, 4, 16.52892561983471, 0.9, 0.0, 1, 0, 0),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -6695,6 +6693,10 @@ class TestFromHolding:
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
             _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
         )
+        np.testing.assert_array_equal(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).sim_start,
+            np.array([1, 1, 1]),
+        )
         assert_records_close(
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
             _from_signals_both(entries=_entries_wide, exits=_exits_wide, sim_start="auto").order_records,
@@ -6706,6 +6708,10 @@ class TestFromHolding:
         assert_records_close(
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
             _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).sim_end,
+            np.array([2, 2, 2]),
         )
         assert_records_close(
             _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
@@ -6729,6 +6735,10 @@ class TestFromHolding:
                 entries=_entries_wide,
                 exits=_exits_wide,
             ).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3]).sim_start,
+            np.array([1, 2, 3]),
         )
         assert_records_close(
             _from_signals_both(
@@ -6780,6 +6790,20 @@ class TestFromHolding:
                     sim_start="auto",
                 ).order_records,
             )
+        if not test_flexible:
+            np.testing.assert_array_equal(
+                _from_signals_both(
+                    entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3], group_by=[0, 0, 1]
+                ).sim_start,
+                np.array([1, 3]),
+            )
+        else:
+            np.testing.assert_array_equal(
+                _from_signals_both(
+                    entries=entries_wide, exits=exits_wide, sim_start=[1, 2, 3], group_by=[0, 0, 1]
+                ).sim_start,
+                np.array([1, 3]),
+            )
         _entries_wide = entries_wide.copy()
         _exits_wide = exits_wide.copy()
         _entries_wide.iloc[:1, 0] = False
@@ -6824,39 +6848,23 @@ class TestFromHolding:
         @njit
         def post_signal_func_nb(c):
             _ = vbt.pf_nb.get_position_nb(c)
-            _ = vbt.pf_nb.get_position_nb(c, col=1)
             _ = vbt.pf_nb.in_position_nb(c)
-            _ = vbt.pf_nb.in_position_nb(c, col=1)
             _ = vbt.pf_nb.in_long_position_nb(c)
-            _ = vbt.pf_nb.in_long_position_nb(c, col=1)
             _ = vbt.pf_nb.in_short_position_nb(c)
-            _ = vbt.pf_nb.in_short_position_nb(c, col=1)
             _ = vbt.pf_nb.get_n_active_positions_nb(c)
             _ = vbt.pf_nb.get_n_active_positions_nb(c, all_groups=True)
             _ = vbt.pf_nb.get_cash_nb(c)
-            _ = vbt.pf_nb.get_cash_nb(c, col_or_group=1)
             _ = vbt.pf_nb.get_locked_cash_nb(c)
-            _ = vbt.pf_nb.get_locked_cash_nb(c, col=1)
             _ = vbt.pf_nb.get_free_cash_nb(c)
-            _ = vbt.pf_nb.get_free_cash_nb(c, col_or_group=1)
             _ = vbt.pf_nb.has_free_cash_nb(c)
-            _ = vbt.pf_nb.has_free_cash_nb(c, col_or_group=1)
             _ = vbt.pf_nb.get_val_price_nb(c)
-            _ = vbt.pf_nb.get_val_price_nb(c, col=1)
             _ = vbt.pf_nb.get_value_nb(c)
-            _ = vbt.pf_nb.get_value_nb(c, col_or_group=1)
             _ = vbt.pf_nb.get_leverage_nb(c)
-            _ = vbt.pf_nb.get_leverage_nb(c, col=1)
             _ = vbt.pf_nb.get_position_value_nb(c)
-            _ = vbt.pf_nb.get_position_value_nb(c, col=1)
             _ = vbt.pf_nb.get_allocation_nb(c)
-            _ = vbt.pf_nb.get_allocation_nb(c, col=1)
             _ = vbt.pf_nb.get_order_count_nb(c)
-            _ = vbt.pf_nb.get_order_count_nb(c, col=1)
             _ = vbt.pf_nb.get_order_records_nb(c)
-            _ = vbt.pf_nb.get_order_records_nb(c, col=1)
-            _ = vbt.pf_nb.any_order_nb(c)
-            _ = vbt.pf_nb.any_order_nb(c, col=1)
+            _ = vbt.pf_nb.has_orders_nb(c)
             _ = vbt.pf_nb.order_filled_nb(c)
             _ = vbt.pf_nb.order_opened_position_nb(c)
             _ = vbt.pf_nb.order_increased_position_nb(c)
@@ -6864,19 +6872,13 @@ class TestFromHolding:
             _ = vbt.pf_nb.order_closed_position_nb(c)
             _ = vbt.pf_nb.order_reversed_position_nb(c)
             _ = vbt.pf_nb.get_limit_target_price_nb(c)
-            _ = vbt.pf_nb.get_limit_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_sl_target_price_nb(c)
-            _ = vbt.pf_nb.get_sl_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_tsl_target_price_nb(c)
-            _ = vbt.pf_nb.get_tsl_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_tp_target_price_nb(c)
-            _ = vbt.pf_nb.get_tp_target_price_nb(c, col=1)
             _ = vbt.pf_nb.get_entry_trade_records_nb(c)
-            _ = vbt.pf_nb.get_entry_trade_records_nb(c, col=1)
             _ = vbt.pf_nb.get_exit_trade_records_nb(c)
-            _ = vbt.pf_nb.get_exit_trade_records_nb(c, col=1)
             _ = vbt.pf_nb.get_position_records_nb(c)
-            _ = vbt.pf_nb.get_position_records_nb(c, col=1)
+            _ = vbt.pf_nb.stop_sim_nb(c)
 
         _ = vbt.PF.from_signals(
             [1],
@@ -6884,6 +6886,54 @@ class TestFromHolding:
             short_entries=[[False, True]],
             init_cash=[100, 200],
             post_signal_func_nb=post_signal_func_nb,
+            sl_stop=0.1,
+            tsl_stop=0.2,
+            tp_stop=0.3,
+        )
+
+        @njit
+        def post_segment_func_nb(c):
+            for col in range(c.from_col, c.to_col):
+                _ = vbt.pf_nb.get_col_position_nb(c, col)
+                _ = vbt.pf_nb.col_in_position_nb(c, col)
+                _ = vbt.pf_nb.col_in_long_position_nb(c, col)
+                _ = vbt.pf_nb.col_in_short_position_nb(c, col)
+                _ = vbt.pf_nb.get_col_cash_nb(c, col)
+                _ = vbt.pf_nb.get_col_locked_cash_nb(c, col)
+                _ = vbt.pf_nb.get_col_free_cash_nb(c, col)
+                _ = vbt.pf_nb.col_has_free_cash_nb(c, col)
+                _ = vbt.pf_nb.get_col_val_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_value_nb(c, col)
+                _ = vbt.pf_nb.get_col_leverage_nb(c, col)
+                _ = vbt.pf_nb.get_col_position_value_nb(c, col)
+                _ = vbt.pf_nb.get_col_allocation_nb(c, col)
+                _ = vbt.pf_nb.get_col_order_count_nb(c, col)
+                _ = vbt.pf_nb.get_col_order_records_nb(c, col)
+                _ = vbt.pf_nb.col_has_orders_nb(c, col)
+                _ = vbt.pf_nb.get_col_limit_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_sl_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_tsl_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_tp_target_price_nb(c, col)
+                _ = vbt.pf_nb.get_col_entry_trade_records_nb(c, col)
+                _ = vbt.pf_nb.get_col_exit_trade_records_nb(c, col)
+                _ = vbt.pf_nb.get_col_position_records_nb(c, col)
+
+            _ = vbt.pf_nb.get_n_active_positions_nb(c)
+            _ = vbt.pf_nb.get_n_active_positions_nb(c, all_groups=True)
+            _ = vbt.pf_nb.get_group_cash_nb(c, c.group)
+            _ = vbt.pf_nb.get_group_free_cash_nb(c, c.group)
+            _ = vbt.pf_nb.get_group_value_nb(c, c.group)
+            _ = vbt.pf_nb.get_group_position_value_nb(c, c.group)
+            _ = vbt.pf_nb.stop_group_sim_nb(c, c.group)
+            _ = vbt.pf_nb.stop_sim_nb(c)
+
+        _ = vbt.PF.from_signals(
+            [1],
+            long_entries=[[True, False]],
+            short_entries=[[False, True]],
+            init_cash=[100, 200],
+            post_segment_func_nb=post_segment_func_nb,
+            group_by=True,
             sl_stop=0.1,
             tsl_stop=0.2,
             tp_stop=0.3,

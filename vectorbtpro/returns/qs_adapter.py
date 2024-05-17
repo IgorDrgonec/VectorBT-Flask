@@ -202,9 +202,11 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                     self_arg = new_method_params[0]
                     column_arg = new_method_params[2]
                     other_args = [
-                        p.replace(kind=Parameter.KEYWORD_ONLY)
-                        if p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
-                        else p
+                        (
+                            p.replace(kind=Parameter.KEYWORD_ONLY)
+                            if p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
+                            else p
+                        )
                         for p in list(source_sig.parameters.values())[1:]
                     ]
                     source_sig = source_sig.replace(parameters=(self_arg, column_arg) + tuple(other_args))

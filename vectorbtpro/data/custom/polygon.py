@@ -6,15 +6,15 @@ import time
 import traceback
 import warnings
 from functools import wraps, partial
-import requests
 
 import pandas as pd
+import requests
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.pbar import get_pbar
-from vectorbtpro.data.custom.remote import RemoteData
+from vectorbtpro.utils.pbar import ProgressBar
 
 try:
     if not tp.TYPE_CHECKING:
@@ -80,6 +80,7 @@ class PolygonData(RemoteData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
         **list_tickers_kwargs,
@@ -99,7 +100,9 @@ class PolygonData(RemoteData):
                 if not cls.key_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        if sort:
+            return sorted(all_symbols)
+        return all_symbols
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[PolygonClientT] = None, **client_config) -> PolygonClientT:
@@ -178,17 +181,17 @@ class PolygonData(RemoteData):
 
                 Max 50000 and Default 5000.
             params (dict): Any additional query params.
-            delay (float): Time to sleep after each request (in milliseconds).
+            delay (float): Time to sleep after each request (in seconds).
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
-            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`.
             silence_warnings (bool): Whether to silence all warnings.
 
         For defaults, see `custom.polygon` in `vectorbtpro._settings.data`.
 
         !!! note
             If you're using a free plan that has an API rate limit of several requests per minute,
-            make sure to set `delay` to a higher number, such as 12000 (which makes 5 requests per minute).
+            make sure to set `delay` to a higher number, such as 12 (which makes 5 requests per minute).
         """
         if client_config is None:
             client_config = {}
@@ -205,6 +208,8 @@ class PolygonData(RemoteData):
         retries = cls.resolve_custom_setting(retries, "retries")
         show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
         pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        if "bar_id" not in pbar_kwargs:
+            pbar_kwargs["bar_id"] = "polygon"
         silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
 
         # Resolve the timeframe
@@ -218,7 +223,7 @@ class PolygonData(RemoteData):
             unit = "minute"
         elif unit == "h":
             unit = "hour"
-        elif unit == "d":
+        elif unit == "D":
             unit = "day"
         elif unit == "W":
             unit = "week"
@@ -261,7 +266,7 @@ class PolygonData(RemoteData):
                         if not silence_warnings:
                             warnings.warn(traceback.format_exc(), stacklevel=2)
                         if delay is not None:
-                            time.sleep(delay / 1000)
+                            time.sleep(delay)
 
             return retry_method
 
@@ -299,8 +304,8 @@ class PolygonData(RemoteData):
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
-                return "/"
-            return str(pd.Timestamp(ts, unit="ms", tz="utc"))
+                return "?"
+            return dt.readable_datetime(pd.Timestamp(ts, unit="ms", tz="utc"), freq=timeframe)
 
         def _filter_func(d: tp.Dict, _prev_end_ts: tp.Optional[int] = None) -> bool:
             if start_ts is not None:
@@ -317,8 +322,8 @@ class PolygonData(RemoteData):
         # Iteratively collect the data
         data = []
         try:
-            with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts))
+            with ProgressBar(show_progress=show_progress, **pbar_kwargs) as pbar:
+                pbar.set_description("{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)
@@ -330,18 +335,13 @@ class PolygonData(RemoteData):
                     data += next_data
                     if start_ts is None:
                         start_ts = next_data[0]["t"]
-                    pbar.set_description(
-                        "{} - {}".format(
-                            _ts_to_str(start_ts),
-                            _ts_to_str(next_data[-1]["t"]),
-                        )
-                    )
-                    pbar.update(1)
+                    pbar.set_description("{} → {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1]["t"])))
+                    pbar.update()
                     prev_end_ts = next_data[-1]["t"]
                     if end_ts is not None and prev_end_ts >= end_ts:
                         break
                     if delay is not None:
-                        time.sleep(delay / 1000)  # be kind to api
+                        time.sleep(delay)  # be kind to api
         except Exception as e:
             if not silence_warnings:
                 warnings.warn(traceback.format_exc(), stacklevel=2)

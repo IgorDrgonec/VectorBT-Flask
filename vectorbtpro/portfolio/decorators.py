@@ -3,6 +3,7 @@
 """Class decorators for portfolio."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Config, resolve_dict
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
@@ -31,26 +32,40 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
             def new_method(
                 self,
                 *,
-                group_by: tp.GroupByLike = None,
-                bm_returns: tp.Optional[tp.ArrayLike] = None,
-                freq: tp.Optional[tp.FrequencyLike] = None,
-                year_freq: tp.Optional[tp.FrequencyLike] = None,
+                returns: tp.Optional[tp.SeriesFrame] = None,
+                use_asset_returns: bool = False,
+                bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
                 log_returns: bool = False,
                 daily_returns: bool = False,
-                use_asset_returns: bool = False,
+                sim_start: tp.Optional[tp.ArrayLike] = None,
+                sim_end: tp.Optional[tp.ArrayLike] = None,
+                rec_sim_range: bool = False,
+                freq: tp.Optional[tp.FrequencyLike] = None,
+                year_freq: tp.Optional[tp.FrequencyLike] = None,
+                defaults: tp.KwargsLike = None,
                 jitted: tp.JittedOption = None,
+                chunked: tp.ChunkedOption = None,
+                wrapper: tp.Optional[ArrayWrapper] = None,
+                group_by: tp.GroupByLike = None,
                 _source_name: str = source_name,
                 **kwargs,
             ) -> tp.Any:
                 returns_acc = self.get_returns_acc(
-                    group_by=group_by,
+                    returns=returns,
+                    use_asset_returns=use_asset_returns,
                     bm_returns=bm_returns,
-                    freq=freq,
-                    year_freq=year_freq,
                     log_returns=log_returns,
                     daily_returns=daily_returns,
-                    use_asset_returns=use_asset_returns,
+                    sim_start=sim_start,
+                    sim_end=sim_end,
+                    rec_sim_range=rec_sim_range,
+                    freq=freq,
+                    year_freq=year_freq,
+                    defaults=defaults,
                     jitted=jitted,
+                    chunked=chunked,
+                    wrapper=wrapper,
+                    group_by=group_by,
                 )
                 ret_method = getattr(returns_acc, _source_name)
                 if "jitted" in get_func_arg_names(ret_method):

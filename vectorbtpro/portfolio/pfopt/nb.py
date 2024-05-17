@@ -6,11 +6,11 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.portfolio.enums import Direction, alloc_point_dt, alloc_range_dt
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import rescale_nb
-from vectorbtpro.portfolio.enums import Direction, alloc_point_dt, alloc_range_dt
 
 __all__ = []
 
@@ -280,17 +280,9 @@ def rescale_allocations_nb(allocations: tp.Array2d, to_range: tp.Tuple[float, fl
                 out[i, col] = np.nan
                 continue
             if allocations[i, col] > 0:
-                out[i, col] = rescale_nb(
-                    allocations[i, col] / pos_sum,
-                    (0.0, 1.0),
-                    (max(0.0, new_min), new_max)
-                )
+                out[i, col] = rescale_nb(allocations[i, col] / pos_sum, (0.0, 1.0), (max(0.0, new_min), new_max))
             elif allocations[i, col] < 0:
-                out[i, col] = rescale_nb(
-                    abs(allocations[i, col]) / neg_sum,
-                    (0.0, 1.0),
-                    (min(new_max, 0.0), new_min)
-                )
+                out[i, col] = rescale_nb(abs(allocations[i, col]) / neg_sum, (0.0, 1.0), (min(new_max, 0.0), new_min))
             else:
                 out[i, col] = 0.0
 

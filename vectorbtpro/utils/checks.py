@@ -2,19 +2,18 @@
 
 """Utilities for validation during runtime."""
 
-import attr
+import datetime
+import traceback
+import warnings
 from collections.abc import Hashable, Mapping
 from inspect import signature, getmro
 from keyword import iskeyword
-import datetime
-import warnings
-import traceback
 
+import attr
+import numba
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_datetime64_any_dtype as is_datetime
 from numba.core.registry import CPUDispatcher
-import numba
 
 from vectorbtpro import _typing as tp
 

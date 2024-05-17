@@ -2,8 +2,8 @@
 
 """General types used across vectorbtpro."""
 
-from enum import EnumMeta
 from datetime import datetime, timedelta, tzinfo, date, time
+from enum import EnumMeta
 from pathlib import Path
 from typing import *
 
@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 from mypy_extensions import VarArg
 from pandas import Series, DataFrame as Frame, Index
-from pandas.tseries.offsets import BaseOffset
 from pandas.core.groupby import GroupBy as PandasGroupBy
-from pandas.core.resample import Resampler as PandasResampler
 from pandas.core.indexing import _IndexSlice as IndexSlice
+from pandas.core.resample import Resampler as PandasResampler
+from pandas.tseries.offsets import BaseOffset
 
 try:
     if not TYPE_CHECKING:
@@ -96,8 +96,7 @@ ItemGenerator = Generator[Tuple[Hashable, Any], None, None]
 
 # Arrays
 class SupportsArray(Protocol):
-    def __array__(self) -> np.ndarray:
-        ...
+    def __array__(self) -> np.ndarray: ...
 
 
 DTypeLike = Any
@@ -248,7 +247,9 @@ AnnArgQuery = Union[int, str, Regex]
 # Execution
 FuncArgs = Tuple[Callable, Args, Kwargs]
 FuncsArgs = Iterable[FuncArgs]
-EngineLike = Union[str, type, ExecutionEngine, Callable]
+ExecutionEngineLike = Union[str, type, ExecutionEngine, Callable]
+ExecOutput = Any
+ExecOutputs = List[Any]
 
 # JIT
 JittedOption = Union[None, bool, str, Callable, Kwargs]
@@ -260,7 +261,7 @@ MergeFuncLike = MaybeSequence[Union[None, str, Callable, MergeFunc]]
 
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]
-SizeLike = Union[int, Sizer, SizeFunc]
+SizeLike = Union[int, str, Sizer, SizeFunc]
 ChunkMetaFunc = Callable[[AnnArgs], Iterable[ChunkMeta]]
 ChunkMetaLike = Union[Iterable[ChunkMeta], ChunkMetaGenerator, ChunkMetaFunc]
 TakeSpec = Union[None, Type[NotChunked], Type[ChunkTaker], NotChunked, ChunkTaker]

@@ -2,9 +2,9 @@
 
 """Utilities for formatting."""
 
-import attr
 import inspect
 
+import attr
 import numpy as np
 import pandas as pd
 
@@ -233,6 +233,7 @@ def ptable(*args, display_html: tp.Optional[bool] = None, **kwargs) -> None:
         display_html = is_notebook()
     if display_html:
         from IPython.display import display, HTML
+
         display(HTML(format_array(*args, html=True, **kwargs)))
     else:
         print(format_array(*args, **kwargs))
@@ -339,4 +340,4 @@ def pdir(*args, **kwargs) -> None:
     """Print the output of `vectorbtpro.utils.attr_.parse_attrs`."""
     from vectorbtpro.utils.attr_ import parse_attrs
 
-    print(parse_attrs(*args, **kwargs).to_string())
+    ptable(parse_attrs(*args, **kwargs))

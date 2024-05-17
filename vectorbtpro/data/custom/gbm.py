@@ -5,13 +5,13 @@
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import to_1d_array
+from vectorbtpro.data import nb
+from vectorbtpro.data.custom.synthetic import SyntheticData
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.base.reshaping import to_1d_array
-from vectorbtpro.data import nb
-from vectorbtpro.data.custom.synthetic import SyntheticData
 
 __all__ = [
     "GBMData",

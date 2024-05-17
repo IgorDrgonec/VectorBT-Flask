@@ -2,36 +2,36 @@
 
 """Base class for working with data sources."""
 
-import warnings
-from pathlib import Path
-import traceback
 import inspect
 import string
+import traceback
+import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.merging import column_stack_arrays, is_merge_func_from_config
+from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.data.decorators import attach_symbol_dict_methods
+from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic.drawdowns import Drawdowns
+from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
+from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 from vectorbtpro.utils.pickling import pdict, RecState
-from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
-from vectorbtpro.utils.merging import MergeFunc
-from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexes import stack_indexes
-from vectorbtpro.base.merging import column_stack_arrays, is_merge_func_from_config
-from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.data.decorators import attach_symbol_dict_methods
+from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:
@@ -313,6 +313,16 @@ class OHLCDataMixin(BaseDataMixin):
         return (open + high + low + close) / 4
 
     @property
+    def has_any_ohlc(self) -> bool:
+        """Whether the instance has any of the OHLC features."""
+        return (
+            self.has_feature("Open")
+            or self.has_feature("High")
+            or self.has_feature("Low")
+            or self.has_feature("Close")
+        )
+
+    @property
     def has_ohlc(self) -> bool:
         """Whether the instance has all the OHLC features."""
         return (
@@ -321,6 +331,11 @@ class OHLCDataMixin(BaseDataMixin):
             and self.has_feature("Low")
             and self.has_feature("Close")
         )
+
+    @property
+    def has_any_ohlcv(self) -> bool:
+        """Whether the instance has any of the OHLCV features."""
+        return self.has_any_ohlc or self.has_feature("Volume")
 
     @property
     def has_ohlcv(self) -> bool:
@@ -927,22 +942,31 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return self.classes
         return None
 
-    @property
-    def level_name(self) -> tp.Optional[tp.MaybeIterable[tp.Hashable]]:
-        """Level name(s) for keys.
-
-        Keys are symbols or features depending on the data dict type.
-
-        Must be a sequence if keys are tuples, otherwise a hashable.
-        If False, no level names will be used."""
-        level_name = self._level_name
-        first_key = self.keys[0]
+    @class_or_instancemethod
+    def get_level_name(
+        cls_or_self,
+        keys: tp.Optional[tp.Keys] = None,
+        level_name: tp.Union[None, bool, tp.MaybeIterable[tp.Hashable]] = None,
+        feature_oriented: tp.Optional[bool] = None,
+    ) -> tp.Optional[tp.MaybeIterable[tp.Hashable]]:
+        """Get level name(s) for keys."""
+        if isinstance(cls_or_self, type):
+            checks.assert_not_none(keys, arg_name="keys")
+            checks.assert_not_none(feature_oriented, arg_name="feature_oriented")
+        else:
+            if keys is None:
+                keys = cls_or_self.keys
+            if level_name is None:
+                level_name = cls_or_self._level_name
+            if feature_oriented is None:
+                feature_oriented = cls_or_self.feature_oriented
+        first_key = keys[0]
         if isinstance(level_name, bool):
             if level_name:
                 level_name = None
             else:
                 return None
-        if self.feature_oriented:
+        if feature_oriented:
             key_prefix = "feature"
         else:
             key_prefix = "symbol"
@@ -955,6 +979,39 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if level_name is None:
             level_name = key_prefix
         return level_name
+
+    @property
+    def level_name(self) -> tp.Optional[tp.MaybeIterable[tp.Hashable]]:
+        """Level name(s) for keys.
+
+        Keys are symbols or features depending on the data dict type.
+
+        Must be a sequence if keys are tuples, otherwise a hashable.
+        If False, no level names will be used."""
+        return self.get_level_name()
+
+    @class_or_instancemethod
+    def get_key_index(
+        cls_or_self,
+        keys: tp.Optional[tp.Keys] = None,
+        level_name: tp.Union[None, bool, tp.MaybeIterable[tp.Hashable]] = None,
+        feature_oriented: tp.Optional[bool] = None,
+    ) -> tp.Index:
+        """Get key index."""
+        if isinstance(cls_or_self, type):
+            checks.assert_not_none(keys, arg_name="keys")
+        else:
+            if keys is None:
+                keys = cls_or_self.keys
+        level_name = cls_or_self.get_level_name(keys=keys, level_name=level_name, feature_oriented=feature_oriented)
+        if isinstance(level_name, tuple):
+            return pd.MultiIndex.from_tuples(keys, names=level_name)
+        return pd.Index(keys, name=level_name)
+
+    @property
+    def key_index(self) -> tp.Index:
+        """Key index."""
+        return self.get_key_index()
 
     @property
     def fetch_kwargs(self) -> tp.Union[feature_dict, symbol_dict]:
@@ -1128,12 +1185,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     self.assert_has_feature(key)
                 else:
                     self.assert_has_symbol(key)
-        if isinstance(self.level_name, tuple):
-            key_columns = pd.MultiIndex.from_tuples(keys, names=self.level_name)
-        else:
-            key_columns = pd.Index(keys, name=self.level_name)
+        new_columns = self.get_key_index(keys=keys)
         wrapper = self.wrapper.replace(
-            columns=key_columns,
+            columns=new_columns,
             ndim=ndim,
             grouper=None,
             **kwargs,
@@ -1162,8 +1216,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     classes_columns = pd.Index(classes_frame.iloc[:, 0])
                 else:
                     classes_columns = pd.MultiIndex.from_frame(classes_frame)
-                key_columns = stack_indexes((classes_columns, wrapper.columns), **clean_index_kwargs)
-                wrapper = wrapper.replace(columns=key_columns)
+                new_columns = stack_indexes((classes_columns, wrapper.columns), **clean_index_kwargs)
+                wrapper = wrapper.replace(columns=new_columns)
         if group_by is not None:
             wrapper = wrapper.replace(group_by=group_by)
         return wrapper
@@ -2832,8 +2886,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         skip_on_error = cls.resolve_base_setting(skip_on_error, "skip_on_error")
         silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
         execute_kwargs = cls.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
-        if not single_key and "show_progress" not in execute_kwargs:
-            execute_kwargs["show_progress"] = True
+        execute_kwargs = merge_dicts(dict(show_progress=not single_key), execute_kwargs)
 
         funcs_args = []
         if keys_are_features:
@@ -2865,7 +2918,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             )
             fetch_kwargs[k] = key_fetch_kwargs
 
-        outputs = execute(funcs_args, n_calls=len(keys), progress_desc=keys, **execute_kwargs)
+        key_index = cls.get_key_index(keys=keys, level_name=level_name, feature_oriented=keys_are_features)
+        outputs = execute(funcs_args, size=len(keys), keys=key_index, **execute_kwargs)
         if return_raw:
             return outputs
 
@@ -3073,8 +3127,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         skip_on_error = self.resolve_base_setting(skip_on_error, "skip_on_error")
         silence_warnings = self.resolve_base_setting(silence_warnings, "silence_warnings")
         execute_kwargs = self.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
-        if "show_progress" not in execute_kwargs:
-            execute_kwargs["show_progress"] = False
+        execute_kwargs = merge_dicts(dict(show_progress=False), execute_kwargs)
         if self.feature_oriented:
             func_arg_names = get_func_arg_names(self.fetch_feature)
         else:
@@ -3109,7 +3162,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 )
                 key_indices.append(i)
 
-        outputs = execute(funcs_args, n_calls=len(self.keys), progress_desc=self.keys, **execute_kwargs)
+        outputs = execute(funcs_args, size=len(self.keys), keys=self.key_index, **execute_kwargs)
         if return_raw:
             return outputs
 
@@ -3639,7 +3692,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         *args,
         on_features: tp.Optional[tp.MaybeFeatures] = None,
         on_symbols: tp.Optional[tp.MaybeSymbols] = None,
-        pass_as_first: bool = False,
+        func_args: tp.ArgsLike = None,
+        func_kwargs: tp.KwargsLike = None,
         magnet_kwargs: tp.KwargsLike = None,
         ignore_args: tp.Optional[tp.Sequence[str]] = None,
         rename_args: tp.DictLike = None,
@@ -3707,9 +3761,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if on_symbols is not None:
             _self = _self.select_symbols(on_symbols)
 
-        if pass_as_first:
-            return func(_self, *args, **kwargs)
-
         if checks.is_complex_iterable(func):
             funcs_args = []
             keys = []
@@ -3743,6 +3794,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     new_kwargs["unpack_to"] = "frame"
                 new_kwargs = {
                     **dict(
+                        func_args=func_args,
+                        func_kwargs=func_kwargs,
                         magnet_kwargs=magnet_kwargs,
                         ignore_args=ignore_args,
                         rename_args=rename_args,
@@ -3767,7 +3820,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 keys.append(str(func_name))
 
             keys = pd.Index(keys, name="run_func")
-            results = execute(funcs_args, n_calls=len(keys), progress_desc=keys, **execute_kwargs)
+            results = execute(funcs_args, size=len(keys), keys=keys, **execute_kwargs)
 
             skip_indices = set()
             for i, result in enumerate(results):
@@ -3805,7 +3858,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             func_name = func.lower().strip()
             if func_name.startswith("from_") and getattr(Portfolio, func_name):
                 func = getattr(Portfolio, func_name)
-                pf = func(_self, *args, **kwargs)
+                if func_args is None:
+                    func_args = ()
+                if func_kwargs is None:
+                    func_kwargs = {}
+                pf = func(_self, *args, *func_args, **kwargs, **func_kwargs)
                 if isinstance(pf, Portfolio) and unpack:
                     raise ValueError("Portfolio cannot be unpacked")
                 return pf
@@ -3828,6 +3885,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 return _self.run(
                     indicators,
                     *args,
+                    func_args=func_args,
+                    func_kwargs=func_kwargs,
                     magnet_kwargs=magnet_kwargs,
                     ignore_args=ignore_args,
                     rename_args=rename_args,
@@ -3898,7 +3957,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if k in func_arg_names:
                 kwargs[k] = v
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
-        out = func(*new_args, **new_kwargs)
+        if func_args is None:
+            func_args = ()
+        if func_kwargs is None:
+            func_kwargs = {}
+        out = func(*new_args, *func_args, **new_kwargs, **func_kwargs)
         if isinstance(unpack, bool):
             if unpack:
                 if isinstance(out, IndicatorBase):
@@ -4911,20 +4974,20 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title="Start",
+            start_index=dict(
+                title="Start Index",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
                 tags="wrapper",
             ),
-            end=dict(
-                title="End",
+            end_index=dict(
+                title="End Index",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
                 tags="wrapper",
             ),
-            period=dict(
-                title="Period",
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -5004,7 +5067,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             >>> data = vbt.YFData.pull(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
             ```
 
-            [=100% "100%"]{: .candystripe}
+            [=100% "100%"]{: .candystripe .candystripe-animate }
 
             ```pycon
             >>> data.plot(feature='Close', base=1).show()

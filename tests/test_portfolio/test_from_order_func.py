@@ -9,10 +9,9 @@ from numba import njit, typeof
 from numba.typed import List
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import *
-
-from tests.utils import *
 
 seed = 42
 
@@ -20,9 +19,7 @@ day_dt = np.timedelta64(86400000000000)
 
 price = pd.Series(
     [1.0, 2.0, 3.0, 4.0, 5.0],
-    index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 price_wide = price.vbt.tile(3, keys=["a", "b", "c"])
 
@@ -2147,7 +2144,7 @@ class TestFromOrderFunc:
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
-        assert_series_equal(pf.cash_earnings, pd.Series([0, 1, 2, 3]))
+        assert_series_equal(pf.cash_earnings, pd.Series([0.0, 1.0, 2.0, 3.0]))
         assert_records_close(
             pf.order_records,
             np.array(
@@ -3359,37 +3356,48 @@ class TestFromOrderFunc:
         _order_size_wide.iloc[:1] = np.nan
         assert_records_close(
             _from_order_func(order_size_wide, sim_start=1).order_records,
-            _from_order_func(_order_size_wide).order_records
+            _from_order_func(_order_size_wide).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_start=1).sim_start,
+            np.array([1, 1, 1]),
         )
         _order_size_wide = order_size_wide.copy()
         _order_size_wide.iloc[2:] = np.nan
         assert_records_close(
             _from_order_func(order_size_wide, sim_end=2).order_records,
-            _from_order_func(_order_size_wide).order_records
+            _from_order_func(_order_size_wide).order_records,
         )
-        if not test_row_wise:
-            _order_size_wide = order_size_wide.copy()
-            _order_size_wide.iloc[:1, 0] = np.nan
-            _order_size_wide.iloc[:2, 1] = np.nan
-            _order_size_wide.iloc[:3, 2] = np.nan
-            assert_records_close(
-                _from_order_func(order_size_wide, sim_start=[1, 2, 3]).order_records,
-                _from_order_func(_order_size_wide).order_records
-            )
-            with pytest.raises(Exception):
-                _from_order_func(order_size_wide, sim_start=[1, 2])
-            _order_size_wide = order_size_wide.copy()
-            _order_size_wide.iloc[:1, 0] = np.nan
-            _order_size_wide.iloc[:2, 1] = np.nan
-            _order_size_wide.iloc[:2, 2] = np.nan
-            assert_records_close(
-                _from_order_func(
-                    order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True
-                ).order_records,
-                _from_order_func(
-                    _order_size_wide, group_by=[0, 0, 1], cash_sharing=True
-                ).order_records
-            )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_end=2).sim_end,
+            np.array([2, 2, 2]),
+        )
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1, 0] = np.nan
+        _order_size_wide.iloc[:2, 1] = np.nan
+        _order_size_wide.iloc[:3, 2] = np.nan
+        assert_records_close(
+            _from_order_func(order_size_wide, sim_start=[1, 2, 3]).order_records,
+            _from_order_func(_order_size_wide).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_start=[1, 2, 3]).sim_start,
+            np.array([1, 2, 3]),
+        )
+        with pytest.raises(Exception):
+            _from_order_func(order_size_wide, sim_start=[1, 2])
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1, 0] = np.nan
+        _order_size_wide.iloc[:2, 1] = np.nan
+        _order_size_wide.iloc[:2, 2] = np.nan
+        assert_records_close(
+            _from_order_func(order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True).order_records,
+            _from_order_func(_order_size_wide, group_by=[0, 0, 1], cash_sharing=True).order_records,
+        )
+        np.testing.assert_array_equal(
+            _from_order_func(order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True).sim_start,
+            np.array([1, 2]),
+        )
 
 
 # ############# from_def_order_func ############# #

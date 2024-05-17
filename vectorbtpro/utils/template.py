@@ -2,9 +2,8 @@
 
 """Utilities for working with templates."""
 
-from string import Template
-
 import importlib
+from string import Template
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
@@ -12,9 +11,9 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.eval_ import multiline_eval
+from vectorbtpro.utils.module_ import package_shortcut_config
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.search import any_in_obj, find_and_replace_in_obj
-from vectorbtpro.utils.module_ import package_shortcut_config
 
 __all__ = [
     "CustomTemplate",

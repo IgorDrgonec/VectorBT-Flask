@@ -1,14 +1,12 @@
 import os
-from datetime import datetime
 
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.enums import range_dt
-
-from tests.utils import *
 
 seed = 42
 
@@ -22,9 +20,7 @@ mask = pd.DataFrame(
         [True, False, False],
         [False, True, False],
     ],
-    index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
     columns=["a", "b", "c"],
 )
 
@@ -2173,13 +2169,16 @@ class TestAccessors:
                     [False, False, True, True, False],
                 ],
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, "a"),
-                    (1, "a"),
-                    (0, "b"),
-                    (1, "b"),
-                    (0, "c"),
-                ], names=["signal", None]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0, "a"),
+                        (1, "a"),
+                        (0, "b"),
+                        (1, "b"),
+                        (0, "c"),
+                    ],
+                    names=["signal", None],
+                ),
             ),
         )
         mask2 = mask.copy()
@@ -2195,12 +2194,15 @@ class TestAccessors:
                     [False, False, False, False],
                 ],
                 index=mask2.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, "a"),
-                    (1, "a"),
-                    (-1, "b"),
-                    (0, "c"),
-                ], names=["signal", None]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0, "a"),
+                        (1, "a"),
+                        (-1, "b"),
+                        (0, "c"),
+                    ],
+                    names=["signal", None],
+                ),
             ),
         )
         assert_frame_equal(
@@ -2214,11 +2216,14 @@ class TestAccessors:
                     [False, False, False],
                 ],
                 index=mask2.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, "a"),
-                    (1, "a"),
-                    (0, "c"),
-                ], names=["signal", None]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0, "a"),
+                        (1, "a"),
+                        (0, "c"),
+                    ],
+                    names=["signal", None],
+                ),
             ),
         )
         mask3 = mask.copy()
@@ -2248,11 +2253,14 @@ class TestAccessors:
                     [False, False, False],
                 ],
                 index=mask2.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (-1, "a"),
-                    (-1, "b"),
-                    (-1, "c"),
-                ], names=["signal", None]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (-1, "a"),
+                        (-1, "b"),
+                        (-1, "c"),
+                    ],
+                    names=["signal", None],
+                ),
             ),
         )
         with pytest.raises(Exception):
@@ -2268,13 +2276,16 @@ class TestAccessors:
                     [False, False, True, True, False],
                 ],
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, 3, "a"),
-                    (3, -1, "a"),
-                    (1, 4, "b"),
-                    (4, -1, "b"),
-                    (2, -1, "c"),
-                ], names=["source_signal", "target_signal", None]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0, 3, "a"),
+                        (3, -1, "a"),
+                        (1, 4, "b"),
+                        (4, -1, "b"),
+                        (2, -1, "c"),
+                    ],
+                    names=["source_signal", "target_signal", None],
+                ),
             ),
         )
         assert_frame_equal(
@@ -2288,10 +2299,13 @@ class TestAccessors:
                     [False, True],
                 ],
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (mask.index[0], mask.index[3], "a"),
-                    (mask.index[1], mask.index[4], "b"),
-                ], names=["source_signal", "target_signal", None]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (mask.index[0], mask.index[3], "a"),
+                        (mask.index[1], mask.index[4], "b"),
+                    ],
+                    names=["source_signal", "target_signal", None],
+                ),
             ),
         )
         assert_frame_equal(
@@ -2379,9 +2393,7 @@ class TestAccessors:
                     [False, False, False],
                 ],
                 index=mask2.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [(0, "a"), (1, "a"), (0, "c")], names=["signal", None]
-                ),
+                columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "a"), (0, "c")], names=["signal", None]),
             ),
         )
         assert_frame_equal(
@@ -2399,9 +2411,7 @@ class TestAccessors:
                     [False, True, False],
                 ],
                 index=mask2.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [(0, "a"), (1, "a"), (0, "c")], names=["signal", None]
-                ),
+                columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "a"), (0, "c")], names=["signal", None]),
             ),
         )
         mask3 = mask.copy()
@@ -3112,9 +3122,9 @@ class TestAccessors:
     def test_stats(self):
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total",
                 "Rate [%]",
                 "First Index",
@@ -3246,9 +3256,9 @@ class TestAccessors:
                 ],
                 index=pd.Index(
                     [
-                        "Start",
-                        "End",
-                        "Period",
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
                         "Total",
                         "Rate [%]",
                         "Total Overlapping",

@@ -3,9 +3,8 @@ import os
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.base import resampling
-
 from tests.utils import *
+from vectorbtpro.base import resampling
 
 
 # ############# Global ############# #

@@ -2,19 +2,19 @@
 
 """Utilities for configuration."""
 
-import warnings
 import inspect
+import warnings
 from copy import copy, deepcopy
 from pathlib import Path
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.attr_ import MISSING
-from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
 from vectorbtpro.utils.caching import Cacheable
+from vectorbtpro.utils.chaining import Chainable
+from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
-from vectorbtpro.utils.chaining import Chainable
 
 __all__ = [
     "hdict",
@@ -460,7 +460,7 @@ class Config(pdict):
         readonly = _resolve_setting("readonly", False)
         nested = _resolve_setting("nested", True)
         convert_children = _resolve_setting("convert_children", False)
-        as_attrs = _resolve_setting("as_attrs", False)
+        as_attrs = _resolve_setting("as_attrs", frozen_keys or readonly)
         copy_kwargs = _resolve_setting(
             "copy_kwargs",
             dict(copy_mode="none", nested=nested),
@@ -972,7 +972,7 @@ class HasSettings:
             if path_id is not None:
                 raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
             else:
-                raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+                raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         setting_dicts = []
         for cls_, path in paths:
             path_settings = cls_.get_path_settings(path, sub_path=sub_path, sub_path_only=sub_path_only)
@@ -1068,7 +1068,7 @@ class HasSettings:
             if path_id is not None:
                 raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
             else:
-                raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+                raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         for cls_, path in paths:
             try:
                 return cls_.get_path_setting(path, key, sub_path=sub_path, sub_path_only=sub_path_only)
@@ -1088,12 +1088,12 @@ class HasSettings:
             else:
                 if sub_path is not None:
                     raise SettingNotFoundError(
-                        f"Found no key '{key}' under the settings associated with the class '{cls.__name__}' "
+                        f"Found no key '{key}' under the settings associated with the class {cls.__name__} "
                         f"and sub-path '{sub_path}'"
                     )
                 else:
                     raise SettingNotFoundError(
-                        f"Found no key '{key}' under the settings associated with the class '{cls.__name__}'"
+                        f"Found no key '{key}' under the settings associated with the class {cls.__name__}"
                     )
         return default
 
@@ -1150,17 +1150,18 @@ class HasSettings:
         If `sub_path` is provided, appends it to the resolved path and gives it more priority.
         If only the `sub_path` should be considered, set `sub_path_only` to True."""
         if merge:
-            return merge_dicts(
-                cls.get_setting(
-                    key,
-                    default=default,
-                    path_id=path_id,
-                    inherit=inherit,
-                    sub_path=sub_path,
-                    sub_path_only=sub_path_only,
-                ),
-                value,
+            setting = cls.get_setting(
+                key,
+                default=default,
+                path_id=path_id,
+                inherit=inherit,
+                sub_path=sub_path,
+                sub_path_only=sub_path_only,
             )
+            if setting is None or isinstance(setting, dict):
+                if value is None or isinstance(value, dict):
+                    return merge_dicts(setting, value)
+            return value
         if value is None:
             return cls.get_setting(
                 key,
@@ -1194,7 +1195,7 @@ class HasSettings:
         else:
             path = cls._settings_path
         if path is None:
-            raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+            raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         if sub_path is not None:
             path = combine_pathlike_keys(path, sub_path)
         cls_cfg = get_dict_item(settings, path, populate=populate_)
@@ -1227,7 +1228,7 @@ class HasSettings:
         else:
             path = cls._settings_path
         if path is None:
-            raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+            raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         if sub_path is not None:
             path = combine_pathlike_keys(path, sub_path)
         if not cls.has_path_settings(path):

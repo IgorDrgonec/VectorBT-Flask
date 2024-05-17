@@ -5,13 +5,13 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
+from vectorbtpro.portfolio.enums import SimulationOutput
+from vectorbtpro.records.chunking import merge_records
 from vectorbtpro.utils.chunking import ChunkMeta, ArraySlicer
 from vectorbtpro.utils.config import ReadonlyConfig
 from vectorbtpro.utils.template import Rep
-from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.merging import column_stack_arrays
-from vectorbtpro.portfolio.enums import SimulationOutput
-from vectorbtpro.records.chunking import merge_records
 
 __all__ = []
 
@@ -96,6 +96,14 @@ def merge_sim_outs(
         in_outputs = in_outputs_merge_func(results, chunk_meta, ann_args, mapper, **kwargs)
     else:
         in_outputs = None
+    if results[0].sim_start is not None:
+        sim_start = concat_arrays([r.sim_start for r in results])
+    else:
+        sim_start = None
+    if results[0].sim_end is not None:
+        sim_end = concat_arrays([r.sim_end for r in results])
+    else:
+        sim_end = None
     return SimulationOutput(
         order_records=order_records,
         log_records=log_records,
@@ -103,6 +111,8 @@ def merge_sim_outs(
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start,
+        sim_end=sim_end,
     )
 
 

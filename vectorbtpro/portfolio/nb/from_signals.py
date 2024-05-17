@@ -11,8 +11,8 @@ from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.from_order_func import no_post_func_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
-from vectorbtpro.signals.enums import StopType
 from vectorbtpro.returns.nb import get_return_nb
+from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.math_ import is_less_nb
@@ -360,6 +360,24 @@ def signal_to_size_nb(
     return order_size, size_type, direction
 
 
+@register_jitted(cache=True)
+def prepare_fs_records_nb(
+    target_shape: tp.Shape,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
+) -> tp.Tuple[tp.RecordArray2d, tp.RecordArray2d]:
+    """Prepare from-signals records."""
+    if max_order_records is None:
+        order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
+    else:
+        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
+    if max_log_records is None:
+        log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
+    else:
+        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
+    return order_records, log_records
+
+
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
@@ -419,7 +437,7 @@ def signal_to_size_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def from_basic_signals_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     open: tp.FlexArray2dLike = np.nan,
     high: tp.FlexArray2dLike = np.nan,
     low: tp.FlexArray2dLike = np.nan,
@@ -517,26 +535,13 @@ def from_basic_signals_nb(
     upon_opposite_entry_ = to_2d_array_nb(np.asarray(upon_opposite_entry))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-
-    if max_order_records is None:
-        order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
-    else:
-        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
-    if max_log_records is None:
-        log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
-    else:
-        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
+    order_records, log_records = prepare_fs_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
-
     last_cash = prepare_last_cash_nb(
         target_shape=target_shape,
         group_lens=group_lens,
@@ -611,19 +616,21 @@ def from_basic_signals_nb(
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+        _sim_start = sim_start_[group]
+        _sim_end = sim_end_[group]
         for i in range(_sim_start, _sim_end):
+
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
@@ -1061,7 +1068,14 @@ def from_basic_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    return prepare_simout_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -1070,6 +1084,8 @@ def from_basic_signals_nb(
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -1160,7 +1176,7 @@ def from_basic_signals_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def from_signals_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
     open: tp.FlexArray2dLike = np.nan,
@@ -1310,32 +1326,19 @@ def from_signals_nb(
     time_delta_format_ = to_2d_array_nb(np.asarray(time_delta_format))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-
     n_sl_steps = sl_stop_.shape[0]
     n_tsl_steps = tsl_stop_.shape[0]
     n_tp_steps = tp_stop_.shape[0]
     n_td_steps = td_stop_.shape[0]
     n_dt_steps = dt_stop_.shape[0]
 
-    if max_order_records is None:
-        order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
-    else:
-        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
-    if max_log_records is None:
-        log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
-    else:
-        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
+    order_records, log_records = prepare_fs_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
-
     last_cash = prepare_last_cash_nb(
         target_shape=target_shape,
         group_lens=group_lens,
@@ -1517,19 +1520,21 @@ def from_signals_nb(
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+        _sim_start = sim_start_[group]
+        _sim_end = sim_end_[group]
         for i in range(_sim_start, _sim_end):
+
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
@@ -2201,23 +2206,27 @@ def from_signals_nb(
                                 can_execute = True
                                 if _stop_order_type == OrderType.Limit:
                                     # Use close to check whether the limit price was hit
-                                    limit_price, _, can_execute = check_limit_hit_nb(
-                                        open=_open,
-                                        high=_high,
-                                        low=_low,
-                                        close=_close,
-                                        price=_price,
-                                        size=_size,
-                                        direction=_direction,
-                                        limit_delta=_limit_delta,
-                                        delta_format=_delta_format,
-                                        limit_reverse=False,
-                                        can_use_ohlc=stop_hit_on_open,
-                                        check_open=False,
-                                        hard_limit=False,
-                                    )
+                                    if _stop_exit_price == StopExitPrice.Close:
+                                        # Cannot place a limit order at the close price and execute right away
+                                        can_execute = False
                                     if can_execute:
-                                        _price = limit_price
+                                        limit_price, _, can_execute = check_limit_hit_nb(
+                                            open=_open,
+                                            high=_high,
+                                            low=_low,
+                                            close=_close,
+                                            price=_price,
+                                            size=_size,
+                                            direction=_direction,
+                                            limit_delta=_limit_delta,
+                                            delta_format=_delta_format,
+                                            limit_reverse=False,
+                                            can_use_ohlc=stop_hit_on_open,
+                                            check_open=False,
+                                            hard_limit=False,
+                                        )
+                                        if can_execute:
+                                            _price = limit_price
 
                                 # Save info
                                 exec_stop_set = True
@@ -3380,7 +3389,14 @@ def from_signals_nb(
             if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
-    return prepare_simout_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -3389,6 +3405,8 @@ def from_signals_nb(
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -3608,7 +3626,7 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 )
 def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
@@ -3763,32 +3781,19 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     time_delta_format_ = to_2d_array_nb(np.asarray(time_delta_format))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-
     n_sl_steps = sl_stop_.shape[0]
     n_tsl_steps = tsl_stop_.shape[0]
     n_tp_steps = tp_stop_.shape[0]
     n_td_steps = td_stop_.shape[0]
     n_dt_steps = dt_stop_.shape[0]
 
-    if max_order_records is None:
-        order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
-    else:
-        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
-    if max_log_records is None:
-        log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
-    else:
-        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
+    order_records, log_records = prepare_fs_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
-
     last_cash = prepare_last_cash_nb(
         target_shape=target_shape,
         group_lens=group_lens,
@@ -3947,19 +3952,21 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+        _sim_start = sim_start_[group]
+        _sim_end = sim_end_[group]
         for i in range(_sim_start, _sim_end):
+
             # Add cash
             if cash_sharing:
                 _cash_deposits = flex_select_nb(cash_deposits_, i, group)
@@ -4006,7 +4013,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         group_value += last_position[col] * last_val_price[col]
                     last_value[col] = group_value
                     last_return[col] = get_return_nb(
-                        input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
+                        input_value=prev_close_value[col],
+                        output_value=last_value[col] - last_cash_deposits[col],
                     )
 
             # Update open position stats
@@ -4056,6 +4064,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                     last_tp_info=last_tp_info,
                     last_td_info=last_td_info,
                     last_dt_info=last_dt_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -4164,7 +4174,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             group_value += last_position[col] * last_val_price[col]
                         last_value[col] = group_value
                         last_return[col] = get_return_nb(
-                            input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
+                            input_value=prev_close_value[col],
+                            output_value=last_value[col] - last_cash_deposits[col],
                         )
 
                 # Get size and value of each order
@@ -4740,23 +4751,27 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 can_execute = True
                                 if _stop_order_type == OrderType.Limit:
                                     # Use close to check whether the limit price was hit
-                                    limit_price, _, can_execute = check_limit_hit_nb(
-                                        open=_open,
-                                        high=_high,
-                                        low=_low,
-                                        close=_close,
-                                        price=_price,
-                                        size=_size,
-                                        direction=_direction,
-                                        limit_delta=_limit_delta,
-                                        delta_format=_delta_format,
-                                        limit_reverse=False,
-                                        can_use_ohlc=stop_hit_on_open,
-                                        check_open=False,
-                                        hard_limit=False,
-                                    )
+                                    if _stop_exit_price == StopExitPrice.Close:
+                                        # Cannot place a limit order at the close price and execute right away
+                                        can_execute = False
                                     if can_execute:
-                                        _price = limit_price
+                                        limit_price, _, can_execute = check_limit_hit_nb(
+                                            open=_open,
+                                            high=_high,
+                                            low=_low,
+                                            close=_close,
+                                            price=_price,
+                                            size=_size,
+                                            direction=_direction,
+                                            limit_delta=_limit_delta,
+                                            delta_format=_delta_format,
+                                            limit_reverse=False,
+                                            can_use_ohlc=stop_hit_on_open,
+                                            check_open=False,
+                                            hard_limit=False,
+                                        )
+                                        if can_execute:
+                                            _price = limit_price
 
                                 # Save info
                                 exec_stop_set = True
@@ -4933,7 +4948,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             keep_limit = False
                             keep_stop = False
                             execute_limit = True
-                            if exec_stop_set_on_close:
+                            if exec_limit_set_on_close:
                                 exec_limit_bar_zone = BarZone.Close
                             else:
                                 exec_limit_bar_zone = BarZone.Open
@@ -5946,6 +5961,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             last_tp_info=last_tp_info,
                             last_td_info=last_td_info,
                             last_dt_info=last_dt_info,
+                            sim_start=sim_start_,
+                            sim_end=sim_end_,
                             group=group,
                             group_len=group_len,
                             from_col=from_col,
@@ -6000,7 +6017,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         group_value += last_position[col] * last_val_price[col]
                     last_value[col] = group_value
                     last_return[col] = get_return_nb(
-                        input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
+                        input_value=prev_close_value[col],
+                        output_value=last_value[col] - last_cash_deposits[col],
                     )
                     prev_close_value[col] = last_value[col]
 
@@ -6047,6 +6065,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                 last_tp_info=last_tp_info,
                 last_td_info=last_td_info,
                 last_dt_info=last_dt_info,
+                sim_start=sim_start_,
+                sim_end=sim_end_,
                 group=group,
                 group_len=group_len,
                 from_col=from_col,
@@ -6055,7 +6075,17 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
             )
             post_segment_func_nb(post_segment_ctx, *post_segment_args)
 
-    return prepare_simout_nb(
+            if i >= sim_end_[group] - 1:
+                break
+
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -6064,6 +6094,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 

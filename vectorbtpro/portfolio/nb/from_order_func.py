@@ -16,9 +16,27 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.template import RepFunc
 
 
+@register_jitted(cache=True)
+def calc_group_value_nb(
+    from_col: int,
+    to_col: int,
+    cash_now: float,
+    last_position: tp.Array1d,
+    last_val_price: tp.Array1d,
+) -> float:
+    """Calculate group value."""
+    group_value = cash_now
+    group_len = to_col - from_col
+    for k in range(group_len):
+        col = from_col + k
+        if last_position[col] != 0:
+            group_value += last_position[col] * last_val_price[col]
+    return group_value
+
+
 @register_jitted
-def get_ctx_group_value_nb(seg_ctx: SegmentContext) -> float:
-    """Get group value from context.
+def calc_ctx_group_value_nb(seg_ctx: SegmentContext) -> float:
+    """Calculate group value from context.
 
     Accepts `vectorbtpro.portfolio.enums.SegmentContext`.
 
@@ -29,7 +47,7 @@ def get_ctx_group_value_nb(seg_ctx: SegmentContext) -> float:
         Cash sharing must be enabled."""
     if not seg_ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
-    return get_group_value_nb(
+    return calc_group_value_nb(
         seg_ctx.from_col,
         seg_ctx.to_col,
         seg_ctx.last_cash[seg_ctx.group],
@@ -67,7 +85,7 @@ def sort_call_seq_out_1d_nb(
     if not ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
 
-    group_value_now = get_ctx_group_value_nb(ctx)
+    group_value_now = calc_ctx_group_value_nb(ctx)
     group_len = ctx.to_col - ctx.from_col
     for c in range(group_len):
         if call_seq_out[c] != c:
@@ -133,7 +151,7 @@ def sort_call_seq_out_nb(
     if not ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
 
-    group_value_now = get_ctx_group_value_nb(ctx)
+    group_value_now = calc_ctx_group_value_nb(ctx)
     group_len = ctx.to_col - ctx.from_col
     for c in range(group_len):
         if call_seq_out[c] != c:
@@ -363,6 +381,7 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, tp.VarArg()], None]
 # % </skip>
 # % </block>
 
+
 # % <section from_order_func_nb>
 # % <uncomment>
 # import vectorbtpro as vbt
@@ -445,7 +464,7 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, tp.VarArg()], None]
 )
 def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
@@ -843,23 +862,26 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-
-    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
-    last_position = prepare_last_position_nb(target_shape, init_position_)
+    order_records, log_records = prepare_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
+    last_cash = prepare_last_cash_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
+    )
+    last_position = prepare_last_position_nb(
+        target_shape=target_shape,
+        init_position=init_position_,
+    )
     last_value = prepare_last_value_nb(
-        target_shape,
-        group_lens,
-        cash_sharing,
-        init_cash_,
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
         init_position=init_position_,
         init_price=init_price_,
     )
@@ -884,6 +906,12 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
 
     # Call function before the simulation
     pre_sim_ctx = SimulationContext(
@@ -911,7 +939,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -921,9 +951,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -958,7 +988,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -968,9 +1000,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -978,14 +1010,10 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         )
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+        _sim_start = sim_start_[group]
+        _sim_end = sim_end_[group]
         for i in range(_sim_start, _sim_end):
+
             if call_seq is None:
                 for c in range(group_len):
                     temp_call_seq[c] = c
@@ -1002,7 +1030,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -1052,7 +1080,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -1062,9 +1092,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -1090,7 +1120,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -1173,7 +1203,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -1183,9 +1215,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -1326,7 +1358,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -1336,9 +1370,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -1387,7 +1421,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -1444,7 +1478,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -1454,9 +1490,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -1465,6 +1501,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                     call_seq_now=call_seq_now,
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
+
+            if i >= sim_end_[group] - 1:
+                break
 
         # Call function after the group
         post_group_ctx = GroupContext(
@@ -1492,7 +1531,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -1502,9 +1543,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -1538,7 +1579,9 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -1548,13 +1591,20 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    return prepare_simout_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -1563,6 +1613,8 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         cash_earnings=cash_earnings_,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -1603,6 +1655,7 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
 # % </uncomment>
 # % </skip>
 # % </block>
+
 
 # % <section from_order_func_rw_nb>
 # % <uncomment>
@@ -1666,8 +1719,8 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
-        sim_start=None,
-        sim_end=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -1686,7 +1739,7 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
 )
 def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
@@ -1720,8 +1773,8 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
-    sim_start: tp.Optional[int] = None,
-    sim_end: tp.Optional[int] = None,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -1849,14 +1902,26 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
-    last_position = prepare_last_position_nb(target_shape, init_position_)
+    order_records, log_records = prepare_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
+    last_cash = prepare_last_cash_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
+    )
+    last_position = prepare_last_position_nb(
+        target_shape=target_shape,
+        init_position=init_position_,
+    )
     last_value = prepare_last_value_nb(
-        target_shape,
-        group_lens,
-        cash_sharing,
-        init_cash_,
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
         init_position=init_position_,
         init_price=init_price_,
     )
@@ -1881,6 +1946,12 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
 
     # Call function before the simulation
     pre_sim_ctx = SimulationContext(
@@ -1908,7 +1979,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -1918,25 +1991,14 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
-    if sim_start is None:
-        _sim_start = 0
-    else:
-        _sim_start = int(sim_start)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-    if sim_end is None:
-        _sim_end = target_shape[0]
-    else:
-        _sim_end = int(sim_end)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+    _sim_start = sim_start_.min()
+    _sim_end = sim_end_.max()
     for i in range(_sim_start, _sim_end):
 
         # Call function before the row
@@ -1965,7 +2027,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -1975,14 +2039,17 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             i=i,
         )
         pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
 
         for group in range(len(group_lens)):
+            if i < sim_start_[group] or i >= sim_end_[group]:
+                continue
+
             from_col = group_start_idxs[group]
             to_col = group_end_idxs[group]
             group_len = to_col - from_col
@@ -2003,7 +2070,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -2053,7 +2120,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -2063,9 +2132,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -2091,7 +2160,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -2174,7 +2243,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -2184,9 +2255,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -2327,7 +2398,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -2337,9 +2410,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -2388,7 +2461,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -2445,7 +2518,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -2455,9 +2530,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -2493,7 +2568,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -2503,12 +2580,20 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             i=i,
         )
         post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
+
+        sim_end_reached = True
+        for group in range(len(group_lens)):
+            if i < sim_end_[group] - 1:
+                sim_end_reached = False
+                break
+        if sim_end_reached:
+            break
 
     # Call function after the simulation
     post_sim_ctx = SimulationContext(
@@ -2536,7 +2621,9 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -2546,13 +2633,20 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    return prepare_simout_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -2561,6 +2655,8 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
         cash_earnings=cash_earnings_,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -2591,6 +2687,7 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
 # % </uncomment>
 # % </skip>
 # % </block>
+
 
 # % <section from_flex_order_func_nb>
 # % <uncomment>
@@ -2673,7 +2770,7 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
 )
 def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
@@ -2907,23 +3004,26 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    if sim_start is None:
-        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
-    else:
-        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
-    if sim_end is None:
-        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
-    else:
-        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
-
-    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
-    last_position = prepare_last_position_nb(target_shape, init_position_)
+    order_records, log_records = prepare_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
+    last_cash = prepare_last_cash_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
+    )
+    last_position = prepare_last_position_nb(
+        target_shape=target_shape,
+        init_position=init_position_,
+    )
     last_value = prepare_last_value_nb(
-        target_shape,
-        group_lens,
-        cash_sharing,
-        init_cash_,
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
         init_position=init_position_,
         init_price=init_price_,
     )
@@ -2946,6 +3046,12 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
 
     # Call function before the simulation
     pre_sim_ctx = SimulationContext(
@@ -2973,7 +3079,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -2983,9 +3091,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -3020,7 +3128,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -3030,9 +3140,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -3040,13 +3150,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         )
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
-        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+        _sim_start = sim_start_[group]
+        _sim_end = sim_end_[group]
         for i in range(_sim_start, _sim_end):
 
             if track_value:
@@ -3058,7 +3163,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -3108,7 +3213,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -3118,9 +3225,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -3146,7 +3253,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -3207,7 +3314,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -3217,9 +3326,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -3379,7 +3488,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -3389,9 +3500,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -3440,7 +3551,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -3497,7 +3608,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -3507,9 +3620,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -3518,6 +3631,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
                     call_seq_now=None,
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
+
+            if i >= sim_end_[group] - 1:
+                break
 
         # Call function after the group
         post_group_ctx = GroupContext(
@@ -3545,7 +3661,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -3555,9 +3673,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -3591,7 +3709,9 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -3601,13 +3721,20 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    return prepare_simout_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -3616,6 +3743,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         cash_earnings=cash_earnings_,
         call_seq=None,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 
@@ -3683,8 +3812,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
-        sim_start=None,
-        sim_end=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -3703,7 +3832,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 )
 def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb", new_func_name)
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
@@ -3736,8 +3865,8 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
-    sim_start: tp.Optional[int] = None,
-    sim_end: tp.Optional[int] = None,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -3812,14 +3941,26 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
-    last_position = prepare_last_position_nb(target_shape, init_position_)
+    order_records, log_records = prepare_records_nb(
+        target_shape=target_shape,
+        max_order_records=max_order_records,
+        max_log_records=max_log_records,
+    )
+    last_cash = prepare_last_cash_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
+    )
+    last_position = prepare_last_position_nb(
+        target_shape=target_shape,
+        init_position=init_position_,
+    )
     last_value = prepare_last_value_nb(
-        target_shape,
-        group_lens,
-        cash_sharing,
-        init_cash_,
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
         init_position=init_position_,
         init_price=init_price_,
     )
@@ -3842,6 +3983,12 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(target_shape[0], len(group_lens)),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
 
     # Call function before the simulation
     pre_sim_ctx = SimulationContext(
@@ -3869,7 +4016,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -3879,25 +4028,14 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
-    if sim_start is None:
-        _sim_start = 0
-    else:
-        _sim_start = int(sim_start)
-        if _sim_start < 0:
-            _sim_start = target_shape[0] + _sim_start
-    if sim_end is None:
-        _sim_end = target_shape[0]
-    else:
-        _sim_end = int(sim_end)
-        if _sim_end < 0:
-            _sim_end = target_shape[0] + _sim_end
-
+    _sim_start = sim_start_.min()
+    _sim_end = sim_end_.max()
     for i in range(_sim_start, _sim_end):
 
         # Call function before the row
@@ -3926,7 +4064,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -3936,14 +4076,17 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             i=i,
         )
         pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
 
         for group in range(len(group_lens)):
+            if i < sim_start_[group] or i >= sim_end_[group]:
+                continue
+
             from_col = group_start_idxs[group]
             to_col = group_end_idxs[group]
             group_len = to_col - from_col
@@ -3957,7 +4100,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -4007,7 +4150,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -4017,9 +4162,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -4045,7 +4190,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
             if track_value:
                 # Update value and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -4106,7 +4251,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -4116,9 +4263,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -4278,7 +4425,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                         fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
+                        order_counts=order_counts,
                         log_records=log_records,
+                        log_counts=log_counts,
                         in_outputs=in_outputs,
                         last_cash=last_cash,
                         last_position=last_position,
@@ -4288,9 +4437,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        order_counts=order_counts,
-                        log_counts=log_counts,
                         last_pos_info=last_pos_info,
+                        sim_start=sim_start_,
+                        sim_end=sim_end_,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -4339,7 +4488,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
                 # Update previous value, current value, and return
                 if cash_sharing:
-                    last_value[group] = get_group_value_nb(
+                    last_value[group] = calc_group_value_nb(
                         from_col,
                         to_col,
                         last_cash[group],
@@ -4396,7 +4545,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                     fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
+                    order_counts=order_counts,
                     log_records=log_records,
+                    log_counts=log_counts,
                     in_outputs=in_outputs,
                     last_cash=last_cash,
                     last_position=last_position,
@@ -4406,9 +4557,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    order_counts=order_counts,
-                    log_counts=log_counts,
                     last_pos_info=last_pos_info,
+                    sim_start=sim_start_,
+                    sim_end=sim_end_,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -4444,7 +4595,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
             fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
+            order_counts=order_counts,
             log_records=log_records,
+            log_counts=log_counts,
             in_outputs=in_outputs,
             last_cash=last_cash,
             last_position=last_position,
@@ -4454,12 +4607,20 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            order_counts=order_counts,
-            log_counts=log_counts,
             last_pos_info=last_pos_info,
+            sim_start=sim_start_,
+            sim_end=sim_end_,
             i=i,
         )
         post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
+
+        sim_end_reached = True
+        for group in range(len(group_lens)):
+            if i < sim_end_[group] - 1:
+                sim_end_reached = False
+                break
+        if sim_end_reached:
+            break
 
     # Call function after the simulation
     post_sim_ctx = SimulationContext(
@@ -4487,7 +4648,9 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
+        order_counts=order_counts,
         log_records=log_records,
+        log_counts=log_counts,
         in_outputs=in_outputs,
         last_cash=last_cash,
         last_position=last_position,
@@ -4497,13 +4660,20 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        order_counts=order_counts,
-        log_counts=log_counts,
         last_pos_info=last_pos_info,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
-    return prepare_simout_nb(
+    sim_start_out, sim_end_out = generic_nb.resolve_ungrouped_sim_range_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        sim_start=sim_start_,
+        sim_end=sim_end_,
+        allow_none=True,
+    )
+    return prepare_sim_out_nb(
         order_records=order_records,
         order_counts=order_counts,
         log_records=log_records,
@@ -4512,6 +4682,8 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         cash_earnings=cash_earnings_,
         call_seq=None,
         in_outputs=in_outputs,
+        sim_start=sim_start_out,
+        sim_end=sim_end_out,
     )
 
 

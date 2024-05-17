@@ -10,10 +10,10 @@ from functools import wraps, partial
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.pbar import get_pbar
-from vectorbtpro.data.custom.remote import RemoteData
+from vectorbtpro.utils.pbar import ProgressBar
 
 try:
     if not tp.TYPE_CHECKING:
@@ -126,6 +126,7 @@ class CCXTData(RemoteData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         exchange: tp.Union[None, str, CCXTExchangeT] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
     ) -> tp.List[str]:
@@ -141,7 +142,9 @@ class CCXTData(RemoteData):
                 if not cls.key_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        if sort:
+            return sorted(all_symbols)
+        return all_symbols
 
     @classmethod
     def resolve_exchange(
@@ -287,14 +290,14 @@ class CCXTData(RemoteData):
                 See `vectorbtpro.utils.datetime_.to_timezone`.
             find_earliest_date (bool): Whether to find the earliest date using `CCXTData.find_earliest_date`.
             limit (int): The maximum number of returned items.
-            delay (float): Time to sleep after each request (in milliseconds).
+            delay (float): Time to sleep after each request (in seconds).
 
                 !!! note
                     Use only if `enableRateLimit` is not set.
             retries (int): The number of retries on failure to fetch data.
             fetch_params (dict): Exchange-specific keyword arguments passed to `fetch_ohlcv`.
             show_progress (bool): Whether to show the progress bar.
-            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`.
             silence_warnings (bool): Whether to silence all warnings.
             return_fetch_method (bool): Required by `CCXTData.find_earliest_date`.
 
@@ -306,6 +309,7 @@ class CCXTData(RemoteData):
         assert_can_import("ccxt")
         import ccxt
 
+        exchange = cls.resolve_custom_setting(exchange, "exchange")
         if exchange is None and ":" in symbol:
             exchange, symbol = symbol.split(":")
         if exchange_config is None:
@@ -328,6 +332,8 @@ class CCXTData(RemoteData):
         )
         show_progress = cls.resolve_exchange_setting(show_progress, "show_progress", exchange_name=exchange_name)
         pbar_kwargs = cls.resolve_exchange_setting(pbar_kwargs, "pbar_kwargs", merge=True, exchange_name=exchange_name)
+        if "bar_id" not in pbar_kwargs:
+            pbar_kwargs["bar_id"] = "ccxt"
         silence_warnings = cls.resolve_exchange_setting(
             silence_warnings, "silence_warnings", exchange_name=exchange_name
         )
@@ -341,7 +347,9 @@ class CCXTData(RemoteData):
         split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "W":
+            if unit == "D":
+                unit = "d"
+            elif unit == "W":
                 unit = "w"
             elif unit == "Y":
                 unit = "y"
@@ -361,7 +369,7 @@ class CCXTData(RemoteData):
                         if not silence_warnings:
                             warnings.warn(traceback.format_exc(), stacklevel=2)
                         if delay is not None:
-                            time.sleep(delay / 1000)
+                            time.sleep(delay)
 
             return retry_method
 
@@ -393,8 +401,8 @@ class CCXTData(RemoteData):
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
-                return "/"
-            return str(pd.Timestamp(ts, unit="ms", tz="utc"))
+                return "?"
+            return dt.readable_datetime(pd.Timestamp(ts, unit="ms", tz="utc"), freq=timeframe)
 
         def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
             if start_ts is not None:
@@ -411,8 +419,8 @@ class CCXTData(RemoteData):
         # Iteratively collect the data
         data = []
         try:
-            with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts))
+            with ProgressBar(show_progress=show_progress, **pbar_kwargs) as pbar:
+                pbar.set_description("{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)
@@ -424,18 +432,13 @@ class CCXTData(RemoteData):
                     data += next_data
                     if start_ts is None:
                         start_ts = next_data[0][0]
-                    pbar.set_description(
-                        "{} - {}".format(
-                            _ts_to_str(start_ts),
-                            _ts_to_str(next_data[-1][0]),
-                        )
-                    )
-                    pbar.update(1)
+                    pbar.set_description("{} → {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
+                    pbar.update()
                     prev_end_ts = next_data[-1][0]
                     if end_ts is not None and prev_end_ts >= end_ts:
                         break
                     if delay is not None:
-                        time.sleep(delay / 1000)  # be kind to api
+                        time.sleep(delay)  # be kind to api
         except Exception as e:
             if not silence_warnings:
                 warnings.warn(traceback.format_exc(), stacklevel=2)

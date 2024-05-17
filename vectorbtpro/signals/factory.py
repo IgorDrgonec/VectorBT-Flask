@@ -51,7 +51,7 @@ class SignalFactory(IndicatorFactory):
         mode: tp.Union[str, int] = FactoryMode.Both,
         input_names: tp.Optional[tp.Sequence[str]] = None,
         attr_settings: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         mode = map_enum_fields(mode, FactoryMode)
         if input_names is None:
@@ -101,7 +101,7 @@ class SignalFactory(IndicatorFactory):
             entry_trace_kwargs: tp.KwargsLike = None,
             exit_trace_kwargs: tp.KwargsLike = None,
             fig: tp.Optional[tp.BaseFigure] = None,
-            **kwargs
+            **kwargs,
         ) -> tp.BaseFigure:
             self_col = _self.select_col(column=column, group_by=False)
             if entry_y is not None and isinstance(entry_y, str):
@@ -216,7 +216,7 @@ class SignalFactory(IndicatorFactory):
         exit_settings: tp.KwargsLike = None,
         cache_settings: tp.KwargsLike = None,
         jit_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.Type[IndicatorBase]:
         """Build signal generator class around entry and exit placement functions.
 
@@ -694,7 +694,7 @@ class SignalFactory(IndicatorFactory):
             return_cache: bool = False,
             use_cache: tp.Optional[CacheOutputT] = None,
             execute_kwargs: tp.KwargsLike = None,
-            **_kwargs
+            **_kwargs,
         ) -> tp.Union[CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             # Get arguments
             if len(input_list) == 0:

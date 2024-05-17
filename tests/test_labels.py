@@ -1,22 +1,11 @@
 import os
-from datetime import datetime
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 close = pd.DataFrame(
     {"a": [1, 2, 1, 2, 3, 2], "b": [3, 2, 3, 2, 1, 2]},
-    index=pd.Index(
-        [
-            datetime(2023, 1, 1),
-            datetime(2023, 1, 2),
-            datetime(2023, 1, 3),
-            datetime(2023, 1, 4),
-            datetime(2023, 1, 5),
-            datetime(2023, 1, 6),
-        ]
-    ),
+    index=pd.date_range("2023", periods=6),
 )
 
 up_ths = [np.array([[1, 1 / 2]]), np.array([[2, 1 / 2]]), np.array([[3, 1 / 2]])]

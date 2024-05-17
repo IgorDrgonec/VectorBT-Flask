@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import broadcast_array_to
+from vectorbtpro.data import nb
+from vectorbtpro.data.custom.synthetic import SyntheticData
+from vectorbtpro.ohlcv import nb as ohlcv_nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.base.reshaping import broadcast_array_to
-from vectorbtpro.ohlcv import nb as ohlcv_nb
-from vectorbtpro.data import nb
-from vectorbtpro.data.custom.synthetic import SyntheticData
 
 __all__ = [
     "GBMOHLCData",
@@ -59,7 +59,7 @@ class GBMOHLCData(SyntheticData):
             dt (float): Time change (one period of time).
             seed (int): Seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-            template_context (dict): Template context.
+            template_context (dict): Context used to substitute templates.
 
         For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
 

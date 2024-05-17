@@ -6,17 +6,15 @@ from functools import partial
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.annotations import get_annotations, Annotatable, Union
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.config import merge_dicts
 
 __all__ = [
     "MergeFunc",
 ]
 
 __pdoc__ = {}
-
 
 MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 

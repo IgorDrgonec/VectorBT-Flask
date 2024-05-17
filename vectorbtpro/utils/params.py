@@ -2,7 +2,6 @@
 
 """Utilities for working with parameters."""
 
-import math
 import inspect
 from collections import OrderedDict
 from collections.abc import Callable
@@ -14,15 +13,15 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import DefineMixin, define
-from vectorbtpro.utils.config import Config, Configured, merge_dicts
-from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.template import CustomTemplate, substitute_templates
-from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
-from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
 from vectorbtpro.utils.annotations import Annotatable, has_annotatables
+from vectorbtpro.utils.attr_ import DefineMixin, define
+from vectorbtpro.utils.config import FrozenConfig, Configured, merge_dicts
+from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
+from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
 from vectorbtpro.utils.search import find_in_obj, replace_in_obj
+from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
+from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 __all__ = [
     "generate_param_combs",
@@ -905,7 +904,46 @@ def combine_params(
 
 
 class Parameterizer(Configured):
-    """Class responsible for parameterizing and running a function."""
+    """Class responsible for parameterizing and running a function.
+
+    Does the following:
+
+    1. Searches for values wrapped with the class `Param` in any nested dicts and tuples
+    using `Parameterizer.find_params_in_obj`
+    2. Uses `combine_params` to build parameter combinations
+    3. Maps parameter combinations to configs using `Parameterizer.param_product_to_objs`
+    4. Generates and resolves parameter configs by combining combinations from the step above with
+    `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
+    5. If `selection` is not None, substitutes it as a template, translates it into indices that
+    can be mapped to `param_index`, and selects them from all the objects generated above.
+    6. Builds mono-chunks if `mono_n_chunks`, `mono_chunk_len`, or `mono_chunk_meta` is not None
+    7. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
+    8. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
+    9. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`
+
+    Argument `param_configs` accepts either a list of dictionaries with arguments named by their names
+    in the signature, or a dictionary of dictionaries, where keys are config names. If a list is passed,
+    each dictionary can also contain the key `_name` to give the config a name. Variable arguments
+    can be passed either in the rolled (`args=(...), kwargs={...}`) or unrolled
+    (`args_0=..., args_1=..., some_kwarg=...`) format.
+
+    !!! important
+        Defining a parameter and listing the same argument in `param_configs` will prioritize
+        the config over the parameter, even though the parameter will still be visible in the final columns.
+        There are no checks implemented to raise an error when this happens!
+
+    If mono-chunking is enabled, parameter configs will be distributed over chunks. Any argument that
+    is wrapped with `Param` or appears in `mono_merge_func` will be aggregated into a list. It will
+    be merged using either `Param.mono_merge_func` or `mono_merge_func` in the same way as `merge_func`.
+    If an argument satisfies neither of the above requirements and all its values within a chunk are same,
+    this value will be passed as a scalar. Arguments `mono_merge_func` and `mono_merge_kwargs`
+    must be dictionaries where keys are argument names in the flattened signature and values are
+    functions and keyword arguments respectively.
+
+    If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
+    remove it from the final index.
+
+    For defaults, see `vectorbtpro._settings.params`."""
 
     _settings_path: tp.SettingsPath = "params"
 
@@ -1006,33 +1044,33 @@ class Parameterizer(Configured):
         )
 
         self._func = func
-        self._param_search_kwargs = param_search_kwargs
-        self._skip_single_comb = skip_single_comb
-        self._template_context = template_context
-        self._build_grid = build_grid
-        self._grid_indices = grid_indices
-        self._random_subset = random_subset
-        self._random_replace = random_replace
-        self._random_sort = random_sort
-        self._max_guesses = max_guesses
-        self._max_misses = max_misses
-        self._seed = seed
-        self._clean_index_kwargs = clean_index_kwargs
-        self._name_tuple_to_str = name_tuple_to_str
-        self._merge_func = merge_func
-        self._merge_kwargs = merge_kwargs
-        self._selection = selection
-        self._forward_kwargs_as = forward_kwargs_as
-        self._mono_min_size = mono_min_size
-        self._mono_n_chunks = mono_n_chunks
-        self._mono_chunk_len = mono_chunk_len
-        self._mono_chunk_meta = mono_chunk_meta
-        self._mono_reduce = mono_reduce
-        self._mono_merge_func = mono_merge_func
-        self._mono_merge_kwargs = mono_merge_kwargs
-        self._return_meta = return_meta
-        self._return_param_index = return_param_index
-        self._execute_kwargs = execute_kwargs
+        self._param_search_kwargs = self.resolve_setting(param_search_kwargs, "param_search_kwargs", merge=True)
+        self._skip_single_comb = self.resolve_setting(skip_single_comb, "skip_single_comb")
+        self._template_context = self.resolve_setting(template_context, "template_context", merge=True)
+        self._build_grid = self.resolve_setting(build_grid, "build_grid")
+        self._grid_indices = self.resolve_setting(grid_indices, "grid_indices")
+        self._random_subset = self.resolve_setting(random_subset, "random_subset")
+        self._random_replace = self.resolve_setting(random_replace, "random_replace")
+        self._random_sort = self.resolve_setting(random_sort, "random_sort")
+        self._max_guesses = self.resolve_setting(max_guesses, "max_guesses")
+        self._max_misses = self.resolve_setting(max_misses, "max_misses")
+        self._seed = self.resolve_setting(seed, "seed")
+        self._clean_index_kwargs = self.resolve_setting(clean_index_kwargs, "clean_index_kwargs", merge=True)
+        self._name_tuple_to_str = self.resolve_setting(name_tuple_to_str, "name_tuple_to_str")
+        self._merge_func = self.resolve_setting(merge_func, "merge_func")
+        self._merge_kwargs = self.resolve_setting(merge_kwargs, "merge_kwargs", merge=True)
+        self._selection = self.resolve_setting(selection, "selection")
+        self._forward_kwargs_as = self.resolve_setting(forward_kwargs_as, "forward_kwargs_as", merge=True)
+        self._mono_min_size = self.resolve_setting(mono_min_size, "mono_min_size")
+        self._mono_n_chunks = self.resolve_setting(mono_n_chunks, "mono_n_chunks")
+        self._mono_chunk_len = self.resolve_setting(mono_chunk_len, "mono_chunk_len")
+        self._mono_chunk_meta = self.resolve_setting(mono_chunk_meta, "mono_chunk_meta")
+        self._mono_reduce = self.resolve_setting(mono_reduce, "mono_reduce")
+        self._mono_merge_func = self.resolve_setting(mono_merge_func, "mono_merge_func")
+        self._mono_merge_kwargs = self.resolve_setting(mono_merge_kwargs, "mono_merge_kwargs", merge=True)
+        self._return_meta = self.resolve_setting(return_meta, "return_meta")
+        self._return_param_index = self.resolve_setting(return_param_index, "return_param_index")
+        self._execute_kwargs = self.resolve_setting(execute_kwargs, "execute_kwargs", merge=True)
 
     @property
     def func(self) -> tp.Callable:
@@ -1040,17 +1078,17 @@ class Parameterizer(Configured):
         return self._func
 
     @property
-    def param_search_kwargs(self) -> tp.KwargsLike:
+    def param_search_kwargs(self) -> tp.Kwargs:
         """See `Parameterized.find_params_in_obj`."""
         return self._param_search_kwargs
 
     @property
-    def skip_single_comb(self) -> tp.Optional[bool]:
+    def skip_single_comb(self) -> bool:
         """Whether to execute the function directly if there's only one parameter combination."""
         return self._skip_single_comb
 
     @property
-    def template_context(self) -> tp.KwargsLike:
+    def template_context(self) -> tp.Kwargs:
         """Template context.
 
         Any template in both `execute_kwargs` and `merge_kwargs` will be substituted.
@@ -1075,12 +1113,12 @@ class Parameterizer(Configured):
         return self._random_subset
 
     @property
-    def random_replace(self) -> tp.Optional[bool]:
+    def random_replace(self) -> bool:
         """See `combine_params`."""
         return self._random_replace
 
     @property
-    def random_sort(self) -> tp.Optional[bool]:
+    def random_sort(self) -> bool:
         """See `combine_params`."""
         return self._random_sort
 
@@ -1100,12 +1138,12 @@ class Parameterizer(Configured):
         return self._seed
 
     @property
-    def clean_index_kwargs(self) -> tp.KwargsLike:
+    def clean_index_kwargs(self) -> tp.Kwargs:
         """See `combine_params`."""
         return self._clean_index_kwargs
 
     @property
-    def name_tuple_to_str(self) -> tp.Union[None, bool, tp.Callable]:
+    def name_tuple_to_str(self) -> tp.Union[bool, tp.Callable]:
         """See `combine_params`."""
         return self._name_tuple_to_str
 
@@ -1117,7 +1155,7 @@ class Parameterizer(Configured):
         return self._merge_func
 
     @property
-    def merge_kwargs(self) -> tp.KwargsLike:
+    def merge_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to the merging function.
 
         When defining a custom merging function, make sure to make use of `param_index`
@@ -1137,7 +1175,7 @@ class Parameterizer(Configured):
         return self._selection
 
     @property
-    def forward_kwargs_as(self) -> tp.KwargsLike:
+    def forward_kwargs_as(self) -> tp.Kwargs:
         """Map to rename keyword arguments.
 
         Can also pass any variable from the scope of `Parameterized.run`."""
@@ -1186,7 +1224,7 @@ class Parameterizer(Configured):
         return self._mono_merge_func
 
     @property
-    def mono_merge_kwargs(self) -> tp.KwargsLike:
+    def mono_merge_kwargs(self) -> tp.Kwargs:
         """See `Param.mono_merge_kwargs`.
 
         Can be a dictionary with a value per (unpacked) argument name. Otherwise,
@@ -1194,17 +1232,17 @@ class Parameterizer(Configured):
         return self._mono_merge_kwargs
 
     @property
-    def return_meta(self) -> tp.Optional[bool]:
+    def return_meta(self) -> bool:
         """Whether to return all the metadata generated before running the function."""
         return self._return_meta
 
     @property
-    def return_param_index(self) -> tp.Optional[bool]:
+    def return_param_index(self) -> bool:
         """Whether to return the results along with the parameter index (as a tuple)."""
         return self._return_param_index
 
     @property
-    def execute_kwargs(self) -> tp.KwargsLike:
+    def execute_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.execution.execute`."""
         return self._execute_kwargs
 
@@ -1523,47 +1561,7 @@ class Parameterizer(Configured):
         eval_id: tp.Optional[tp.Hashable] = None,
         **kwargs,
     ) -> tp.Any:
-        """Parameterize arguments and run the function.
-
-        Does the following:
-
-        1. Searches for values wrapped with the class `Param` in any nested dicts and tuples
-        using `Parameterizer.find_params_in_obj`
-        2. Uses `combine_params` to build parameter combinations
-        3. Maps parameter combinations to configs using `Parameterizer.param_product_to_objs`
-        4. Generates and resolves parameter configs by combining combinations from the step above with
-        `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
-        5. If `selection` is not None, substitutes it as a template, translates it into indices that
-        can be mapped to `param_index`, and selects them from all the objects generated above.
-        6. Builds mono-chunks if `mono_n_chunks`, `mono_chunk_len`, or `mono_chunk_meta` is not None
-        7. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
-        8. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
-        9. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`
-
-        Argument `param_configs` accepts either a list of dictionaries with arguments named by their names
-        in the signature, or a dictionary of dictionaries, where keys are config names. If a list is passed,
-        each dictionary can also contain the key `_name` to give the config a name. Variable arguments
-        can be passed either in the rolled (`args=(...), kwargs={...}`) or unrolled
-        (`args_0=..., args_1=..., some_kwarg=...`) format.
-
-        !!! important
-            Defining a parameter and listing the same argument in `param_configs` will prioritize
-            the config over the parameter, even though the parameter will still be visible in the final columns.
-            There are no checks implemented to raise an error when this happens!
-
-        If mono-chunking is enabled, parameter configs will be distributed over chunks. Any argument that
-        is wrapped with `Param` or appears in `mono_merge_func` will be aggregated into a list. It will
-        be merged using either `Param.mono_merge_func` or `mono_merge_func` in the same way as `merge_func`.
-        If an argument satisfies neither of the above requirements and all its values within a chunk are same,
-        this value will be passed as a scalar. Arguments `mono_merge_func` and `mono_merge_kwargs`
-        must be dictionaries where keys are argument names in the flattened signature and values are
-        functions and keyword arguments respectively.
-
-        If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
-        remove it from the final index.
-
-        For defaults, see `vectorbtpro._settings.params`.
-        """
+        """Parameterize arguments and run the function."""
         param_search_kwargs = self.resolve_setting(self.param_search_kwargs, "param_search_kwargs", merge=True)
         skip_single_comb = self.resolve_setting(self.skip_single_comb, "skip_single_comb")
         template_context = self.resolve_setting(self.template_context, "template_context", merge=True)
@@ -1800,9 +1798,14 @@ class Parameterizer(Configured):
                 funcs_args=template_context["funcs_args"],
             )
 
+        execute_kwargs = merge_dicts(
+            dict(show_progress=False if template_context["single_comb"] else None),
+            execute_kwargs,
+        )
         results = execute(
             template_context["funcs_args"],
-            n_calls=len(template_context["param_configs"]),
+            size=len(template_context["param_configs"]),
+            keys=template_context["param_index"],
             **execute_kwargs,
         )
 
@@ -1870,6 +1873,7 @@ def parameterized(
     return_meta: tp.Optional[bool] = None,
     return_param_index: tp.Optional[bool] = None,
     execute_kwargs: tp.KwargsLike = None,
+    merge_to_execute_kwargs: tp.Optional[bool] = None,
     eval_id: tp.Optional[tp.Hashable] = None,
     **kwargs,
 ) -> tp.Callable:
@@ -1880,7 +1884,8 @@ def parameterized(
     Each option can be modified in the `options` attribute of the wrapper function or
     directly passed as a keyword argument with a leading underscore.
 
-    Keyword arguments `**kwargs` are passed directly to `vectorbtpro.utils.execution.execute`.
+    Keyword arguments `**kwargs` and `execute_kwargs` are merged into `execute_kwargs`
+    if `merge_to_execute_kwargs` is True, otherwise, `**kwargs` are passed directly to `Parameterizer`.
 
     Usage:
         * No parameters, no parameter configs:
@@ -2031,6 +2036,17 @@ def parameterized(
 
         params_cfg = settings["params"]
 
+        if merge_to_execute_kwargs is None:
+            _merge_to_execute_kwargs = params_cfg["merge_to_execute_kwargs"]
+        else:
+            _merge_to_execute_kwargs = merge_to_execute_kwargs
+        if _merge_to_execute_kwargs:
+            _execute_kwargs = merge_dicts(kwargs, execute_kwargs)
+            _parameterizer_kwargs = {}
+        else:
+            _execute_kwargs = execute_kwargs
+            _parameterizer_kwargs = kwargs
+
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             def _resolve_key(key, merge=False):
@@ -2074,47 +2090,43 @@ def parameterized(
                 return_meta=_resolve_key("return_meta"),
                 return_param_index=_resolve_key("return_param_index"),
                 execute_kwargs=_resolve_key("execute_kwargs", merge=True),
+                **_resolve_key("parameterizer_kwargs", merge=True),
             ).run(*args, eval_id=eval_id, **kwargs)
 
         wrapper.func = func
         wrapper.name = func.__name__
         wrapper.is_parameterized = True
-        wrapper.options = Config(
-            dict(
-                parameterizer_cls=parameterizer_cls,
-                param_search_kwargs=param_search_kwargs,
-                skip_single_comb=skip_single_comb,
-                template_context=template_context,
-                build_grid=build_grid,
-                grid_indices=grid_indices,
-                random_subset=random_subset,
-                random_replace=random_replace,
-                random_sort=random_sort,
-                max_guesses=max_guesses,
-                max_misses=max_misses,
-                seed=seed,
-                clean_index_kwargs=clean_index_kwargs,
-                name_tuple_to_str=name_tuple_to_str,
-                merge_func=merge_func,
-                merge_kwargs=merge_kwargs,
-                selection=selection,
-                forward_kwargs_as=forward_kwargs_as,
-                mono_min_size=mono_min_size,
-                mono_n_chunks=mono_n_chunks,
-                mono_chunk_len=mono_chunk_len,
-                mono_chunk_meta=mono_chunk_meta,
-                mono_reduce=mono_reduce,
-                mono_merge_func=mono_merge_func,
-                mono_merge_kwargs=mono_merge_kwargs,
-                return_meta=return_meta,
-                return_param_index=return_param_index,
-                execute_kwargs=merge_dicts(kwargs, execute_kwargs),
-                eval_id=eval_id,
-            ),
-            options_=dict(
-                frozen_keys=True,
-                as_attrs=True,
-            ),
+        wrapper.options = FrozenConfig(
+            parameterizer_cls=parameterizer_cls,
+            parameterizer_kwargs=_parameterizer_kwargs,
+            param_search_kwargs=param_search_kwargs,
+            skip_single_comb=skip_single_comb,
+            template_context=template_context,
+            build_grid=build_grid,
+            grid_indices=grid_indices,
+            random_subset=random_subset,
+            random_replace=random_replace,
+            random_sort=random_sort,
+            max_guesses=max_guesses,
+            max_misses=max_misses,
+            seed=seed,
+            clean_index_kwargs=clean_index_kwargs,
+            name_tuple_to_str=name_tuple_to_str,
+            merge_func=merge_func,
+            merge_kwargs=merge_kwargs,
+            selection=selection,
+            forward_kwargs_as=forward_kwargs_as,
+            mono_min_size=mono_min_size,
+            mono_n_chunks=mono_n_chunks,
+            mono_chunk_len=mono_chunk_len,
+            mono_chunk_meta=mono_chunk_meta,
+            mono_reduce=mono_reduce,
+            mono_merge_func=mono_merge_func,
+            mono_merge_kwargs=mono_merge_kwargs,
+            return_meta=return_meta,
+            return_param_index=return_param_index,
+            execute_kwargs=_execute_kwargs,
+            eval_id=eval_id,
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False

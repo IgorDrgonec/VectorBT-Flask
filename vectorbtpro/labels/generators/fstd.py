@@ -1,10 +1,10 @@
 """Module with `FSTD`."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.generic import enums as generic_enums
+from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.labels import nb
+from vectorbtpro.utils.config import merge_dicts
 
 __all__ = [
     "FSTD",

@@ -3,9 +3,8 @@ import os
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.base import grouping
-
 from tests.utils import *
+from vectorbtpro.base import grouping
 
 
 # ############# Global ############# #

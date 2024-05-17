@@ -2,20 +2,21 @@
 
 """Utilities for working with class/instance attributes."""
 
-import attr
-from attr.exceptions import NotAnAttrsClassError
 import enum
-import re
 import inspect
+import re
 from collections.abc import Iterable
 from functools import cached_property as cachedproperty
 
+import attr
 import pandas as pd
+from attr.exceptions import NotAnAttrsClassError
 
+import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
+from vectorbtpro.utils.hashing import Hashable
 
 __all__ = [
     "MISSING",
@@ -39,7 +40,6 @@ class _Missing(enum.Enum):
 
 MISSING = _Missing.MISSING
 """Sentinel that represents a missing value."""
-
 
 DefineMixinT = tp.TypeVar("DefineMixinT", bound="DefineMixin")
 
@@ -463,8 +463,10 @@ class AttrResolverMixin:
         return deep_getattr(self, *args, **kwargs)
 
 
-def parse_attrs(obj: tp.Any, own_only: bool = False, sort_by: tp.Optional[str] = None) -> tp.Frame:
+def parse_attrs(obj: tp.Any = None, own_only: bool = False, sort_by: tp.Optional[str] = None) -> tp.Frame:
     """Parse attributes of a class, object, or a module, and return a DataFrame with types and paths."""
+    if obj is None:
+        obj = vbt
     if inspect.isclass(obj) or inspect.ismodule(obj):
         cls = obj
     else:

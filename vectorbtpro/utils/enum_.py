@@ -14,11 +14,7 @@ __all__ = [
 
 
 def map_enum_fields(
-    field: tp.Any,
-    enum: tp.Union[tp.NamedTuple, tp.EnumMeta],
-    enum_unkval: tp.Any = -1,
-    ignore_type=int,
-    **kwargs
+    field: tp.Any, enum: tp.Union[tp.NamedTuple, tp.EnumMeta], enum_unkval: tp.Any = -1, ignore_type=int, **kwargs
 ) -> tp.Any:
     """Map fields to values.
 
@@ -29,11 +25,7 @@ def map_enum_fields(
 
 
 def map_enum_values(
-    value: tp.Any,
-    enum: tp.Union[tp.NamedTuple, tp.EnumMeta],
-    enum_unkval: tp.Any = -1,
-    ignore_type=str,
-    **kwargs
+    value: tp.Any, enum: tp.Union[tp.NamedTuple, tp.EnumMeta], enum_unkval: tp.Any = -1, ignore_type=str, **kwargs
 ) -> tp.Any:
     """Map values to fields.
 

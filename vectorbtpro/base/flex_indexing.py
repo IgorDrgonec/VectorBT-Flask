@@ -2,8 +2,8 @@
 
 """Classes and functions for flexible indexing."""
 
-from vectorbtpro._settings import settings
 from vectorbtpro import _typing as tp
+from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = [
@@ -16,7 +16,6 @@ __all__ = [
     "flex_select_2d_row_nb",
     "flex_select_2d_col_nb",
 ]
-
 
 _rotate_rows = settings["indexing"]["rotate_rows"]
 _rotate_cols = settings["indexing"]["rotate_cols"]

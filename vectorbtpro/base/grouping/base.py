@@ -14,13 +14,13 @@ from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes
+from vectorbtpro.base.grouping import nb
+from vectorbtpro.base.indexes import ExceptLevel
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.array_ import is_sorted
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.decorators import cached_method
 from vectorbtpro.utils.template import CustomTemplate
-from vectorbtpro.base.grouping import nb
-from vectorbtpro.base.indexes import ExceptLevel
 
 __all__ = [
     "Grouper",

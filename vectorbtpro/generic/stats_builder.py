@@ -57,20 +57,20 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title="Start",
+            start_index=dict(
+                title="Start Index",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
                 tags="wrapper",
             ),
-            end=dict(
-                title="End",
+            end_index=dict(
+                title="End Index",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
                 tags="wrapper",
             ),
-            period=dict(
-                title="Period",
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -206,7 +206,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * Raises a warning if it's None but the result of calculation has multiple values
             dropna (bool): Whether to hide metrics that are all NaN.
             silence_warnings (bool): Whether to silence all warnings.
-            template_context (mapping): Global context to replace templates.
+            template_context (mapping): Context used to substitute templates.
 
                 Gets merged over `template_context` from `StatsBuilderMixin.stats_defaults`.
 
@@ -361,9 +361,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         # Check metric_settings
         missed_keys = set(metric_settings.keys()).difference(set(metrics_dct.keys()))
         if len(missed_keys) > 0:
-            raise ValueError(
-                f"Keys {missed_keys} in metric_settings could not be matched with any metric"
-            )
+            raise ValueError(f"Keys {missed_keys} in metric_settings could not be matched with any metric")
 
         # Merge settings
         opt_arg_names_dct = {}
@@ -407,9 +405,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     metrics_dct.pop(metric_name, None)
                     continue
 
-            custom_arg_names = set(_metric_settings.keys()).union(
-                set(passed_metric_settings.keys())
-            )
+            custom_arg_names = set(_metric_settings.keys()).union(set(passed_metric_settings.keys()))
             opt_arg_names = set(opt_settings.keys())
             custom_reself = reself.resolve_self(
                 cond_kwargs=merged_settings,
@@ -461,11 +457,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     if to_remove:
                         if to_check and warning_message is not None and not _silence_warnings:
                             warnings.warn(warning_message)
-                        if (
-                            inv_to_check
-                            and inv_warning_message is not None
-                            and not _silence_warnings
-                        ):
+                        if inv_to_check and inv_warning_message is not None and not _silence_warnings:
                             warnings.warn(inv_warning_message)
 
                         metrics_dct.pop(metric_name, None)
@@ -548,11 +540,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                 resolve_path_arg = _final_kwargs.pop("resolve_path_" + attr, True)
                                 if resolve_path_arg:
                                     if call_attr:
-                                        cond_kwargs = {
-                                            k: v
-                                            for k, v in _final_kwargs.items()
-                                            if k in _opt_arg_names
-                                        }
+                                        cond_kwargs = {k: v for k, v in _final_kwargs.items() if k in _opt_arg_names}
                                         out = custom_reself.resolve_attr(
                                             attr,  # do not pass _attr, important for caching
                                             args=args,

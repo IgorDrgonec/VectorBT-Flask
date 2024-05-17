@@ -5,13 +5,13 @@
 import numpy as np
 from numba import prange
 from numba.core.types import Type, Omitted
-from numba.np.numpy_support import as_dtype
 from numba.extending import overload
+from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_1d_pc_nb, flex_select_col_nb
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_col_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch

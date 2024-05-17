@@ -359,6 +359,7 @@ from vectorbtpro.utils.jitting import (
 from vectorbtpro.utils.template import RepEval, substitute_templates, CustomTemplate
 
 __all__ = [
+    "JITRegistry",
     "jit_reg",
     "register_jitted",
 ]
@@ -424,7 +425,7 @@ class JittedSetup(DefineMixin):
 
 
 class JITRegistry:
-    """Class that registers jitted functions."""
+    """Class for registering jitted functions."""
 
     def __init__(self) -> None:
         self._jitable_setups = {}

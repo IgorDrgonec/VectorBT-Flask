@@ -335,7 +335,7 @@ Get count and PnL of trades with duration of more than 2 days:
 ... ).get()
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> size = pd.DataFrame({
@@ -490,11 +490,11 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_pd_array, broadcast_to
 from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_pd_array, broadcast_to
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.generic.enums import range_dt
+from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbtpro.portfolio.orders import Orders
@@ -911,18 +911,17 @@ class Trades(Ranges):
         )
         if clean_index_kwargs is None:
             clean_index_kwargs = {}
-        new_columns = stack_indexes((
-            self.wrapper.columns[self.get_field_arr("col")],
-            pd.Index(self.get_field_arr("id"), name="id"),
-        ), **clean_index_kwargs)
+        new_columns = stack_indexes(
+            (
+                self.wrapper.columns[self.get_field_arr("col")],
+                pd.Index(self.get_field_arr("id"), name="id"),
+            ),
+            **clean_index_kwargs,
+        )
         if wrap_kwargs is None:
             wrap_kwargs = {}
         return self.wrapper.wrap(
-            out,
-            group_by=False,
-            index=pd.RangeIndex(stop=len(out)),
-            columns=new_columns,
-            **wrap_kwargs
+            out, group_by=False, index=pd.RangeIndex(stop=len(out)), columns=new_columns, **wrap_kwargs
         )
 
     def get_expanding_worst_price(
@@ -950,18 +949,17 @@ class Trades(Ranges):
         )
         if clean_index_kwargs is None:
             clean_index_kwargs = {}
-        new_columns = stack_indexes((
-            self.wrapper.columns[self.get_field_arr("col")],
-            pd.Index(self.get_field_arr("id"), name="id"),
-        ), **clean_index_kwargs)
+        new_columns = stack_indexes(
+            (
+                self.wrapper.columns[self.get_field_arr("col")],
+                pd.Index(self.get_field_arr("id"), name="id"),
+            ),
+            **clean_index_kwargs,
+        )
         if wrap_kwargs is None:
             wrap_kwargs = {}
         return self.wrapper.wrap(
-            out,
-            group_by=False,
-            index=pd.RangeIndex(stop=len(out)),
-            columns=new_columns,
-            **wrap_kwargs
+            out, group_by=False, index=pd.RangeIndex(stop=len(out)), columns=new_columns, **wrap_kwargs
         )
 
     def get_mfe(
@@ -1232,10 +1230,20 @@ class Trades(Ranges):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -2378,6 +2386,8 @@ class EntryTrades(Trades):
         close: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -2399,6 +2409,8 @@ class EntryTrades(Trades):
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
             init_price=to_1d_array(init_price),
+            sim_start=None if sim_start is None else to_1d_array(sim_start),
+            sim_end=None if sim_end is None else to_1d_array(sim_end),
         )
         return cls.from_records(
             orders.wrapper,
@@ -2611,6 +2623,8 @@ class ExitTrades(Trades):
         close: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -2632,6 +2646,8 @@ class ExitTrades(Trades):
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
             init_price=to_1d_array(init_price),
+            sim_start=None if sim_start is None else to_1d_array(sim_start),
+            sim_end=None if sim_end is None else to_1d_array(sim_end),
         )
         return cls.from_records(
             orders.wrapper,

@@ -2,22 +2,35 @@
 
 """Base class for splitting."""
 
-import warnings
-import math
 import inspect
+import math
+import warnings
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.accessors import BaseIDXAccessor
+from vectorbtpro.base.grouping.base import Grouper
+from vectorbtpro.base.indexes import combine_indexes, stack_indexes
+from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
+from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, is_merge_func_from_config
+from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.reshaping import to_dict
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic.splitting import nb
+from vectorbtpro.generic.splitting.purged import BasePurgedCV, PurgedWalkForwardCV, PurgedKFoldCV
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
+from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.array_ import is_range
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
 from vectorbtpro.utils.parsing import (
     get_func_arg_names,
     annotate_args,
@@ -25,26 +38,13 @@ from vectorbtpro.utils.parsing import (
     unflatten_ann_args,
     ann_args_to_args,
 )
-from vectorbtpro.utils.annotations import Annotatable, has_annotatables
-from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
-from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.selection import _NoResult, NoResultsException, PosSel, LabelSel
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
-from vectorbtpro.base.indexes import combine_indexes, stack_indexes
-from vectorbtpro.base.reshaping import to_dict
-from vectorbtpro.base.accessors import BaseIDXAccessor
-from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.grouping.base import Grouper
-from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, is_merge_func_from_config
-from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic.splitting import nb
-from vectorbtpro.generic.splitting.purged import BasePurgedCV, PurgedWalkForwardCV, PurgedKFoldCV
+from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 
 if tp.TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator as BaseCrossValidatorT
 else:
-    BaseCrossValidatorT = tp.Any
+    BaseCrossValidatorT = "BaseCrossValidator"
 
 __all__ = [
     "FixRange",
@@ -54,7 +54,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
 
 SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
 
@@ -336,6 +335,12 @@ class Takeable(Annotatable, DefineMixin):
         return True
 
 
+class ZeroLengthError(ValueError):
+    """Thrown whenever a range has a length of zero."""
+
+    pass
+
+
 class Splitter(Analyzable):
     """Base class for splitting."""
 
@@ -530,7 +535,7 @@ class Splitter(Analyzable):
                 Otherwise, will use `Splitter.split_range` to split the range into multiple ranges.
             split_range_kwargs (dict): Keyword arguments passed to `Splitter.split_range`.
             range_bounds_kwargs (dict): Keyword arguments passed to `Splitter.get_range_bounds`.
-            template_context (dict): Mapping used to substitute templates in ranges.
+            template_context (dict): Context used to substitute templates in ranges.
             freq (any): Index frequency in case it cannot be parsed from `index`.
 
                 If None, will be parsed using `vectorbtpro.base.accessors.BaseIDXAccessor.get_freq`.
@@ -1083,13 +1088,16 @@ class Splitter(Analyzable):
         for start, stop in zip(start_idxs, stop_idxs):
             new_split = slice(start, stop)
             if split is not None:
-                new_split = cls.split_range(
-                    new_split,
-                    split,
-                    template_context=template_context,
-                    index=index,
-                    **split_range_kwargs,
-                )
+                try:
+                    new_split = cls.split_range(
+                        new_split,
+                        split,
+                        template_context=template_context,
+                        index=index,
+                        **split_range_kwargs,
+                    )
+                except ZeroLengthError:
+                    continue
             splits.append(new_split)
 
         return cls.from_splits(
@@ -1161,13 +1169,16 @@ class Splitter(Analyzable):
         indices = []
         for i, new_split in enumerate(grouper.iter_group_idxs()):
             if split is not None:
-                new_split = cls.split_range(
-                    new_split,
-                    split,
-                    template_context=template_context,
-                    index=index,
-                    **split_range_kwargs,
-                )
+                try:
+                    new_split = cls.split_range(
+                        new_split,
+                        split,
+                        template_context=template_context,
+                        index=index,
+                        **split_range_kwargs,
+                    )
+                except ZeroLengthError:
+                    continue
             else:
                 new_split = [new_split]
             splits.append(new_split)
@@ -1763,41 +1774,38 @@ class Splitter(Analyzable):
         if _take_kwargs is None:
             _take_kwargs = {}
         if len(var_kwargs) > 0:
-            if len(splitter_kwargs) == 0 and len(take_kwargs) > 0:
-                splitter_kwargs = var_kwargs
-            elif len(splitter_kwargs) > 0 and len(take_kwargs) == 0:
-                take_kwargs = var_kwargs
-            elif len(splitter_kwargs) == 0 and len(take_kwargs) == 0:
-                if splitter is None or not isinstance(splitter, cls):
-                    take_arg_names = get_func_arg_names(cls.take)
-                    if splitter is not None:
-                        if isinstance(splitter, str):
-                            splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
-                        else:
-                            splitter_arg_names = get_func_arg_names(splitter)
-                        for k, v in var_kwargs.items():
-                            assigned = False
-                            if k in splitter_arg_names:
-                                splitter_kwargs[k] = v
-                                assigned = True
-                            if k != "split" and k in take_arg_names:
-                                take_kwargs[k] = v
-                                assigned = True
-                            if not assigned:
-                                raise ValueError(f"Argument '{k}' couldn't be assigned")
+            var_splitter_kwargs = {}
+            var_take_kwargs = {}
+            if splitter is None or not isinstance(splitter, cls):
+                take_arg_names = get_func_arg_names(cls.take)
+                if splitter is not None:
+                    if isinstance(splitter, str):
+                        splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
                     else:
-                        for k, v in var_kwargs.items():
-                            if k == "freq":
-                                splitter_kwargs[k] = v
-                                take_kwargs[k] = v
-                            elif k == "split" or k not in take_arg_names:
-                                splitter_kwargs[k] = v
-                            else:
-                                take_kwargs[k] = v
+                        splitter_arg_names = get_func_arg_names(splitter)
+                    for k, v in var_kwargs.items():
+                        assigned = False
+                        if k in splitter_arg_names:
+                            var_splitter_kwargs[k] = v
+                            assigned = True
+                        if k != "split" and k in take_arg_names:
+                            var_take_kwargs[k] = v
+                            assigned = True
+                        if not assigned:
+                            raise ValueError(f"Argument '{k}' couldn't be assigned")
                 else:
-                    take_kwargs = var_kwargs
+                    for k, v in var_kwargs.items():
+                        if k == "freq":
+                            var_splitter_kwargs[k] = v
+                            var_take_kwargs[k] = v
+                        elif k == "split" or k not in take_arg_names:
+                            var_splitter_kwargs[k] = v
+                        else:
+                            var_take_kwargs[k] = v
             else:
-                raise ValueError("Pass keyword arguments as splitter_kwargs or take_kwargs")
+                var_take_kwargs = var_kwargs
+            splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
+            take_kwargs = merge_dicts(var_take_kwargs, take_kwargs)
         if splitter is None:
             splitter = cls.guess_method(**splitter_kwargs)
         if splitter is None:
@@ -2265,7 +2273,7 @@ class Splitter(Analyzable):
             meta["stop"] = stop
             meta["length"] = stop - start
             if not allow_zero_len and meta["length"] == 0:
-                raise ValueError("Range has zero length")
+                raise ZeroLengthError("Range has zero length")
             if range_format.lower() == "indices":
                 range_ = np.arange(*range_.indices(len(index)))
             elif range_format.lower() == "mask":
@@ -2281,7 +2289,7 @@ class Splitter(Analyzable):
                 indices = np.flatnonzero(range_)
                 if len(indices) == 0:
                     if not allow_zero_len:
-                        raise ValueError("Range has zero length")
+                        raise ZeroLengthError("Range has zero length")
                     meta["is_constant"] = True
                     meta["start"] = 0
                     meta["stop"] = 0
@@ -2313,7 +2321,7 @@ class Splitter(Analyzable):
                     meta["was_indices"] = True
                     if len(range_) == 0:
                         if not allow_zero_len:
-                            raise ValueError("Range has zero length")
+                            raise ZeroLengthError("Range has zero length")
                         meta["is_constant"] = True
                         meta["start"] = 0
                         meta["stop"] = 0
@@ -3721,7 +3729,9 @@ class Splitter(Analyzable):
                         yield _get_func_args(i, j)
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_splits * n_sets, **execute_kwargs)
+            keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
+            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
             def _get_generator():
@@ -3730,7 +3740,9 @@ class Splitter(Analyzable):
                         yield _get_func_args(i, j)
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_splits * n_sets, **execute_kwargs)
+            keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
+            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
             def _process_chunk(chunk):
@@ -3747,7 +3759,8 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_splits, **execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_split else None), execute_kwargs)
+            results = execute(funcs_args, size=n_splits, keys=split_labels, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
             def _process_chunk(chunk):
@@ -3764,7 +3777,8 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_sets, **execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=False if one_set else None), execute_kwargs)
+            results = execute(funcs_args, size=n_sets, keys=set_labels, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 

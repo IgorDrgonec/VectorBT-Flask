@@ -91,7 +91,7 @@ class Gauge(Configured, TraceUpdater):
         add_trace_kwargs: tp.KwargsLike = None,
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a gauge plot.
 
@@ -133,7 +133,7 @@ class Gauge(Configured, TraceUpdater):
             add_trace_kwargs=add_trace_kwargs,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         from vectorbtpro._settings import settings
@@ -219,7 +219,7 @@ class Bar(Configured, TraceUpdater):
         add_trace_kwargs: tp.KwargsLike = None,
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a bar plot.
 
@@ -261,7 +261,7 @@ class Bar(Configured, TraceUpdater):
             add_trace_kwargs=add_trace_kwargs,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         if trace_kwargs is None:
@@ -329,7 +329,7 @@ class Scatter(Configured, TraceUpdater):
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         use_gl: tp.Optional[bool] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a scatter plot.
 
@@ -375,7 +375,7 @@ class Scatter(Configured, TraceUpdater):
             add_trace_kwargs=add_trace_kwargs,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         from vectorbtpro._settings import settings
@@ -475,7 +475,7 @@ class Histogram(Configured, TraceUpdater):
         add_trace_kwargs: tp.KwargsLike = None,
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a histogram plot.
 
@@ -526,7 +526,7 @@ class Histogram(Configured, TraceUpdater):
             add_trace_kwargs=add_trace_kwargs,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         if trace_kwargs is None:
@@ -660,7 +660,7 @@ class Box(Configured, TraceUpdater):
         add_trace_kwargs: tp.KwargsLike = None,
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a box plot.
 
@@ -692,7 +692,7 @@ class Box(Configured, TraceUpdater):
             add_trace_kwargs=add_trace_kwargs,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         if trace_kwargs is None:
@@ -820,7 +820,7 @@ class Heatmap(Configured, TraceUpdater):
         add_trace_kwargs: tp.KwargsLike = None,
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a heatmap plot.
 
@@ -862,7 +862,7 @@ class Heatmap(Configured, TraceUpdater):
             add_trace_kwargs=add_trace_kwargs,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         from vectorbtpro._settings import settings
@@ -950,7 +950,7 @@ class Volume(Configured, TraceUpdater):
         scene_name: str = "scene",
         make_figure_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> None:
         """Create a volume plot.
 
@@ -999,7 +999,7 @@ class Volume(Configured, TraceUpdater):
             scene_name=scene_name,
             make_figure_kwargs=make_figure_kwargs,
             fig=fig,
-            **layout_kwargs
+            **layout_kwargs,
         )
 
         from vectorbtpro._settings import settings

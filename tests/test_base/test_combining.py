@@ -4,9 +4,8 @@ import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-from vectorbtpro.base import combining, merging
-
 from tests.utils import *
+from vectorbtpro.base import combining, merging
 
 # Initialize global variables
 sr1 = pd.Series([1], index=pd.Index(["x1"], name="i1"), name="a1")

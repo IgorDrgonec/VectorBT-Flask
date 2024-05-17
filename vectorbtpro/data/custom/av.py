@@ -2,21 +2,21 @@
 
 """Module with `AVData`."""
 
+import re
+import urllib.parse
 import warnings
 from functools import lru_cache
-import re
-import requests
-import urllib.parse
 
 import numpy as np
 import pandas as pd
+import requests
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.module_ import check_installed
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.data.custom.remote import RemoteData
 
 try:
     if not tp.TYPE_CHECKING:
@@ -95,7 +95,7 @@ class AVData(RemoteData):
     _settings_path: tp.SettingsPath = dict(custom="data.custom.av")
 
     @classmethod
-    def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
+    def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None, sort: bool = True) -> tp.List[str]:
         """List all symbols."""
         apikey = cls.resolve_custom_setting(apikey, "apikey")
 
@@ -106,7 +106,9 @@ class AVData(RemoteData):
         query["apikey"] = apikey
         url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(query)
         df = pd.read_csv(url)
-        return sorted(df["symbol"].tolist())
+        if sort:
+            return sorted(df["symbol"].tolist())
+        return df["symbol"].tolist()
 
     @classmethod
     @lru_cache()
@@ -297,7 +299,7 @@ class AVData(RemoteData):
             elif unit == "h":
                 interval = str(60 * multiplier) + "min"
                 interval_type = "intraday"
-            elif unit == "d":
+            elif unit == "D":
                 interval = "daily"
                 interval_type = "daily"
             elif unit == "W":

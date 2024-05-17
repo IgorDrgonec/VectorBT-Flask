@@ -49,8 +49,10 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
         target_shape=ch.ShapeSlicer(axis=1),
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         col_map=base_ch.GroupMapSlicer(),
-        init_position=base_ch.FlexArraySlicer(),
         direction=None,
+        init_position=base_ch.FlexArraySlicer(),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
@@ -61,17 +63,29 @@ def asset_flow_nb(
     col_map: tp.GroupMap,
     direction: int = Direction.Both,
     init_position: tp.FlexArray1dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get asset flow series per column.
 
     Returns the total transacted amount of assets at each time step."""
     init_position_ = to_1d_array_nb(np.asarray(init_position))
 
+    out = np.full(target_shape, np.nan, dtype=np.float_)
+
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.full(target_shape, 0.0, dtype=np.float_)
-
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=target_shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        out[_sim_start:_sim_end, col] = 0.0
+        if _sim_start >= _sim_end:
+            continue
         col_len = col_lens[col]
         if col_len == 0:
             continue
@@ -80,6 +94,8 @@ def asset_flow_nb(
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
 
             if order_record["id"] < last_id:
                 raise ValueError("Ids must come in ascending order per column")
@@ -105,39 +121,473 @@ def asset_flow_nb(
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="asset_flow", axis=1),
-    arg_take_spec=dict(asset_flow=ch.ArraySlicer(axis=1), init_position=base_ch.FlexArraySlicer()),
+    arg_take_spec=dict(
+        asset_flow=ch.ArraySlicer(axis=1),
+        direction=None,
+        init_position=base_ch.FlexArraySlicer(),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def assets_nb(asset_flow: tp.Array2d, init_position: tp.FlexArray1dLike = 0.0) -> tp.Array2d:
+def assets_nb(
+    asset_flow: tp.Array2d,
+    direction: int = Direction.Both,
+    init_position: tp.FlexArray1dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
     """Get asset series per column.
 
     Returns the current position at each time step."""
     init_position_ = to_1d_array_nb(np.asarray(init_position))
 
-    out = np.empty_like(asset_flow)
+    out = np.full(asset_flow.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=asset_flow.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(asset_flow.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
         position_now = flex_select_1d_pc_nb(init_position_, col)
-        for i in range(asset_flow.shape[0]):
+
+        for i in range(_sim_start, _sim_end):
             flow_value = asset_flow[i, col]
             position_now = add_nb(position_now, flow_value)
-            out[i, col] = position_now
+            if direction == Direction.Both:
+                out[i, col] = position_now
+            elif direction == Direction.LongOnly and position_now > 0:
+                out[i, col] = position_now
+            elif direction == Direction.ShortOnly and position_now < 0:
+                out[i, col] = -position_now
+            else:
+                out[i, col] = 0.0
     return out
 
 
-@register_jitted(cache=True)
-def long_assets_nb(assets: tp.Array2d) -> tp.Array2d:
-    """Get long-only assets."""
-    return np.where(assets > 0, assets, 0.0)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="assets", axis=1),
+    arg_take_spec=dict(
+        assets=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def position_mask_nb(
+    assets: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get position mask per column."""
+    out = np.full(assets.shape, False, dtype=np.bool_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=assets.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(assets.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
+            if assets[i, col] != 0:
+                out[i, col] = True
+    return out
 
 
-@register_jitted(cache=True)
-def short_assets_nb(assets: tp.Array2d) -> tp.Array2d:
-    """Get short-only assets."""
-    return np.where(assets < 0, -assets, 0.0)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        assets=base_ch.array_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def position_mask_grouped_nb(
+    assets: tp.Array2d,
+    group_lens: tp.GroupLens,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get position mask per group."""
+    out = np.full((assets.shape[0], len(group_lens)), False, dtype=np.bool_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=assets.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+
+        for col in range(from_col, to_col):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
+                if not np.isnan(assets[i, col]) and assets[i, col] != 0:
+                    out[i, group] = True
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="assets", axis=1),
+    arg_take_spec=dict(
+        assets=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def position_coverage_nb(
+    assets: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array1d:
+    """Get position mask per column."""
+    out = np.full(assets.shape[1], 0.0, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=assets.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(assets.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+        hit_elements = 0
+
+        for i in range(_sim_start, _sim_end):
+            if assets[i, col] != 0:
+                hit_elements += 1
+
+        out[col] = hit_elements / (_sim_end - _sim_start)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        assets=base_ch.array_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        granular_groups=None,
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def position_coverage_grouped_nb(
+    assets: tp.Array2d,
+    group_lens: tp.GroupLens,
+    granular_groups: bool = False,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array1d:
+    """Get position coverage per group."""
+    out = np.full(len(group_lens), 0.0, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=assets.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+        n_elements = 0
+        hit_elements = 0
+
+        if granular_groups:
+            for col in range(from_col, to_col):
+                _sim_start = sim_start_[col]
+                _sim_end = sim_end_[col]
+                if _sim_start >= _sim_end:
+                    continue
+                n_elements += _sim_end - _sim_start
+
+                for i in range(_sim_start, _sim_end):
+                    if not np.isnan(assets[i, col]) and assets[i, col] != 0:
+                        hit_elements += 1
+        else:
+            min_sim_start = assets.shape[0]
+            max_sim_end = 0
+            for col in range(from_col, to_col):
+                _sim_start = sim_start_[col]
+                _sim_end = sim_end_[col]
+                if _sim_start >= _sim_end:
+                    continue
+                if _sim_start < min_sim_start:
+                    min_sim_start = _sim_start
+                if _sim_end > max_sim_end:
+                    max_sim_end = _sim_end
+            if min_sim_start >= max_sim_end:
+                continue
+            n_elements = max_sim_end - min_sim_start
+
+            for i in range(min_sim_start, max_sim_end):
+                for col in range(from_col, to_col):
+                    _sim_start = sim_start_[col]
+                    _sim_end = sim_end_[col]
+                    if _sim_start >= _sim_end:
+                        continue
+                    if not np.isnan(assets[i, col]) and assets[i, col] != 0:
+                        hit_elements += 1
+                        break
+
+        if n_elements == 0:
+            out[group] = np.nan
+        else:
+            out[group] = hit_elements / n_elements
+    return out
 
 
 # ############# Cash ############# #
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        target_shape=base_ch.shape_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        cash_sharing=None,
+        cash_deposits_raw=RepFunc(portfolio_ch.get_cash_deposits_slicer),
+        split_shared=None,
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def cash_deposits_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.GroupLens,
+    cash_sharing: bool,
+    cash_deposits_raw: tp.FlexArray2dLike = 0.0,
+    split_shared: bool = False,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get cash deposit series per column."""
+    cash_deposits_raw_ = to_2d_array_nb(np.asarray(cash_deposits_raw))
+
+    out = np.full(target_shape, np.nan, dtype=np.float_)
+
+    if not cash_sharing:
+        sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+            sim_shape=target_shape,
+            sim_start=sim_start,
+            sim_end=sim_end,
+        )
+        for col in prange(target_shape[1]):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
+                out[i, col] = flex_select_nb(cash_deposits_raw_, i, col)
+    else:
+        group_end_idxs = np.cumsum(group_lens)
+        group_start_idxs = group_end_idxs - group_lens
+        sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+            sim_shape=target_shape,
+            sim_start=sim_start,
+            sim_end=sim_end,
+        )
+        for group in prange(len(group_lens)):
+            from_col = group_start_idxs[group]
+            to_col = group_end_idxs[group]
+
+            for col in range(from_col, to_col):
+                _sim_start = sim_start_[col]
+                _sim_end = sim_end_[col]
+                if _sim_start >= _sim_end:
+                    continue
+
+                for i in range(_sim_start, _sim_end):
+                    _cash_deposits = flex_select_nb(cash_deposits_raw_, i, group)
+                    if split_shared:
+                        out[i, col] = _cash_deposits / (to_col - from_col)
+                    else:
+                        out[i, col] = _cash_deposits
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        target_shape=base_ch.shape_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        cash_sharing=None,
+        cash_deposits_raw=RepFunc(portfolio_ch.get_cash_deposits_slicer),
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def cash_deposits_grouped_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.GroupLens,
+    cash_sharing: bool,
+    cash_deposits_raw: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get cash deposit series per group."""
+    cash_deposits_raw_ = to_2d_array_nb(np.asarray(cash_deposits_raw))
+
+    out = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+
+    if cash_sharing:
+        sim_start_, sim_end_ = generic_nb.prepare_grouped_sim_range_nb(
+            target_shape=target_shape,
+            group_lens=group_lens,
+            sim_start=sim_start,
+            sim_end=sim_end,
+        )
+        for group in prange(len(group_lens)):
+            _sim_start = sim_start_[group]
+            _sim_end = sim_end_[group]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
+                out[i, group] = flex_select_nb(cash_deposits_raw_, i, group)
+    else:
+        group_end_idxs = np.cumsum(group_lens)
+        group_start_idxs = group_end_idxs - group_lens
+        sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+            sim_shape=target_shape,
+            sim_start=sim_start,
+            sim_end=sim_end,
+        )
+        for group in prange(len(group_lens)):
+            from_col = group_start_idxs[group]
+            to_col = group_end_idxs[group]
+
+            for col in range(from_col, to_col):
+                _sim_start = sim_start_[col]
+                _sim_end = sim_end_[col]
+                if _sim_start >= _sim_end:
+                    continue
+
+                for i in range(_sim_start, _sim_end):
+                    if np.isnan(out[i, group]):
+                        out[i, group] = 0.0
+                    out[i, group] += flex_select_nb(cash_deposits_raw_, i, col)
+    return out
+
+
+@register_chunkable(
+    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
+    arg_take_spec=dict(
+        target_shape=ch.ShapeSlicer(axis=1),
+        cash_earnings_raw=base_ch.FlexArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def cash_earnings_nb(
+    target_shape: tp.Shape,
+    cash_earnings_raw: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get cash earning series per column."""
+    cash_earnings_raw_ = to_2d_array_nb(np.asarray(cash_earnings_raw))
+
+    out = np.full(target_shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=target_shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(target_shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
+            out[i, col] = flex_select_nb(cash_earnings_raw_, i, col)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        target_shape=base_ch.shape_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        cash_earnings_raw=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def cash_earnings_grouped_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.GroupLens,
+    cash_earnings_raw: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get cash earning series per group."""
+    cash_earnings_raw_ = to_2d_array_nb(np.asarray(cash_earnings_raw))
+
+    out = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=target_shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+
+        for col in range(from_col, to_col):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
+                if np.isnan(out[i, group]):
+                    out[i, group] = 0.0
+                out[i, group] += flex_select_nb(cash_earnings_raw_, i, col)
+    return out
 
 
 @register_jitted(cache=True)
@@ -189,7 +639,9 @@ def get_free_cash_diff_nb(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         col_map=base_ch.GroupMapSlicer(),
         free=None,
-        cash_earnings=base_ch.FlexArraySlicer(axis=1),
+        cash_earnings_raw=base_ch.FlexArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
@@ -199,20 +651,30 @@ def cash_flow_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     free: bool = False,
-    cash_earnings: tp.FlexArray2dLike = 0.0,
+    cash_earnings_raw: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get (free) cash flow series per column."""
-    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+    out = cash_earnings_nb(
+        target_shape,
+        cash_earnings_raw=cash_earnings_raw,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
 
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.empty(target_shape, dtype=np.float_)
-
-    for col in prange(target_shape[1]):
-        for i in range(target_shape[0]):
-            out[i, col] = flex_select_nb(cash_earnings_, i, col)
-
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=target_shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
         col_len = col_lens[col]
         if col_len == 0:
             continue
@@ -222,6 +684,8 @@ def cash_flow_nb(
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
 
             if order_record["id"] < last_id:
                 raise ValueError("Ids must come in ascending order per column")
@@ -235,40 +699,65 @@ def cash_flow_nb(
 
             if side == OrderSide.Sell:
                 size *= -1
-            new_position_now = add_nb(position_now, size)
+            position_before = position_now
+            position_now = add_nb(position_now, size)
             if free:
-                debt_now, cash_flow = get_free_cash_diff_nb(position_now, new_position_now, debt_now, price, fees)
+                debt_now, cash_flow = get_free_cash_diff_nb(
+                    position_before=position_before,
+                    position_now=position_now,
+                    debt_now=debt_now,
+                    price=price,
+                    fees=fees,
+                )
             else:
                 cash_flow = -size * price - fees
             out[i, col] = add_nb(out[i, col], cash_flow)
-            position_now = new_position_now
     return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
-    arg_take_spec=dict(arr=base_ch.array_gl_slicer, group_lens=ch.ArraySlicer(axis=0)),
+    arg_take_spec=dict(
+        cash_flow=base_ch.array_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def sum_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
-    """Squeeze each group of columns into a single column using sum operation."""
-    check_group_lens_nb(group_lens, arr.shape[1])
-    out = np.empty((arr.shape[0], len(group_lens)), dtype=np.float_)
+def cash_flow_grouped_nb(
+    cash_flow: tp.Array2d,
+    group_lens: tp.GroupLens,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get (free) cash flow series per group."""
+    out = np.full((cash_flow.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
-
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=cash_flow.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
-        out[:, group] = np.sum(arr[:, from_col:to_col], axis=1)
+
+        for col in range(from_col, to_col):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
+                if np.isnan(out[i, group]):
+                    out[i, group] = 0.0
+                out[i, group] += cash_flow[i, col]
+
     return out
-
-
-@register_jitted(cache=True)
-def cash_flow_grouped_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
-    """Get cash flow series per group."""
-    return sum_grouped_nb(cash_flow, group_lens)
 
 
 @register_chunkable(
@@ -277,6 +766,8 @@ def cash_flow_grouped_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d) -> tp.Ar
         init_cash_raw=None,
         free_cash_flow=ch.ArraySlicer(axis=1),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="concat",
 )
@@ -285,58 +776,53 @@ def align_init_cash_nb(
     init_cash_raw: int,
     free_cash_flow: tp.Array2d,
     cash_deposits: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
-    """Align initial cash to the maximum negative free cash flow.
-
-    Adds 1 for easier computing returns."""
+    """Align initial cash to the maximum negative free cash flow per column or group."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty(free_cash_flow.shape[1], dtype=np.float_)
-    for col in range(free_cash_flow.shape[1]):
+    out = np.full(free_cash_flow.shape[1], np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=free_cash_flow.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(free_cash_flow.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
         free_cash = 0.0
         min_req_cash = np.inf
-        for i in range(free_cash_flow.shape[0]):
+
+        for i in range(_sim_start, _sim_end):
             free_cash = add_nb(free_cash, free_cash_flow[i, col])
             free_cash = add_nb(free_cash, flex_select_nb(cash_deposits_, i, col))
             if free_cash < min_req_cash:
                 min_req_cash = free_cash
+
         if min_req_cash < 0:
             out[col] = np.abs(min_req_cash)
         else:
             out[col] = 1.0
+
     if init_cash_raw == InitCashMode.AutoAlign:
         out = np.full(out.shape, np.max(out))
     return out
 
 
 @register_jitted(cache=True)
-def init_cash_grouped_nb(init_cash_raw: tp.FlexArray1d, group_lens: tp.Array1d, cash_sharing: bool) -> tp.Array1d:
-    """Get initial cash per group."""
-    out = np.empty(group_lens.shape, dtype=np.float_)
-    if cash_sharing:
-        for group in range(len(group_lens)):
-            out[group] = flex_select_1d_pc_nb(init_cash_raw, group)
-    else:
-        from_col = 0
-        for group in range(len(group_lens)):
-            to_col = from_col + group_lens[group]
-            cash_sum = 0.0
-            for col in range(from_col, to_col):
-                cash_sum += flex_select_1d_pc_nb(init_cash_raw, col)
-            out[group] = cash_sum
-            from_col = to_col
-    return out
-
-
-@register_jitted(cache=True)
 def init_cash_nb(
     init_cash_raw: tp.FlexArray1d,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     split_shared: bool = False,
 ) -> tp.Array1d:
     """Get initial cash per column."""
     out = np.empty(np.sum(group_lens), dtype=np.float_)
+
     if not cash_sharing:
         for col in range(out.shape[0]):
             out[col] = flex_select_1d_pc_nb(init_cash_raw, col)
@@ -355,81 +841,27 @@ def init_cash_nb(
     return out
 
 
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="group_lens", axis=0),
-    arg_take_spec=dict(
-        target_shape=base_ch.shape_gl_slicer,
-        cash_deposits_raw=RepFunc(portfolio_ch.get_cash_deposits_slicer),
-        group_lens=ch.ArraySlicer(axis=0),
-        cash_sharing=None,
-    ),
-    merge_func="column_stack",
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def cash_deposits_grouped_nb(
-    target_shape: tp.Shape,
-    cash_deposits_raw: tp.FlexArray2d,
-    group_lens: tp.Array1d,
+@register_jitted(cache=True)
+def init_cash_grouped_nb(
+    init_cash_raw: tp.FlexArray1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
-) -> tp.Array2d:
-    """Get cash deposit series per group."""
-    out = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
+) -> tp.Array1d:
+    """Get initial cash per group."""
+    out = np.empty(group_lens.shape, dtype=np.float_)
+
     if cash_sharing:
-        for group in prange(len(group_lens)):
-            for i in range(target_shape[0]):
-                out[i, group] = flex_select_nb(cash_deposits_raw, i, group)
+        for group in range(len(group_lens)):
+            out[group] = flex_select_1d_pc_nb(init_cash_raw, group)
     else:
-        group_end_idxs = np.cumsum(group_lens)
-        group_start_idxs = group_end_idxs - group_lens
-        for group in prange(len(group_lens)):
-            from_col = group_start_idxs[group]
-            to_col = group_end_idxs[group]
-            for i in range(target_shape[0]):
-                cash_sum = 0.0
-                for col in range(from_col, to_col):
-                    cash_sum += flex_select_nb(cash_deposits_raw, i, col)
-                out[i, group] = cash_sum
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="group_lens", axis=0),
-    arg_take_spec=dict(
-        target_shape=base_ch.shape_gl_slicer,
-        cash_deposits_raw=RepFunc(portfolio_ch.get_cash_deposits_slicer),
-        group_lens=ch.ArraySlicer(axis=0),
-        cash_sharing=None,
-        split_shared=None,
-    ),
-    merge_func="column_stack",
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def cash_deposits_nb(
-    target_shape: tp.Shape,
-    cash_deposits_raw: tp.FlexArray2d,
-    group_lens: tp.Array1d,
-    cash_sharing: bool,
-    split_shared: bool = False,
-) -> tp.Array2d:
-    """Get cash deposit series per column."""
-    out = np.empty(target_shape, dtype=np.float_)
-    if not cash_sharing:
-        for col in prange(target_shape[1]):
-            for i in range(target_shape[0]):
-                out[i, col] = flex_select_nb(cash_deposits_raw, i, col)
-    else:
-        group_end_idxs = np.cumsum(group_lens)
-        group_start_idxs = group_end_idxs - group_lens
-        for group in prange(len(group_lens)):
-            from_col = group_start_idxs[group]
-            to_col = group_end_idxs[group]
-            for i in range(target_shape[0]):
-                _cash_deposits = flex_select_nb(cash_deposits_raw, i, group)
-                for col in range(from_col, to_col):
-                    if split_shared:
-                        out[i, col] = _cash_deposits / (to_col - from_col)
-                    else:
-                        out[i, col] = _cash_deposits
+        from_col = 0
+        for group in range(len(group_lens)):
+            to_col = from_col + group_lens[group]
+            cash_sum = 0.0
+            for col in range(from_col, to_col):
+                cash_sum += flex_select_1d_pc_nb(init_cash_raw, col)
+            out[group] = cash_sum
+            from_col = to_col
     return out
 
 
@@ -439,6 +871,8 @@ def cash_deposits_nb(
         cash_flow=ch.ArraySlicer(axis=1),
         init_cash=base_ch.FlexArraySlicer(),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
@@ -447,55 +881,30 @@ def cash_nb(
     cash_flow: tp.Array2d,
     init_cash: tp.FlexArray1d,
     cash_deposits: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
-    """Get cash series per column."""
+    """Get cash series per column or group."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty_like(cash_flow)
+    out = np.full(cash_flow.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=cash_flow.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(cash_flow.shape[1]):
-        for i in range(cash_flow.shape[0]):
-            if i == 0:
-                cash_now = flex_select_1d_pc_nb(init_cash, col)
-            else:
-                cash_now = out[i - 1, col]
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+        cash_now = flex_select_1d_pc_nb(init_cash, col)
+
+        for i in range(_sim_start, _sim_end):
             cash_now = add_nb(cash_now, flex_select_nb(cash_deposits_, i, col))
             cash_now = add_nb(cash_now, cash_flow[i, col])
             out[i, col] = cash_now
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="group_lens", axis=0),
-    arg_take_spec=dict(
-        target_shape=base_ch.shape_gl_slicer,
-        cash_flow_grouped=ch.ArraySlicer(axis=1),
-        group_lens=ch.ArraySlicer(axis=0),
-        init_cash_grouped=base_ch.FlexArraySlicer(),
-        cash_deposits_grouped=base_ch.FlexArraySlicer(axis=1),
-    ),
-    merge_func="column_stack",
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def cash_grouped_nb(
-    target_shape: tp.Shape,
-    cash_flow_grouped: tp.Array2d,
-    group_lens: tp.Array1d,
-    init_cash_grouped: tp.FlexArray1d,
-    cash_deposits_grouped: tp.FlexArray2dLike = 0.0,
-) -> tp.Array2d:
-    """Get cash series per group."""
-    cash_deposits_grouped_ = to_2d_array_nb(np.asarray(cash_deposits_grouped))
-
-    check_group_lens_nb(group_lens, target_shape[1])
-    out = np.empty_like(cash_flow_grouped)
-
-    for group in prange(len(group_lens)):
-        cash_now = flex_select_1d_pc_nb(init_cash_grouped, group)
-        for i in range(cash_flow_grouped.shape[0]):
-            flow_value = cash_flow_grouped[i, group]
-            cash_now = add_nb(cash_now, flex_select_nb(cash_deposits_grouped_, i, group))
-            cash_now = add_nb(cash_now, flow_value)
-            out[i, group] = cash_now
     return out
 
 
@@ -513,6 +922,7 @@ def init_position_value_nb(
     init_price_ = to_1d_array_nb(np.asarray(init_price))
 
     out = np.empty(n_cols, dtype=np.float_)
+
     for col in range(n_cols):
         _init_position = float(flex_select_1d_pc_nb(init_position_, col))
         _init_price = float(flex_select_1d_pc_nb(init_price_, col))
@@ -524,47 +934,74 @@ def init_position_value_nb(
 
 
 @register_jitted(cache=True)
+def init_position_value_grouped_nb(
+    group_lens: tp.GroupLens,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+) -> tp.Array1d:
+    """Get initial position value per group."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
+    out = np.full(len(group_lens), 0.0, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+
+        for col in range(from_col, to_col):
+            _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+            _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+            if _init_position != 0:
+                out[group] += _init_position * _init_price
+    return out
+
+
+@register_jitted(cache=True)
 def init_value_nb(init_position_value: tp.Array1d, init_cash: tp.FlexArray1d) -> tp.Array1d:
-    """Get initial value per column."""
+    """Get initial value per column or group."""
     out = np.empty(len(init_position_value), dtype=np.float_)
+
     for col in range(len(init_position_value)):
         _init_cash = flex_select_1d_pc_nb(init_cash, col)
         out[col] = _init_cash + init_position_value[col]
     return out
 
 
-@register_jitted(cache=True)
-def init_value_grouped_nb(
-    group_lens: tp.Array1d,
-    init_position_value: tp.Array1d,
-    init_cash_grouped: tp.FlexArray1d,
-) -> tp.Array1d:
-    """Get initial value per group."""
-    check_group_lens_nb(group_lens, len(init_position_value))
-    out = np.empty(len(group_lens), dtype=np.float_)
-
-    from_col = 0
-    for group in range(len(group_lens)):
-        to_col = from_col + group_lens[group]
-        group_value = flex_select_1d_pc_nb(init_cash_grouped, group)
-        for col in range(from_col, to_col):
-            group_value += init_position_value[col]
-        out[group] = group_value
-        from_col = to_col
-    return out
-
-
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
-    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), assets=ch.ArraySlicer(axis=1)),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        assets=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def asset_value_nb(close: tp.Array2d, assets: tp.Array2d) -> tp.Array2d:
+def asset_value_nb(
+    close: tp.Array2d,
+    assets: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
     """Get asset value series per column."""
-    out = np.empty(close.shape, dtype=np.float_)
+    out = np.full(close.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=close.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(close.shape[1]):
-        for i in range(close.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
             if assets[i, col] == 0:
                 out[i, col] = 0.0
             else:
@@ -572,23 +1009,119 @@ def asset_value_nb(close: tp.Array2d, assets: tp.Array2d) -> tp.Array2d:
     return out
 
 
-@register_jitted(cache=True)
-def asset_value_grouped_nb(asset_value: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        asset_value=base_ch.array_gl_slicer,
+        group_lens=ch.ArraySlicer(axis=0),
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def asset_value_grouped_nb(
+    asset_value: tp.Array2d,
+    group_lens: tp.GroupLens,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
     """Get asset value series per group."""
-    return sum_grouped_nb(asset_value, group_lens)
+    out = np.full((asset_value.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=asset_value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+
+        for col in range(from_col, to_col):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
+                if np.isnan(out[i, group]):
+                    out[i, group] = 0.0
+                out[i, group] += asset_value[i, col]
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="cash", axis=1),
+    arg_take_spec=dict(
+        cash=ch.ArraySlicer(axis=1),
+        asset_value=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def value_nb(
+    cash: tp.Array2d,
+    asset_value: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get value series per column or group."""
+    out = np.full(cash.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=cash.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(cash.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
+            out[i, col] = cash[i, col] + asset_value[i, col]
+    return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="asset_value", axis=1),
-    arg_take_spec=dict(asset_value=ch.ArraySlicer(axis=1), value=ch.ArraySlicer(axis=1)),
+    arg_take_spec=dict(
+        asset_value=ch.ArraySlicer(axis=1),
+        value=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def gross_exposure_nb(asset_value: tp.Array2d, value: tp.Array2d) -> tp.Array2d:
-    """Get gross exposure per column/group."""
-    out = np.empty(asset_value.shape, dtype=np.float_)
+def gross_exposure_nb(
+    asset_value: tp.Array2d,
+    value: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get gross exposure series per column."""
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=asset_value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(asset_value.shape[1]):
-        for i in range(asset_value.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
             if value[i, col] == 0:
                 out[i, col] = np.nan
             else:
@@ -597,17 +1130,38 @@ def gross_exposure_nb(asset_value: tp.Array2d, value: tp.Array2d) -> tp.Array2d:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="cash", axis=1),
-    arg_take_spec=dict(cash=ch.ArraySlicer(axis=1), asset_value=ch.ArraySlicer(axis=1)),
+    size=ch.ArraySizer(arg_query="long_exposure", axis=1),
+    arg_take_spec=dict(
+        long_exposure=ch.ArraySlicer(axis=1),
+        short_exposure=ch.ArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
-    """Get portfolio value series per column/group."""
-    out = np.empty(cash.shape, dtype=np.float_)
-    for col in prange(cash.shape[1]):
-        for i in range(cash.shape[0]):
-            out[i, col] = cash[i, col] + asset_value[i, col]
+def net_exposure_nb(
+    long_exposure: tp.Array2d,
+    short_exposure: tp.Array2d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array2d:
+    """Get net exposure series per column."""
+    out = np.full(long_exposure.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=long_exposure.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(long_exposure.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
+            out[i, col] = long_exposure[i, col] - short_exposure[i, col]
     return out
 
 
@@ -617,6 +1171,8 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
         asset_value=base_ch.array_gl_slicer,
         value=ch.ArraySlicer(axis=1),
         group_lens=ch.ArraySlicer(axis=0),
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
     ),
     merge_func="column_stack",
 )
@@ -624,20 +1180,31 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
 def allocations_nb(
     asset_value: tp.Array2d,
     value: tp.Array2d,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get allocations per column."""
-    check_group_lens_nb(group_lens, asset_value.shape[1])
-    out = np.empty(asset_value.shape, dtype=np.float_)
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
+
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
-
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=asset_value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
 
-        for i in range(asset_value.shape[0]):
-            for col in range(from_col, to_col):
+        for col in range(from_col, to_col):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+
+            for i in range(_sim_start, _sim_end):
                 if value[i, group] == 0:
                     out[i, col] = np.nan
                 else:
@@ -655,6 +1222,8 @@ def allocations_nb(
         init_position=base_ch.FlexArraySlicer(),
         init_price=base_ch.FlexArraySlicer(),
         cash_earnings=base_ch.FlexArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="concat",
 )
@@ -667,6 +1236,8 @@ def total_profit_nb(
     init_position: tp.FlexArray1dLike = 0.0,
     init_price: tp.FlexArray1dLike = np.nan,
     cash_earnings: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """Get total profit per column.
 
@@ -675,31 +1246,46 @@ def total_profit_nb(
     init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
 
-    col_idxs, col_lens = col_map
-    col_start_idxs = np.cumsum(col_lens) - col_lens
     assets = np.full(target_shape[1], 0.0, dtype=np.float_)
     cash = np.full(target_shape[1], 0.0, dtype=np.float_)
-    zero_mask = np.full(target_shape[1], False, dtype=np.bool_)
+    total_profit = np.full(target_shape[1], np.nan, dtype=np.float_)
 
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=target_shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(target_shape[1]):
         _init_position = float(flex_select_1d_pc_nb(init_position_, col))
         _init_price = float(flex_select_1d_pc_nb(init_price_, col))
         if _init_position != 0:
             assets[col] = _init_position
             cash[col] = -_init_position * _init_price
-
-        for i in range(target_shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+        for i in range(_sim_start, _sim_end):
             cash[col] += flex_select_nb(cash_earnings_, i, col)
 
     for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
         col_len = col_lens[col]
         if col_len == 0:
-            zero_mask[col] = assets[col] == 0 and cash[col] == 0
+            if assets[col] == 0 and cash[col] == 0:
+                total_profit[col] = 0.0
             continue
         last_id = -1
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
 
             if order_record["id"] < last_id:
                 raise ValueError("Ids must come in ascending order per column")
@@ -721,15 +1307,13 @@ def total_profit_nb(
                 order_cash = order_record["size"] * order_record["price"] - order_record["fees"]
                 cash[col] = add_nb(cash[col], order_cash)
 
-    total_profit = cash + assets * close[-1, :]
-    total_profit[zero_mask] = 0.0
+        total_profit[col] = cash[col] + assets[col] * close[_sim_end - 1, col]
     return total_profit
 
 
 @register_jitted(cache=True)
-def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) -> tp.Array1d:
+def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.GroupLens) -> tp.Array1d:
     """Get total profit per group."""
-    check_group_lens_nb(group_lens, total_profit.shape[0])
     out = np.empty(len(group_lens), dtype=np.float_)
 
     from_col = 0
@@ -748,6 +1332,8 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         cash_deposits_as_input=None,
         log_returns=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
@@ -758,14 +1344,27 @@ def returns_nb(
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_deposits_as_input: bool = False,
     log_returns: bool = False,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
-    """Get return series per column/group."""
+    """Get return series per column or group."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty(value.shape, dtype=np.float_)
+    out = np.full(value.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(value.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
         input_value = flex_select_1d_pc_nb(init_value, col)
-        for i in range(value.shape[0]):
+
+        for i in range(_sim_start, _sim_end):
             _cash_deposits = flex_select_nb(cash_deposits_, i, col)
             output_value = value[i, col]
             if cash_deposits_as_input:
@@ -789,34 +1388,50 @@ def get_asset_pnl_nb(
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="init_position_value", axis=0),
+    size=ch.ArraySizer(arg_query="asset_value", axis=1),
     arg_take_spec=dict(
-        init_position_value=ch.ArraySlicer(axis=0),
         asset_value=ch.ArraySlicer(axis=1),
         cash_flow=ch.ArraySlicer(axis=1),
+        init_position_value=base_ch.FlexArraySlicer(axis=0),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def asset_pnl_nb(
-    init_position_value: tp.Array1d,
     asset_value: tp.Array2d,
     cash_flow: tp.Array2d,
+    init_position_value: tp.FlexArray1dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
-    """Get asset (realized and unrealized) PnL series per column/group."""
-    out = np.empty_like(cash_flow)
-    for col in prange(cash_flow.shape[1]):
-        for i in range(cash_flow.shape[0]):
-            if i == 0:
-                input_asset_value = 0.0
-                _cash_flow = cash_flow[i, col] - init_position_value[col]
+    """Get asset (realized and unrealized) PnL series per column or group."""
+    init_position_value_ = to_1d_array_nb(np.asarray(init_position_value))
+
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=asset_value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(asset_value.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+        _init_position_value = flex_select_1d_pc_nb(init_position_value_, col)
+
+        for i in range(_sim_start, _sim_end):
+            if i == _sim_start:
+                input_asset_value = _init_position_value
             else:
                 input_asset_value = asset_value[i - 1, col]
-                _cash_flow = cash_flow[i, col]
             out[i, col] = get_asset_pnl_nb(
                 input_asset_value,
                 asset_value[i, col],
-                _cash_flow,
+                cash_flow[i, col],
             )
     return out
 
@@ -845,36 +1460,52 @@ def get_asset_return_nb(
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="init_position_value", axis=0),
+    size=ch.ArraySizer(arg_query="asset_value", axis=1),
     arg_take_spec=dict(
-        init_position_value=ch.ArraySlicer(axis=0),
         asset_value=ch.ArraySlicer(axis=1),
         cash_flow=ch.ArraySlicer(axis=1),
+        init_position_value=base_ch.FlexArraySlicer(axis=0),
         log_returns=None,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def asset_returns_nb(
-    init_position_value: tp.Array1d,
     asset_value: tp.Array2d,
     cash_flow: tp.Array2d,
+    init_position_value: tp.FlexArray1dLike = 0.0,
     log_returns: bool = False,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
-    """Get asset return series per column/group."""
-    out = np.empty_like(cash_flow)
-    for col in prange(cash_flow.shape[1]):
-        for i in range(cash_flow.shape[0]):
-            if i == 0:
-                input_asset_value = 0.0
-                _cash_flow = cash_flow[i, col] - init_position_value[col]
+    """Get asset return series per column or group."""
+    init_position_value_ = to_1d_array_nb(np.asarray(init_position_value))
+
+    out = np.full(asset_value.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=asset_value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(asset_value.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+        _init_position_value = flex_select_1d_pc_nb(init_position_value_, col)
+
+        for i in range(_sim_start, _sim_end):
+            if i == _sim_start:
+                input_asset_value = _init_position_value
             else:
                 input_asset_value = asset_value[i - 1, col]
-                _cash_flow = cash_flow[i, col]
             out[i, col] = get_asset_return_nb(
                 input_asset_value,
                 asset_value[i, col],
-                _cash_flow,
+                cash_flow[i, col],
                 log_returns=log_returns,
             )
     return out
@@ -886,6 +1517,8 @@ def asset_returns_nb(
         close=ch.ArraySlicer(axis=1),
         init_value=base_ch.FlexArraySlicer(),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
     ),
     merge_func="column_stack",
 )
@@ -894,15 +1527,28 @@ def market_value_nb(
     close: tp.Array2d,
     init_value: tp.FlexArray1d,
     cash_deposits: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get market value per column."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    out = np.empty_like(close)
+    out = np.full(close.shape, np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=close.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for col in prange(close.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
         curr_value = flex_select_1d_pc_nb(init_value, col)
-        for i in range(close.shape[0]):
-            if i > 0:
+
+        for i in range(_sim_start, _sim_end):
+            if i > _sim_start:
                 curr_value *= close[i, col] / close[i - 1, col]
             curr_value += flex_select_nb(cash_deposits_, i, col)
             out[i, col] = curr_value
@@ -916,47 +1562,85 @@ def market_value_nb(
         group_lens=ch.ArraySlicer(axis=0),
         init_value=base_ch.FlexArraySlicer(mapper=base_ch.group_lens_mapper),
         cash_deposits=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
+        sim_start=base_ch.flex_1d_array_gl_slicer,
+        sim_end=base_ch.flex_1d_array_gl_slicer,
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def market_value_grouped_nb(
     close: tp.Array2d,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     init_value: tp.FlexArray1d,
     cash_deposits: tp.FlexArray2dLike = 0.0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get market value per group."""
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
 
-    check_group_lens_nb(group_lens, close.shape[1])
-    out = np.empty((close.shape[0], len(group_lens)), dtype=np.float_)
-    temp = np.empty(close.shape[1], dtype=np.float_)
-    last_value = np.empty(close.shape[1], dtype=np.float_)
+    out = np.full((close.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
-
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=close.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
     for group in prange(len(group_lens)):
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
 
-        for i in range(close.shape[0]):
-            for col in range(from_col, to_col):
-                if i == 0:
-                    temp[col] = flex_select_1d_pc_nb(init_value, col)
-                    last_value[col] = temp[col]
-                else:
+        for col in range(from_col, to_col):
+            _sim_start = sim_start_[col]
+            _sim_end = sim_end_[col]
+            if _sim_start >= _sim_end:
+                continue
+            curr_value = prev_value = flex_select_1d_pc_nb(init_value, col)
+
+            for i in range(_sim_start, _sim_end):
+                if i > _sim_start:
                     if not np.isnan(close[i - 1, col]):
                         prev_close = close[i - 1, col]
-                        last_value[col] = prev_close
+                        prev_value = prev_close
                     else:
-                        prev_close = last_value[col]
+                        prev_close = prev_value
                     if not np.isnan(close[i, col]):
-                        this_close = close[i, col]
-                        last_value[col] = this_close
+                        curr_close = close[i, col]
+                        prev_value = curr_close
                     else:
-                        this_close = last_value[col]
-                    temp[col] *= this_close / prev_close
-                temp[col] += flex_select_nb(cash_deposits_, i, col)
-            out[i, group] = np.sum(temp[from_col:to_col])
+                        curr_close = prev_value
+                    curr_value *= curr_close / prev_close
+                curr_value += flex_select_nb(cash_deposits_, i, col)
+                if np.isnan(out[i, group]):
+                    out[i, group] = 0.0
+                out[i, group] += curr_value
+    return out
+
+
+@register_jitted(cache=True)
+def total_market_return_nb(
+    market_value: tp.Array2d,
+    input_value: tp.FlexArray1d,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.Array1d:
+    """Get total market return per column or group."""
+    out = np.full(market_value.shape[1], np.nan, dtype=np.float_)
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=market_value.shape,
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in range(market_value.shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        _input_value = flex_select_1d_pc_nb(input_value, col)
+        if _input_value != 0:
+            out[col] = (market_value[_sim_end - 1, col] - _input_value) / _input_value
     return out

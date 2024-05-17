@@ -3,10 +3,9 @@ import os
 import pytest
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.base import indexes, indexing, flex_indexing, reshaping
 from vectorbtpro.utils import checks
-
-from tests.utils import *
 
 day_dt = np.timedelta64(86400000000000)
 
@@ -1525,66 +1524,42 @@ class TestIndexing:
         with pytest.raises(Exception):
             indexing.get_idxs(slice("2020-01-01", "2020-01-02"), dti, c, closed_start=False)
 
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("12:00", "14:00"), dti, c, closed_start=False, closed_end=False
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("12:00", "14:00"), dti, c, closed_start=False, closed_end=False)
         np.testing.assert_array_equal(row_idxs, np.array([13, 37]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("12:00", "14:00"), dti, c, closed_start=False, closed_end=True
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("12:00", "14:00"), dti, c, closed_start=False, closed_end=True)
         np.testing.assert_array_equal(row_idxs, np.array([13, 14, 37, 38]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("12:00", "14:00"), dti, c, closed_start=True, closed_end=False
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("12:00", "14:00"), dti, c, closed_start=True, closed_end=False)
         np.testing.assert_array_equal(row_idxs, np.array([12, 13, 36, 37]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("12:00", "14:00"), dti, c, closed_start=True, closed_end=True
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("12:00", "14:00"), dti, c, closed_start=True, closed_end=True)
         np.testing.assert_array_equal(row_idxs, np.array([12, 13, 14, 36, 37, 38]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("23:00", "01:00"), dti, c, closed_start=False, closed_end=False
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("23:00", "01:00"), dti, c, closed_start=False, closed_end=False)
         np.testing.assert_array_equal(row_idxs, np.array([0, 24, 48]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("23:00", "01:00"), dti, c, closed_start=False, closed_end=True
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("23:00", "01:00"), dti, c, closed_start=False, closed_end=True)
         np.testing.assert_array_equal(row_idxs, np.array([0, 1, 24, 25, 48]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("23:00", "01:00"), dti, c, closed_start=True, closed_end=False
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("23:00", "01:00"), dti, c, closed_start=True, closed_end=False)
         np.testing.assert_array_equal(row_idxs, np.array([0, 23, 24, 47, 48]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("23:00", "01:00"), dti, c, closed_start=True, closed_end=True
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("23:00", "01:00"), dti, c, closed_start=True, closed_end=True)
         np.testing.assert_array_equal(row_idxs, np.array([0, 1, 23, 24, 25, 47, 48]))
         assert col_idxs == slice(None, None, None)
 
         dti = pd.date_range("2020-01-01", "2020-01-03", freq="15min", tz="Europe/Berlin")
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=False
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=False)
         np.testing.assert_array_equal(row_idxs, np.array([59, 60, 61, 62, 155, 156, 157, 158]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=True
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=True)
         np.testing.assert_array_equal(row_idxs, np.array([59, 60, 61, 62, 63, 155, 156, 157, 158, 159]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("14:30", "15:45"), dti, c, closed_start=True, closed_end=False
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("14:30", "15:45"), dti, c, closed_start=True, closed_end=False)
         np.testing.assert_array_equal(row_idxs, np.array([58, 59, 60, 61, 62, 154, 155, 156, 157, 158]))
         assert col_idxs == slice(None, None, None)
-        row_idxs, col_idxs = indexing.get_idxs(
-            slice("14:30", "15:45"), dti, c, closed_start=True, closed_end=True
-        )
+        row_idxs, col_idxs = indexing.get_idxs(slice("14:30", "15:45"), dti, c, closed_start=True, closed_end=True)
         np.testing.assert_array_equal(row_idxs, np.array([58, 59, 60, 61, 62, 63, 154, 155, 156, 157, 158, 159]))
         assert col_idxs == slice(None, None, None)
 

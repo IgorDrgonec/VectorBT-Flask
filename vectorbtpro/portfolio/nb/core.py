@@ -1574,34 +1574,16 @@ def order_nothing_nb() -> Order:
 
 
 @register_jitted(cache=True)
-def check_group_lens_nb(group_lens: tp.Array1d, n_cols: int) -> None:
+def check_group_lens_nb(group_lens: tp.GroupLens, n_cols: int) -> None:
     """Check `group_lens`."""
     if np.sum(group_lens) != n_cols:
         raise ValueError("group_lens has incorrect total number of columns")
 
 
 @register_jitted(cache=True)
-def is_grouped_nb(group_lens: tp.Array1d) -> bool:
+def is_grouped_nb(group_lens: tp.GroupLens) -> bool:
     """Check if columm,ns are grouped, that is, more than one column per group."""
     return np.any(group_lens > 1)
-
-
-@register_jitted(cache=True)
-def get_group_value_nb(
-    from_col: int,
-    to_col: int,
-    cash_now: float,
-    last_position: tp.Array1d,
-    last_val_price: tp.Array1d,
-) -> float:
-    """Get group value."""
-    group_value = cash_now
-    group_len = to_col - from_col
-    for k in range(group_len):
-        col = from_col + k
-        if last_position[col] != 0:
-            group_value += last_position[col] * last_val_price[col]
-    return group_value
 
 
 @register_jitted(cache=True)
@@ -1625,7 +1607,7 @@ def prepare_records_nb(
 @register_jitted(cache=True)
 def prepare_last_cash_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1d,
 ) -> tp.Array1d:
@@ -1653,7 +1635,7 @@ def prepare_last_position_nb(target_shape: tp.Shape, init_position: tp.FlexArray
 @register_jitted(cache=True)
 def prepare_last_value_nb(
     target_shape: tp.Shape,
-    group_lens: tp.Array1d,
+    group_lens: tp.GroupLens,
     cash_sharing: bool,
     init_cash: tp.FlexArray1d,
     init_position: tp.FlexArray1d,
@@ -1724,7 +1706,7 @@ def prepare_last_pos_info_nb(
 
 
 @register_jitted
-def prepare_simout_nb(
+def prepare_sim_out_nb(
     order_records: tp.RecordArray2d,
     order_counts: tp.Array1d,
     log_records: tp.RecordArray2d,
@@ -1733,6 +1715,8 @@ def prepare_simout_nb(
     cash_earnings: tp.Array2d,
     call_seq: tp.Optional[tp.Array2d] = None,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
+    sim_start: tp.Optional[tp.Array1d] = None,
+    sim_end: tp.Optional[tp.Array1d] = None,
 ) -> SimulationOutput:
     """Prepare simulation output."""
     order_records_flat = generic_nb.repartition_nb(order_records, order_counts)
@@ -1744,6 +1728,8 @@ def prepare_simout_nb(
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,
+        sim_start=sim_start,
+        sim_end=sim_end,
     )
 
 

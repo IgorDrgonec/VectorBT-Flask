@@ -1,16 +1,12 @@
 import os
 from datetime import datetime
-from itertools import permutations
 
 import pytest
 from numba import njit
-from sklearn.model_selection import TimeSeriesSplit
 
 import vectorbtpro as vbt
-from vectorbtpro.generic import nb
-from vectorbtpro.generic import enums
-
 from tests.utils import *
+from vectorbtpro.generic import nb
 
 seed = 42
 
@@ -18,9 +14,7 @@ day_dt = np.timedelta64(86400000000000)
 
 df = pd.DataFrame(
     {"a": [1, 2, 3, 4, np.nan], "b": [np.nan, 4, 3, 2, 1], "c": [1, 2, np.nan, 2, 1]},
-    index=pd.DatetimeIndex(
-        [datetime(2018, 1, 1), datetime(2018, 1, 2), datetime(2018, 1, 3), datetime(2018, 1, 4), datetime(2018, 1, 5)],
-    ),
+    index=pd.date_range("2018", periods=5),
 )
 group_by = np.array(["g1", "g1", "g2"])
 
@@ -1144,7 +1138,11 @@ class TestAccessors:
                     [1.0, 0.19999999999999996, np.nan],
                     [np.nan, 0.19999999999999996, np.nan],
                 ],
-                index=pd.DatetimeIndex(["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"]),
+                index=pd.DatetimeIndex(
+                    ["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"],
+                    dtype="datetime64[ns]",
+                    freq="D",
+                ),
                 columns=pd.Index(["a", "b", "c"], dtype="object"),
             ),
         )
@@ -1158,7 +1156,11 @@ class TestAccessors:
                     [1.0, np.nan, np.nan],
                     [np.nan, 0.19999999999999996, np.nan],
                 ],
-                index=pd.DatetimeIndex(["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"]),
+                index=pd.DatetimeIndex(
+                    ["2018-01-01", "2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"],
+                    dtype="datetime64[ns]",
+                    freq="D",
+                ),
                 columns=pd.Index(["a", "b", "c"], dtype="object"),
             ),
         )
@@ -1760,11 +1762,11 @@ class TestAccessors:
                     [1.0, -np.inf, -1.0],
                     [0.0, np.nan, 0.0],
                     [-1.0, np.inf, 1.0],
-                    [0.816497, -np.inf, -0.816497],
-                    [-0.816497, np.inf, 0.816497],
+                    [0.8164965809277261, -np.inf, -0.8164965809277261],
+                    [-0.8164965809277261, np.inf, 0.8164965809277261],
                 ],
                 index=df.index,
-                columns=df.columns
+                columns=df.columns,
             ),
         )
 
@@ -3883,7 +3885,19 @@ class TestAccessors:
 
     def test_stats(self):
         stats_index = pd.Index(
-            ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max", "Min Index", "Max Index"],
+            [
+                "Start Index",
+                "End Index",
+                "Total Duration",
+                "Count",
+                "Mean",
+                "Std",
+                "Min",
+                "Median",
+                "Max",
+                "Min Index",
+                "Max Index",
+            ],
             dtype="object",
         )
         assert_series_equal(
@@ -3963,9 +3977,9 @@ class TestAccessors:
         mapping = {x: "test_" + str(x) for x in pd.unique(df.values.flatten())}
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Value Counts: test_1.0",
                 "Value Counts: test_2.0",
                 "Value Counts: test_3.0",

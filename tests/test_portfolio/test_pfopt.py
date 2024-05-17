@@ -1,13 +1,12 @@
 import os
-import pytest
 
+import pytest
 from numba import njit
 
 import vectorbtpro as vbt
 import vectorbtpro.portfolio.pfopt.base as pfopt
-from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
-
 from tests.utils import *
+from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
 
 pypfopt_available = True
 try:
@@ -24,6 +23,7 @@ try:
     import universal
 except:
     universal_available = False
+
 
 # ############# Global ############# #
 
@@ -701,303 +701,354 @@ class TestPyPortfolioOpt:
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns)),
-                pd.Series({
-                    "A": 0.12676800514501807,
-                    "B": 0.4760327891840394,
-                    "C": 7.2644261969418e-10,
-                    "D": 0.3971992047740059,
-                    "E": 1.7049415731580372e-10,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.12676800514501807,
+                        "B": 0.4760327891840394,
+                        "C": 7.2644261969418e-10,
+                        "D": 0.3971992047740059,
+                        "E": 1.7049415731580372e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns, factors=factor_returns, model="FM")),
-                pd.Series({
-                    "A": 0.1267680051458212,
-                    "B": 0.4760327891836326,
-                    "C": 7.264414768832996e-10,
-                    "D": 0.3971992047736109,
-                    "E": 1.704938888482468e-10,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.1267680051458212,
+                        "B": 0.4760327891836326,
+                        "C": 7.264414768832996e-10,
+                        "D": 0.3971992047736109,
+                        "E": 1.704938888482468e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    factors=factor_returns,
-                    model="FM",
-                    stats_methods=["assets_stats", "factors_stats"],
-                )),
-                pd.Series({
-                    "A": 0.1267680051458212,
-                    "B": 0.4760327891836326,
-                    "C": 7.264414768832996e-10,
-                    "D": 0.3971992047736109,
-                    "E": 1.704938888482468e-10,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        factors=factor_returns,
+                        model="FM",
+                        stats_methods=["assets_stats", "factors_stats"],
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.1267680051458212,
+                        "B": 0.4760327891836326,
+                        "C": 7.264414768832996e-10,
+                        "D": 0.3971992047736109,
+                        "E": 1.704938888482468e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    factors=factor_returns,
-                    func_kwargs=dict(
-                        assets_stats=dict(),
-                        factors_stats=dict(),
-                        optimization=dict(model="FM"),
-                    ),
-                )),
-                pd.Series({
-                    "A": 0.1267680051458212,
-                    "B": 0.4760327891836326,
-                    "C": 7.264414768832996e-10,
-                    "D": 0.3971992047736109,
-                    "E": 1.704938888482468e-10,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        factors=factor_returns,
+                        func_kwargs=dict(
+                            assets_stats=dict(),
+                            factors_stats=dict(),
+                            optimization=dict(model="FM"),
+                        ),
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.1267680051458212,
+                        "B": 0.4760327891836326,
+                        "C": 7.264414768832996e-10,
+                        "D": 0.3971992047736109,
+                        "E": 1.704938888482468e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    factors=factor_returns,
-                    func_kwargs=dict(
-                        optimization=dict(model="FM"),
-                    ),
-                )),
-                pd.Series({
-                    "A": 0.1267680051458212,
-                    "B": 0.4760327891836326,
-                    "C": 7.264414768832996e-10,
-                    "D": 0.3971992047736109,
-                    "E": 1.704938888482468e-10,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        factors=factor_returns,
+                        func_kwargs=dict(
+                            optimization=dict(model="FM"),
+                        ),
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.1267680051458212,
+                        "B": 0.4760327891836326,
+                        "C": 7.264414768832996e-10,
+                        "D": 0.3971992047736109,
+                        "E": 1.704938888482468e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns, method_mu="hist", method_cov="hist", d=0.94)),
-                pd.Series({
-                    "A": 0.12676800514501807,
-                    "B": 0.4760327891840394,
-                    "C": 7.2644261969418e-10,
-                    "D": 0.3971992047740059,
-                    "E": 1.7049415731580372e-10,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.12676800514501807,
+                        "B": 0.4760327891840394,
+                        "C": 7.2644261969418e-10,
+                        "D": 0.3971992047740059,
+                        "E": 1.7049415731580372e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns, port_cls="HCPortfolio")),
-                pd.Series({
-                    "A": 0.19369278873359128,
-                    "B": 0.20238981440998197,
-                    "C": 0.20942969908552786,
-                    "D": 0.19933866749954113,
-                    "E": 0.19514903027135774,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.19369278873359128,
+                        "B": 0.20238981440998197,
+                        "C": 0.20942969908552786,
+                        "D": 0.19933866749954113,
+                        "E": 0.19514903027135774,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns, port_cls=rp.HCPortfolio)),
-                pd.Series({
-                    "A": 0.19369278873359128,
-                    "B": 0.20238981440998197,
-                    "C": 0.20942969908552786,
-                    "D": 0.19933866749954113,
-                    "E": 0.19514903027135774,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.19369278873359128,
+                        "B": 0.20238981440998197,
+                        "C": 0.20942969908552786,
+                        "D": 0.19933866749954113,
+                        "E": 0.19514903027135774,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns, opt_method="rp")),
-                pd.Series({
-                    "A": 0.22652553527275376,
-                    "B": 0.20225103853474868,
-                    "C": 0.21538322980670396,
-                    "D": 0.1744225679341509,
-                    "E": 0.18141762845164283,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.22652553527275376,
+                        "B": 0.20225103853474868,
+                        "C": 0.21538322980670396,
+                        "D": 0.1744225679341509,
+                        "E": 0.18141762845164283,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(longer_returns, opt_method="rrp")),
-                pd.Series({
-                    "A": 0.22652582481582162,
-                    "B": 0.2022516322803447,
-                    "C": 0.2153823193787835,
-                    "D": 0.17442220639910935,
-                    "E": 0.18141801712594077,
-                }),
+                pd.Series(
+                    {
+                        "A": 0.22652582481582162,
+                        "B": 0.2022516322803447,
+                        "C": 0.2153823193787835,
+                        "D": 0.17442220639910935,
+                        "E": 0.18141801712594077,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(longer_returns, opt_method="owa")),
-                pd.Series({
-                    "A": 0.13634806044544748,
-                    "B": 0.46540649778161475,
-                    "C": 1.0038802647286919e-12,
-                    "D": 0.39824544177166576,
-                    "E": 2.6807396988462483e-13,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns, constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)]
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.09999988709015002,
+                        "B": 0.4869261339374733,
+                        "C": 1.6951444542121246e-08,
+                        "D": 0.4130739578334771,
+                        "E": 4.187455131058068e-09,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns, constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)]
-                )),
-                pd.Series({
-                    "A": 0.09999988709015002,
-                    "B": 0.4869261339374733,
-                    "C": 1.6951444542121246e-08,
-                    "D": 0.4130739578334771,
-                    "E": 4.187455131058068e-09,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                        constraints=[dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Weight=0.2)],
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 2.7553253657466047e-09,
+                        "B": 0.1999999954418845,
+                        "C": 1.3301654710792048e-08,
+                        "D": 0.7999999875008236,
+                        "E": 1.0003118168811534e-09,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    asset_classes=["C1", "C1", "C2", "C2", "C3"],
-                    constraints=[dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Weight=0.2)],
-                )),
-                pd.Series({
-                    "A": 2.7553253657466047e-09,
-                    "B": 0.1999999954418845,
-                    "C": 1.3301654710792048e-08,
-                    "D": 0.7999999875008236,
-                    "E": 1.0003118168811534e-09,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        asset_classes=pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class"),
+                        constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 2.7553253657466047e-09,
+                        "B": 0.1999999954418845,
+                        "C": 1.3301654710792048e-08,
+                        "D": 0.7999999875008236,
+                        "E": 1.0003118168811534e-09,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    asset_classes=pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class"),
-                    constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
-                )),
-                pd.Series({
-                    "A": 2.7553253657466047e-09,
-                    "B": 0.1999999954418845,
-                    "C": 1.3301654710792048e-08,
-                    "D": 0.7999999875008236,
-                    "E": 1.0003118168811534e-09,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns.vbt.add_levels(pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class")),
+                        constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
+                    )
+                ),
+                pd.Series(
+                    {
+                        ("C1", "A"): 2.7553253657466047e-09,
+                        ("C1", "B"): 0.1999999954418845,
+                        ("C2", "C"): 1.3301654710792048e-08,
+                        ("C2", "D"): 0.7999999875008236,
+                        ("C3", "E"): 1.0003118168811534e-09,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns.vbt.add_levels(pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class")),
-                    constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
-                )),
-                pd.Series({
-                    ("C1", "A"): 2.7553253657466047e-09,
-                    ("C1", "B"): 0.1999999954418845,
-                    ("C2", "C"): 1.3301654710792048e-08,
-                    ("C2", "D"): 0.7999999875008236,
-                    ("C3", "E"): 1.0003118168811534e-09,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        factors=factor_returns,
+                        model="FM",
+                        constraints=[dict(Factor="F", Sign="<=", Value=0.5)],
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.12677262060399214,
+                        "B": 0.47603049596901686,
+                        "C": 1.7644613667926323e-10,
+                        "D": 0.3971968832083084,
+                        "E": 4.223652304226146e-11,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    factors=factor_returns,
-                    model="FM",
-                    constraints=[dict(Factor="F", Sign="<=", Value=0.5)],
-                )),
-                pd.Series({
-                    "A": 0.12677262060399214,
-                    "B": 0.47603049596901686,
-                    "C": 1.7644613667926323e-10,
-                    "D": 0.3971968832083084,
-                    "E": 4.223652304226146e-11,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        port_cls="HCPortfolio",
+                        constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)],
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.1,
+                        "B": 0.20238981440998197,
+                        "C": 0.20942969908552786,
+                        "D": 0.29303145623313237,
+                        "E": 0.19514903027135774,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    port_cls="HCPortfolio",
-                    constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)],
-                )),
-                pd.Series({
-                    "A": 0.1,
-                    "B": 0.20238981440998197,
-                    "C": 0.20942969908552786,
-                    "D": 0.29303145623313237,
-                    "E": 0.19514903027135774,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        model="BL",
+                        asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                        views=[
+                            dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
+                            dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
+                        ],
+                        freq="1d",
+                        year_freq="252d",
+                        delta=None,
+                        eq=True,
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.19028479017478658,
+                        "B": 0.1964263445744196,
+                        "C": 0.3316412298128069,
+                        "D": 0.2816476353359129,
+                        "E": 1.0207392238984308e-10,
+                    }
+                ),
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    model="BL",
-                    asset_classes=["C1", "C1", "C2", "C2", "C3"],
-                    views=[
-                        dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
-                        dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
-                    ],
-                    freq="1d",
-                    year_freq="252d",
-                    delta=None,
-                    eq=True,
-                )),
-                pd.Series({
-                    "A": 0.19028479017478658,
-                    "B": 0.1964263445744196,
-                    "C": 0.3316412298128069,
-                    "D": 0.2816476353359129,
-                    "E": 1.0207392238984308e-10,
-                }),
-                atol=1e-4,
-            )
-            assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    pre_opt=True,
-                    pre_opt_as_w=True,
-                    model="BL",
-                    asset_classes=["C1", "C1", "C2", "C2", "C3"],
-                    views=[
-                        dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
-                        dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
-                    ],
-                    freq="1d",
-                    year_freq="252d",
-                    delta=None,
-                    eq=True,
-                )),
-                pd.Series({
-                    "A": 0.027579416662377298,
-                    "B": 0.485577412107038,
-                    "C": 1.6032254651302998e-08,
-                    "D": 0.4860571855320755,
-                    "E": 0.0007859696662543658,
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        pre_opt=True,
+                        pre_opt_as_w=True,
+                        model="BL",
+                        asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                        views=[
+                            dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
+                            dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
+                        ],
+                        freq="1d",
+                        year_freq="252d",
+                        delta=None,
+                        eq=True,
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.027579416662377298,
+                        "B": 0.485577412107038,
+                        "C": 1.6032254651302998e-08,
+                        "D": 0.4860571855320755,
+                        "E": 0.0007859696662543658,
+                    }
+                ),
                 atol=1e-4,
             )
             longer_returns.iloc[:, 2] = np.nan
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns,
-                    pre_opt=True,
-                    pre_opt_as_w=True,
-                    model="BL",
-                    asset_classes=["C1", "C1", "C2", "C2", "C3"],
-                    views=[
-                        dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
-                        dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
-                    ],
-                    freq="1d",
-                    year_freq="252d",
-                    delta=None,
-                    eq=True,
-                )),
-                pd.Series({
-                   "A": 0.021150803146091784,
-                   "B": 0.5705920585309042,
-                   "D": 0.40819158602138167,
-                   "E": 6.55523016224704e-05
-                }),
+                pd.Series(
+                    pfopt.riskfolio_optimize(
+                        longer_returns,
+                        pre_opt=True,
+                        pre_opt_as_w=True,
+                        model="BL",
+                        asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                        views=[
+                            dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
+                            dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
+                        ],
+                        freq="1d",
+                        year_freq="252d",
+                        delta=None,
+                        eq=True,
+                    )
+                ),
+                pd.Series(
+                    {
+                        "A": 0.021150803146091784,
+                        "B": 0.5705920585309042,
+                        "D": 0.40819158602138167,
+                        "E": 6.55523016224704e-05,
+                    }
+                ),
                 atol=1e-4,
             )
 
@@ -1554,18 +1605,21 @@ class TestPortfolioOptimizer:
         assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
             pfo.alloc_records.values,
-            np.array([
-                (0, 0, 0),
-                (1, 0, 1),
-                (2, 0, 2),
-                (3, 0, 3),
-                (4, 0, 4),
-                (0, 1, 0),
-                (1, 1, 1),
-                (2, 1, 2),
-                (3, 1, 3),
-                (4, 1, 4),
-            ], dtype=alloc_point_dt),
+            np.array(
+                [
+                    (0, 0, 0),
+                    (1, 0, 1),
+                    (2, 0, 2),
+                    (3, 0, 3),
+                    (4, 0, 4),
+                    (0, 1, 0),
+                    (1, 1, 1),
+                    (2, 1, 2),
+                    (3, 1, 3),
+                    (4, 1, 4),
+                ],
+                dtype=alloc_point_dt,
+            ),
         )
         np.testing.assert_array_equal(
             pfo._allocations,
@@ -2053,9 +2107,9 @@ class TestPortfolioOptimizer:
         )
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Mean Allocation: XOM",
                 "Mean Allocation: RRC",
@@ -2116,9 +2170,9 @@ class TestPortfolioOptimizer:
         )
         stats_index = pd.Index(
             [
-                "Start",
-                "End",
-                "Period",
+                "Start Index",
+                "End Index",
+                "Total Duration",
                 "Total Records",
                 "Coverage",
                 "Overlap Coverage",

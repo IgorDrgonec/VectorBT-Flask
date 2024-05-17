@@ -3,27 +3,28 @@
 """Module with `TVData`."""
 
 import datetime
+import json
+import math
 import random
 import re
 import string
+import time
+
 import pandas as pd
 import requests
-import json
-import time
 from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.remote import RemoteData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Configured
-from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.template import CustomTemplate
-from vectorbtpro.data.custom.remote import RemoteData
 
 __all__ = [
     "TVClient",
     "TVData",
 ]
-
 
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
 """Sign-in URL."""
@@ -304,7 +305,7 @@ class TVClient(Configured):
         """Process raw data into a DataFrame."""
         search_result = re.search(r'"s":\[(.+?)\}\]', raw_data)
         if search_result is None:
-            raise ValueError("Couldn't parse data returned by TradingView")
+            raise ValueError("Couldn't parse data returned by TradingView: {}".format(raw_data))
         out = search_result.group(1)
         x = out.split(',{"')
         data = list()
@@ -413,7 +414,7 @@ class TVClient(Configured):
         while True:
             try:
                 result = self.ws.recv()
-                raw_data = raw_data + result + "\n"
+                raw_data += result + "\n"
             except Exception as e:
                 break
             if "series_completed" in result:
@@ -427,7 +428,9 @@ class TVClient(Configured):
         cls,
         text: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
+        pages: tp.Optional[int] = None,
         delay: tp.Optional[int] = None,
+        retries: int = 3,
         show_progress: bool = True,
         pbar_kwargs: tp.KwargsLike = None,
     ) -> tp.List[dict]:
@@ -438,29 +441,57 @@ class TVClient(Configured):
             exchange = ""
         if pbar_kwargs is None:
             pbar_kwargs = {}
-        symbols_remaining = None
+
         symbols_list = []
         pbar = None
-
-        while symbols_remaining is None or symbols_remaining > 0:
-            url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
-            resp = requests.get(url)
-            symbols_data = json.loads(resp.text)
+        pages_fetched = 0
+        while True:
+            for i in range(retries):
+                try:
+                    url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
+                    resp = requests.get(url)
+                    symbols_data = json.loads(resp.text)
+                    break
+                except json.JSONDecodeError as e:
+                    if i == retries - 1:
+                        raise e
+                    if delay is not None:
+                        time.sleep(delay)
             symbols_remaining = symbols_data.get("symbols_remaining", 0)
             new_symbols = symbols_data.get("symbols", [])
             symbols_list.extend(new_symbols)
-            if pbar is None and symbols_remaining > 0:
-                pbar = get_pbar(
-                    total=len(new_symbols) + symbols_remaining,
+            if pages is None and symbols_remaining > 0:
+                show_pbar = True
+            elif pages is not None and pages > 1:
+                show_pbar = True
+            else:
+                show_pbar = False
+            if pbar is None and show_pbar:
+                if pages is not None:
+                    total = pages
+                else:
+                    total = math.ceil((len(new_symbols) + symbols_remaining) / len(new_symbols))
+                pbar = ProgressBar(
+                    total=total,
                     show_progress=show_progress,
                     **pbar_kwargs,
                 )
             if pbar is not None:
-                pbar.update(len(new_symbols))
+                max_symbols = len(symbols_list) + symbols_remaining
+                if pages is not None:
+                    max_symbols = min(max_symbols, pages * len(new_symbols))
+                pbar.set_description(dict(symbols="%d/%d" % (len(symbols_list), max_symbols)))
+                pbar.update()
+            if symbols_remaining == 0:
+                break
+            pages_fetched += 1
+            if pages is not None and pages_fetched >= pages:
+                break
             if delay is not None:
-                time.sleep(delay / 1000)
+                time.sleep(delay)
         if pbar is not None:
             pbar.close()
+
         return symbols_list
 
     @classmethod
@@ -523,11 +554,14 @@ class TVData(RemoteData):
         exchange_pattern: tp.Optional[str] = None,
         symbol_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         client: tp.Optional[TVClient] = None,
         client_config: tp.DictLike = None,
         text: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
+        pages: tp.Optional[int] = None,
         delay: tp.Optional[int] = None,
+        retries: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         market: tp.Optional[str] = None,
@@ -628,7 +662,9 @@ class TVData(RemoteData):
             ... )
             ```
         """
+        pages = cls.resolve_custom_setting(pages, "pages", sub_path="search", sub_path_only=True)
         delay = cls.resolve_custom_setting(delay, "delay", sub_path="search", sub_path_only=True)
+        retries = cls.resolve_custom_setting(retries, "retries", sub_path="search", sub_path_only=True)
         show_progress = cls.resolve_custom_setting(
             show_progress, "show_progress", sub_path="search", sub_path_only=True
         )
@@ -658,7 +694,9 @@ class TVData(RemoteData):
             data = client.search_symbol(
                 text=text,
                 exchange=exchange,
+                pages=pages,
                 delay=delay,
+                retries=retries,
                 show_progress=show_progress,
                 pbar_kwargs=pbar_kwargs,
             )
@@ -738,7 +776,7 @@ class TVData(RemoteData):
                 symbol = item["symbol"]
             else:
                 item = symbol
-            if "\"symbol\"" in symbol:
+            if '"symbol"' in symbol:
                 continue
             if exchange_pattern is not None:
                 if not cls.key_match(symbol.split(":")[0], exchange_pattern, use_regex=use_regex):
@@ -747,9 +785,11 @@ class TVData(RemoteData):
                 if not cls.key_match(symbol.split(":")[1], symbol_pattern, use_regex=use_regex):
                     continue
             found_symbols.append(item)
-        if return_field_data:
-            return sorted(found_symbols, key=lambda x: x["symbol"])
-        return sorted(found_symbols)
+        if sort:
+            if return_field_data:
+                return sorted(found_symbols, key=lambda x: x["symbol"])
+            return sorted(found_symbols)
+        return found_symbols
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
@@ -781,6 +821,8 @@ class TVData(RemoteData):
         extended_session: tp.Optional[bool] = None,
         pro_data: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
+        delay: tp.Optional[int] = None,
+        retries: tp.Optional[int] = None,
     ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
@@ -811,6 +853,8 @@ class TVData(RemoteData):
             extended_session (bool): Regular session if False, extended session if True.
             pro_data (bool): Whether to use pro data.
             limit (int): The maximum number of returned items.
+            delay (float): Time to sleep after each request (in seconds).
+            retries (int): The number of retries on failure to fetch data.
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
@@ -826,6 +870,8 @@ class TVData(RemoteData):
         extended_session = cls.resolve_custom_setting(extended_session, "extended_session")
         pro_data = cls.resolve_custom_setting(pro_data, "pro_data")
         limit = cls.resolve_custom_setting(limit, "limit")
+        delay = cls.resolve_custom_setting(delay, "delay")
+        retries = cls.resolve_custom_setting(retries, "retries")
 
         freq = timeframe
         if not isinstance(timeframe, str):
@@ -840,7 +886,7 @@ class TVData(RemoteData):
             interval = str(multiplier)
         elif unit == "h":
             interval = f"{str(multiplier)}H"
-        elif unit == "d":
+        elif unit == "D":
             interval = f"{str(multiplier)}D"
         elif unit == "W":
             interval = f"{str(multiplier)}W"
@@ -849,16 +895,24 @@ class TVData(RemoteData):
         else:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
 
-        df = client.get_hist(
-            symbol=symbol,
-            exchange=exchange,
-            interval=interval,
-            fut_contract=fut_contract,
-            adjustment=adjustment,
-            extended_session=extended_session,
-            pro_data=pro_data,
-            limit=limit,
-        )
+        for i in range(retries):
+            try:
+                df = client.get_hist(
+                    symbol=symbol,
+                    exchange=exchange,
+                    interval=interval,
+                    fut_contract=fut_contract,
+                    adjustment=adjustment,
+                    extended_session=extended_session,
+                    pro_data=pro_data,
+                    limit=limit,
+                )
+                break
+            except Exception as e:
+                if i == retries - 1:
+                    raise e
+                if delay is not None:
+                    time.sleep(delay)
         df.rename(
             columns={
                 "symbol": "Symbol",

@@ -207,7 +207,7 @@ def apply_and_concat(
         funcs_args = [(apply_func, (i, *args), kwargs) for i in range(ntimes)]
     if execute_kwargs is None:
         execute_kwargs = {}
-    execute_kwargs["n_calls"] = ntimes
+    execute_kwargs["size"] = ntimes
     return apply_and_concat_each(
         funcs_args,
         n_outputs=n_outputs,

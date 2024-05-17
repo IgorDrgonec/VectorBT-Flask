@@ -13,13 +13,13 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, Annotatable, Union
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
-from vectorbtpro.utils.config import merge_dicts, Config, Configured
+from vectorbtpro.utils.config import merge_dicts, FrozenConfig, Configured
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
-from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, Annotatable, Union
-from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
-from vectorbtpro.utils.execution import execute
 
 __all__ = [
     "ChunkMeta",
@@ -265,13 +265,25 @@ class LenChunkMeta(ArgChunkMeta):
 def yield_chunk_meta(
     size: tp.Optional[int] = None,
     min_size: tp.Optional[int] = None,
-    n_chunks: tp.Optional[int] = None,
-    chunk_len: tp.Optional[int] = None,
+    n_chunks: tp.Union[None, int, str] = None,
+    chunk_len: tp.Union[None, int, str] = None,
 ) -> tp.Generator[ChunkMeta, None, None]:
     """Yield meta of each successive chunk from a sequence with a number of elements.
 
-    If both `n_chunks` and `chunk_len` are None (after resolving them from settings),
-    sets `n_chunks` to the number of cores."""
+    Args:
+        size (int): Size of the space to split.
+        min_size (int): Minimum size.
+
+            If `size` is lower than this number, returns a single chunk.
+        n_chunks (int or str): Number of chunks.
+
+            If "auto", becomes the number of cores.
+        chunk_len (int or str): Length of each chunk.
+
+            If "auto", becomes the number of cores.
+
+    If `size`, `n_chunks`, and `chunk_len` are None (after resolving them from settings),
+    returns a single chunk. If only `n_chunks` and `chunk_len` are None, sets `n_chunks` to "auto"."""
     if size is not None and min_size is not None and size < min_size:
         yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
     else:
@@ -970,7 +982,19 @@ class ChunkedArray(Chunked, DefineMixin):
 
 
 class Chunker(Configured):
-    """Class responsible for chunking arguments of a function and running the function."""
+    """Class responsible for chunking arguments of a function and running the function.
+
+    Does the following:
+
+    1. Generates chunk metadata by passing `n_chunks`, `size`, `min_size`, `chunk_len`,
+        and `chunk_meta` to `Chunker.get_chunk_meta_from_args`.
+    2. Splits arguments and keyword arguments by passing chunk metadata, `arg_take_spec`,
+        and `template_context` to `Chunker.yield_arg_chunks`, which yields one chunk at a time.
+    3. Executes all chunks by passing `**execute_kwargs` to `vectorbtpro.utils.execution.execute`.
+    4. Optionally, post-processes and merges the results by passing them and
+        `**merge_kwargs` to `merge_func`.
+
+    For defaults, see `vectorbtpro._settings.chunking`."""
 
     _settings_path: tp.SettingsPath = "chunking"
 
@@ -989,15 +1013,15 @@ class Chunker(Configured):
         "merge_kwargs",
         "return_raw_chunks",
         "silence_warnings",
-        "disable",
         "forward_kwargs_as",
         "execute_kwargs",
+        "disable",
     }
 
     def __init__(
         self,
         func: tp.Callable,
-        size: tp.Optional[tp.SizeLike] = None,
+        size: tp.Optional[int] = None,
         min_size: tp.Optional[int] = None,
         n_chunks: tp.Optional[tp.SizeLike] = None,
         chunk_len: tp.Optional[tp.SizeLike] = None,
@@ -1010,9 +1034,9 @@ class Chunker(Configured):
         merge_kwargs: tp.KwargsLike = None,
         return_raw_chunks: tp.Optional[bool] = None,
         silence_warnings: tp.Optional[bool] = None,
-        disable: tp.Optional[bool] = None,
         forward_kwargs_as: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
+        disable: tp.Optional[bool] = None,
         **kwargs,
     ) -> None:
         Configured.__init__(
@@ -1031,29 +1055,29 @@ class Chunker(Configured):
             merge_kwargs=merge_kwargs,
             return_raw_chunks=return_raw_chunks,
             silence_warnings=silence_warnings,
-            disable=disable,
             forward_kwargs_as=forward_kwargs_as,
             execute_kwargs=execute_kwargs,
+            disable=disable,
             **kwargs,
         )
 
         self._func = func
-        self._size = size
-        self._min_size = min_size
-        self._n_chunks = n_chunks
-        self._chunk_len = chunk_len
-        self._chunk_meta = chunk_meta
-        self._prepend_chunk_meta = prepend_chunk_meta
-        self._skip_single_chunk = skip_single_chunk
-        self._arg_take_spec = arg_take_spec
-        self._template_context = template_context
-        self._merge_func = merge_func
-        self._merge_kwargs = merge_kwargs
-        self._return_raw_chunks = return_raw_chunks
-        self._silence_warnings = silence_warnings
-        self._disable = disable
-        self._forward_kwargs_as = forward_kwargs_as
-        self._execute_kwargs = execute_kwargs
+        self._size = self.resolve_setting(size, "size")
+        self._min_size = self.resolve_setting(min_size, "min_size")
+        self._n_chunks = self.resolve_setting(n_chunks, "n_chunks")
+        self._chunk_len = self.resolve_setting(chunk_len, "chunk_len")
+        self._chunk_meta = self.resolve_setting(chunk_meta, "chunk_meta")
+        self._prepend_chunk_meta = self.resolve_setting(prepend_chunk_meta, "prepend_chunk_meta")
+        self._skip_single_chunk = self.resolve_setting(skip_single_chunk, "skip_single_chunk")
+        self._arg_take_spec = self.resolve_setting(arg_take_spec, "arg_take_spec")
+        self._template_context = self.resolve_setting(template_context, "template_context", merge=True)
+        self._merge_func = self.resolve_setting(merge_func, "merge_func")
+        self._merge_kwargs = self.resolve_setting(merge_kwargs, "merge_kwargs", merge=True)
+        self._return_raw_chunks = self.resolve_setting(return_raw_chunks, "return_raw_chunks")
+        self._silence_warnings = self.resolve_setting(silence_warnings, "silence_warnings")
+        self._forward_kwargs_as = self.resolve_setting(forward_kwargs_as, "forward_kwargs_as", merge=True)
+        self._execute_kwargs = self.resolve_setting(execute_kwargs, "execute_kwargs", merge=True)
+        self._disable = self.resolve_setting(disable, "disable")
 
     @property
     def func(self) -> tp.Callable:
@@ -1061,8 +1085,8 @@ class Chunker(Configured):
         return self._func
 
     @property
-    def size(self) -> tp.Optional[tp.SizeLike]:
-        """See `yield_chunk_meta`."""
+    def size(self) -> tp.Optional[int]:
+        """See `Chunker.get_chunk_meta_from_args`."""
         return self._size
 
     @property
@@ -1093,7 +1117,7 @@ class Chunker(Configured):
         return self._prepend_chunk_meta
 
     @property
-    def skip_single_chunk(self) -> tp.Optional[bool]:
+    def skip_single_chunk(self) -> bool:
         """Whether to execute the function directly if there's only one chunk."""
         return self._skip_single_chunk
 
@@ -1103,7 +1127,7 @@ class Chunker(Configured):
         return self._arg_take_spec
 
     @property
-    def template_context(self) -> tp.KwargsLike:
+    def template_context(self) -> tp.Kwargs:
         """Template context.
 
         Any template in both `execute_kwargs` and `merge_kwargs` will be substituted. You can use
@@ -1119,36 +1143,36 @@ class Chunker(Configured):
         return self._merge_func
 
     @property
-    def merge_kwargs(self) -> tp.KwargsLike:
+    def merge_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to the merging function."""
         return self._merge_kwargs
 
     @property
-    def return_raw_chunks(self) -> tp.Optional[bool]:
+    def return_raw_chunks(self) -> bool:
         """Whether to return chunks in a raw format."""
         return self._return_raw_chunks
 
     @property
-    def silence_warnings(self) -> tp.Optional[bool]:
+    def silence_warnings(self) -> bool:
         """Whether to silence any warnings."""
         return self._silence_warnings
 
     @property
-    def disable(self) -> tp.Optional[bool]:
-        """Whether to disable chunking entirely."""
-        return self._disable
-
-    @property
-    def forward_kwargs_as(self) -> tp.KwargsLike:
+    def forward_kwargs_as(self) -> tp.Kwargs:
         """Map to rename keyword arguments.
 
         Can also pass any variable from the scope of `Chunker.run`"""
         return self._forward_kwargs_as
 
     @property
-    def execute_kwargs(self) -> tp.KwargsLike:
+    def execute_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.execution.execute`."""
         return self._execute_kwargs
+
+    @property
+    def disable(self) -> bool:
+        """Whether to disable chunking."""
+        return self._disable
 
     @classmethod
     def get_chunk_meta_from_args(
@@ -1165,19 +1189,19 @@ class Chunker(Configured):
 
         Args:
             ann_args (dict): Arguments annotated with `vectorbtpro.utils.parsing.annotate_args`.
-            size (int, Sizer, or callable): Size of the space to split.
+            size (int, Sizer, or callable): See `yield_chunk_meta`.
 
-                Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
-                and returning an integer.
-            min_size (int): If `size` is lower than this number, returns a single chunk.
-            n_chunks (int, Sizer, or callable): Number of chunks.
+                Can be an integer, an instance of `Sizer`, or a callable taking
+                the annotated arguments and returning a value.
+            min_size (int): See `yield_chunk_meta`.
+            n_chunks (int, str, Sizer, or callable): See `yield_chunk_meta`.
 
-                Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
-                and other keyword arguments and returning an integer.
-            chunk_len (int, Sizer, or callable): Length of each chunk.
+                Can be an integer, a string, an instance of `Sizer`, or a callable taking
+                the annotated arguments and other keyword arguments and returning a value.
+            chunk_len (int, str, Sizer, or callable): See `yield_chunk_meta`.
 
-                Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
-                and returning an integer.
+                Can be an integer, a string, an instance of `Sizer`, or a callable taking
+                the annotated arguments and returning a value.
             chunk_meta (iterable of ChunkMeta, ChunkMetaGenerator, or callable): Chunk meta.
 
                 Can be an iterable of `ChunkMeta`, an instance of `ChunkMetaGenerator`, or
@@ -1361,7 +1385,7 @@ class Chunker(Configured):
                 Can be a dictionary (see `Chunker.take_from_args`), or a sequence that will be
                 converted into a dictionary. If a callable, will be called instead of `Chunker.take_from_args`,
                 thus it must have the same arguments apart from `arg_take_spec`.
-            template_context (mapping): Mapping to replace templates in arguments and specification.
+            template_context (mapping): Context used to substitute templates in arguments and specification.
             **kwargs: Keyword arguments passed to `Chunker.take_from_args` or to `arg_take_spec`
                 if it's a callable.
         """
@@ -1588,36 +1612,24 @@ class Chunker(Configured):
         return size
 
     def run(self, *args, **kwargs) -> tp.Any:
-        """Chunk arguments and run the function.
-
-        Does the following:
-
-        1. Generates chunk metadata by passing `n_chunks`, `size`, `min_size`, `chunk_len`,
-            and `chunk_meta` to `Chunker.get_chunk_meta_from_args`.
-        2. Splits arguments and keyword arguments by passing chunk metadata, `arg_take_spec`,
-            and `template_context` to `Chunker.yield_arg_chunks`, which yields one chunk at a time.
-        3. Executes all chunks by passing `**execute_kwargs` to `vectorbtpro.utils.execution.execute`.
-        4. Optionally, post-processes and merges the results by passing them and
-            `**merge_kwargs` to `merge_func`.
-
-        For defaults, see `vectorbtpro._settings.chunking`.
-        """
-        size = self.resolve_setting(self.size, "size")
-        min_size = self.resolve_setting(self.min_size, "min_size")
-        n_chunks = self.resolve_setting(self.n_chunks, "n_chunks")
-        chunk_len = self.resolve_setting(self.chunk_len, "chunk_len")
-        chunk_meta = self.resolve_setting(self.chunk_meta, "chunk_meta")
-        prepend_chunk_meta = self.resolve_setting(self.prepend_chunk_meta, "prepend_chunk_meta")
-        skip_single_chunk = self.resolve_setting(self.skip_single_chunk, "skip_single_chunk")
-        arg_take_spec = self.resolve_setting(self.arg_take_spec, "arg_take_spec")
-        template_context = self.resolve_setting(self.template_context, "template_context", merge=True)
-        merge_func = self.resolve_setting(self.merge_func, "merge_func")
-        merge_kwargs = self.resolve_setting(self.merge_kwargs, "merge_kwargs", merge=True)
-        return_raw_chunks = self.resolve_setting(self.return_raw_chunks, "return_raw_chunks")
-        silence_warnings = self.resolve_setting(self.silence_warnings, "silence_warnings")
-        disable = self.resolve_setting(self.disable, "disable")
-        forward_kwargs_as = self.resolve_setting(self.forward_kwargs_as, "forward_kwargs_as", merge=True)
-        execute_kwargs = self.resolve_setting(self.execute_kwargs, "execute_kwargs", merge=True)
+        """Chunk arguments and run the function."""
+        func = self.func
+        size = self.size
+        min_size = self.min_size
+        n_chunks = self.n_chunks
+        chunk_len = self.chunk_len
+        chunk_meta = self.chunk_meta
+        prepend_chunk_meta = self.prepend_chunk_meta
+        skip_single_chunk = self.skip_single_chunk
+        arg_take_spec = self.arg_take_spec
+        template_context = self.template_context
+        merge_func = self.merge_func
+        merge_kwargs = self.merge_kwargs
+        return_raw_chunks = self.return_raw_chunks
+        silence_warnings = self.silence_warnings
+        forward_kwargs_as = self.forward_kwargs_as
+        execute_kwargs = self.execute_kwargs
+        disable = self.disable
 
         if arg_take_spec is None:
             arg_take_spec = {}
@@ -1644,23 +1656,23 @@ class Chunker(Configured):
                 kwargs[v] = locals()[k]
 
         if disable:
-            return self.func(*args, **kwargs)
+            return func(*args, **kwargs)
 
         if prepend_chunk_meta is None:
             prepend_chunk_meta = False
-            func_arg_names = get_func_arg_names(self.func)
+            func_arg_names = get_func_arg_names(func)
             if len(func_arg_names) > 0:
                 if func_arg_names[0] == "chunk_meta":
                     prepend_chunk_meta = True
         if prepend_chunk_meta:
             args = (Rep("chunk_meta"), *args)
 
-        parsed_sizer = self.parse_sizer_from_func(self.func)
+        parsed_sizer = self.parse_sizer_from_func(func)
         if parsed_sizer is not None:
             if size is not None:
                 raise ValueError(f"Two conflicting sizers: {parsed_sizer} (annotations) and {size} (size)")
             size = parsed_sizer
-        parsed_arg_take_spec = self.parse_spec_from_func(self.func)
+        parsed_arg_take_spec = self.parse_spec_from_func(func)
         if len(parsed_arg_take_spec) > 0:
             if not isinstance(arg_take_spec, dict) or parsed_arg_take_spec.keys() & arg_take_spec.keys():
                 raise ValueError(
@@ -1668,14 +1680,14 @@ class Chunker(Configured):
                     f"and {arg_take_spec} (arg_take_spec)"
                 )
             arg_take_spec = {**parsed_arg_take_spec, **arg_take_spec}
-        parsed_merge_func = parse_merge_func(self.func)
+        parsed_merge_func = parse_merge_func(func)
         if parsed_merge_func is not None:
             if merge_func is not None:
                 raise ValueError(
                     f"Two conflicting merge functions: {parsed_merge_func} (annotations) and {merge_func} (merge_func)"
                 )
             merge_func = parsed_merge_func
-        ann_args = annotate_args(self.func, args, kwargs)
+        ann_args = annotate_args(func, args, kwargs)
         parsed_arg_take_spec = self.parse_spec_from_args(ann_args)
         if len(parsed_arg_take_spec) > 0:
             if not isinstance(arg_take_spec, dict) or parsed_arg_take_spec.keys() & arg_take_spec.keys():
@@ -1716,9 +1728,9 @@ class Chunker(Configured):
         )
         template_context["chunk_meta"] = chunk_meta
         if len(chunk_meta) < 2 and skip_single_chunk:
-            return self.func(*args, **kwargs)
+            return func(*args, **kwargs)
         funcs_args = self.yield_arg_chunks(
-            self.func,
+            func,
             ann_args,
             chunk_meta,
             arg_take_spec=arg_take_spec,
@@ -1729,7 +1741,20 @@ class Chunker(Configured):
         if return_raw_chunks:
             return chunk_meta, funcs_args
         execute_kwargs = substitute_templates(execute_kwargs, template_context, eval_id="execute_kwargs")
-        results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
+        execute_kwargs = merge_dicts(dict(show_progress=False if len(chunk_meta) == 1 else None), execute_kwargs)
+        keys = []
+        for _chunk_meta in chunk_meta:
+            if _chunk_meta.indices is not None:
+                keys.append("{}..{}".format(_chunk_meta.indices[0], _chunk_meta.indices[-1]))
+            elif _chunk_meta.start is not None and _chunk_meta.end is not None:
+                if _chunk_meta.start == _chunk_meta.end - 1:
+                    keys.append(_chunk_meta.start)
+                else:
+                    keys.append("{}..{}".format(_chunk_meta.start, _chunk_meta.end - 1))
+            else:
+                keys.append(MISSING)
+        keys = pd.Index(keys, name="chunk_indices")
+        results = execute(funcs_args, size=len(chunk_meta), keys=keys, **execute_kwargs)
         if merge_func is not None:
             template_context["funcs_args"] = funcs_args
             if isinstance(merge_func, MergeFunc):
@@ -1763,9 +1788,10 @@ def chunked(
     merge_kwargs: tp.KwargsLike = None,
     return_raw_chunks: bool = False,
     silence_warnings: tp.Optional[bool] = None,
-    disable: tp.Optional[bool] = None,
     forward_kwargs_as: tp.KwargsLike = None,
     execute_kwargs: tp.KwargsLike = None,
+    merge_to_execute_kwargs: tp.Optional[bool] = None,
+    disable: tp.Optional[bool] = None,
     **kwargs,
 ) -> tp.Callable:
     """Decorator that chunks the inputs of a function using `Chunker`.
@@ -1775,7 +1801,8 @@ def chunked(
     Each option can be modified in the `options` attribute of the wrapper function or
     directly passed as a keyword argument with a leading underscore.
 
-    Keyword arguments `**kwargs` are passed directly to `vectorbtpro.utils.execution.execute`.
+    Keyword arguments `**kwargs` and `execute_kwargs` are merged into `execute_kwargs`
+    if `merge_to_execute_kwargs` is True, otherwise, `**kwargs` are passed directly to `Chunker`.
 
     Chunking can be disabled using `disable` argument. Additionally, the entire wrapping mechanism
     can be disabled by using the global setting `disable_wrapping` (=> returns the wrapped function).
@@ -2028,6 +2055,17 @@ def chunked(
                 if func_arg_names[0] == "chunk_meta":
                     prepend_chunk_meta = True
 
+        if merge_to_execute_kwargs is None:
+            _merge_to_execute_kwargs = chunking_cfg["merge_to_execute_kwargs"]
+        else:
+            _merge_to_execute_kwargs = merge_to_execute_kwargs
+        if _merge_to_execute_kwargs:
+            _execute_kwargs = merge_dicts(kwargs, execute_kwargs)
+            _chunker_kwargs = {}
+        else:
+            _execute_kwargs = execute_kwargs
+            _chunker_kwargs = kwargs
+
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             def _resolve_key(key, merge=False):
@@ -2043,8 +2081,7 @@ def chunked(
             if chunker_cls is None:
                 chunker_cls = Chunker
             return chunker_cls(
-                func,
-                disable=_resolve_key("disable"),
+                func=func,
                 size=_resolve_key("size"),
                 min_size=_resolve_key("min_size"),
                 n_chunks=_resolve_key("n_chunks"),
@@ -2060,34 +2097,31 @@ def chunked(
                 return_raw_chunks=_resolve_key("return_raw_chunks"),
                 silence_warnings=_resolve_key("silence_warnings"),
                 forward_kwargs_as=_resolve_key("forward_kwargs_as", merge=True),
+                disable=_resolve_key("disable"),
+                **_resolve_key("chunker_kwargs", merge=True),
             ).run(*args, **kwargs)
 
         wrapper.func = func
         wrapper.name = func.__name__
         wrapper.is_chunked = True
-        wrapper.options = Config(
-            dict(
-                chunker_cls=chunker_cls,
-                size=size,
-                min_size=min_size,
-                n_chunks=n_chunks,
-                chunk_len=chunk_len,
-                chunk_meta=chunk_meta,
-                skip_single_chunk=skip_single_chunk,
-                arg_take_spec=arg_take_spec,
-                template_context=template_context,
-                merge_func=merge_func,
-                merge_kwargs=merge_kwargs,
-                return_raw_chunks=return_raw_chunks,
-                silence_warnings=silence_warnings,
-                disable=disable,
-                forward_kwargs_as=forward_kwargs_as,
-                execute_kwargs=merge_dicts(kwargs, execute_kwargs),
-            ),
-            options_=dict(
-                frozen_keys=True,
-                as_attrs=True,
-            ),
+        wrapper.options = FrozenConfig(
+            chunker_cls=chunker_cls,
+            size=size,
+            min_size=min_size,
+            n_chunks=n_chunks,
+            chunk_len=chunk_len,
+            chunk_meta=chunk_meta,
+            skip_single_chunk=skip_single_chunk,
+            arg_take_spec=arg_take_spec,
+            template_context=template_context,
+            merge_func=merge_func,
+            merge_kwargs=merge_kwargs,
+            return_raw_chunks=return_raw_chunks,
+            silence_warnings=silence_warnings,
+            forward_kwargs_as=forward_kwargs_as,
+            execute_kwargs=_execute_kwargs,
+            chunker_kwargs=_chunker_kwargs,
+            disable=disable,
         )
 
         if prepend_chunk_meta:

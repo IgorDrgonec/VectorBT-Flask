@@ -21,7 +21,7 @@ are 0 and 20 (not 19!) respectively.
 >>> price = vbt.YFData.pull('BTC-USD', start=start, end=end).get('Close')
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> fast_ma = vbt.MA.run(price, 10)
@@ -117,9 +117,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, tile
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.generic import nb, enums
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
@@ -134,8 +134,8 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, Readonly
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
-from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
+from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import substitute_templates
 
 __all__ = [
@@ -145,7 +145,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
 
 # ############# Ranges ############# #
 
@@ -163,7 +162,9 @@ ranges_field_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["ranges_field_config"] = f"""Field config for `Ranges`.
+__pdoc__[
+    "ranges_field_config"
+] = f"""Field config for `Ranges`.
 
 ```python
 {ranges_field_config.prettify()}
@@ -173,7 +174,9 @@ __pdoc__["ranges_field_config"] = f"""Field config for `Ranges`.
 ranges_attach_field_config = ReadonlyConfig(dict(status=dict(attach_filters=True)))
 """_"""
 
-__pdoc__["ranges_attach_field_config"] = f"""Config of fields to be attached to `Ranges`.
+__pdoc__[
+    "ranges_attach_field_config"
+] = f"""Config of fields to be attached to `Ranges`.
 
 ```python
 {ranges_attach_field_config.prettify()}
@@ -200,7 +203,9 @@ ranges_shortcut_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["ranges_shortcut_config"] = f"""Config of shortcut properties to be attached to `Ranges`.
+__pdoc__[
+    "ranges_shortcut_config"
+] = f"""Config of shortcut properties to be attached to `Ranges`.
 
 ```python
 {ranges_shortcut_config.prettify()}
@@ -685,10 +690,20 @@ class Ranges(PriceRecords):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -1509,7 +1524,6 @@ Ranges.override_field_config_doc(__pdoc__)
 Ranges.override_metrics_doc(__pdoc__)
 Ranges.override_subplots_doc(__pdoc__)
 
-
 # ############# Pattern ranges ############# #
 
 
@@ -1668,7 +1682,9 @@ pattern_ranges_field_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["pattern_ranges_field_config"] = f"""Field config for `PatternRanges`.
+__pdoc__[
+    "pattern_ranges_field_config"
+] = f"""Field config for `PatternRanges`.
 
 ```python
 {pattern_ranges_field_config.prettify()}
@@ -1867,8 +1883,11 @@ class PatternRanges(Ranges):
 
         # Create config from arguments if empty
         if len(flat_search_configs) == 0:
+            single_group = True
             for col in range(arr_2d.shape[1]):
                 flat_search_configs.append(PSC())
+        else:
+            single_group = False
 
         # Prepare function and arguments
         funcs_args = []
@@ -1894,14 +1913,6 @@ class PatternRanges(Ranges):
             funcs_args.append((func, (), func_kwargs))
             new_search_configs.append(new_search_config)
 
-        # Execute each configuration
-        execute_kwargs = merge_dicts(
-            dict(show_progress=len(flat_search_configs) > 1),
-            execute_kwargs,
-        )
-        result_list = execute(funcs_args, **execute_kwargs)
-        records_arr = np.concatenate(result_list)
-
         # Build column hierarchy
         n_config_params = len(psc_names) // arr_2d.shape[1]
         if param_columns is not None:
@@ -1910,7 +1921,8 @@ class PatternRanges(Ranges):
             else:
                 search_config_index = pd.Index(psc_names, name="search_config")
                 base_columns = stack_indexes(
-                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **clean_index_kwargs
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
+                    **clean_index_kwargs,
                 )
                 new_columns = combine_indexes((param_columns, base_columns), **clean_index_kwargs)
         else:
@@ -1922,6 +1934,11 @@ class PatternRanges(Ranges):
                     (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
                     **clean_index_kwargs,
                 )
+
+        # Execute each configuration
+        execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
+        result_list = execute(funcs_args, keys=new_columns, **execute_kwargs)
+        records_arr = np.concatenate(result_list)
 
         # Wrap with class
         wrapper = ArrayWrapper(

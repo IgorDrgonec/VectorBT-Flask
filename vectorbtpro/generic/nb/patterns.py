@@ -5,10 +5,10 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.generic.enums import RescaleMode, InterpMode, ErrorType, DistanceMeasure
-from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
+from vectorbtpro.generic.enums import RescaleMode, InterpMode, ErrorType, DistanceMeasure
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.array_ import rescale_nb
 
 

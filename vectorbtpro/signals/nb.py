@@ -21,10 +21,10 @@ from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.enums import range_dt, RangeStatus
-from vectorbtpro.signals.enums import *
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
+from vectorbtpro.signals.enums import *
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, rescale_nb
 from vectorbtpro.utils.template import Rep
@@ -1354,8 +1354,8 @@ def between_two_ranges_nb(
 
     for col in prange(source_mask.shape[1]):
         _, _, source_idxs, target_idsx = relation_idxs_1d_nb(
-            source_mask[:, col], 
-            target_mask[:, col], 
+            source_mask[:, col],
+            target_mask[:, col],
             relation=relation,
         )
         for i in range(len(source_idxs)):
@@ -1516,7 +1516,7 @@ def unravel_nb(
 
 @register_jitted(cache=True)
 def unravel_between_nb(
-    mask: tp.Array2d, 
+    mask: tp.Array2d,
     incl_open_source: bool = False,
     incl_empty_cols: bool = True,
 ) -> tp.Tuple[

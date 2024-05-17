@@ -2,10 +2,9 @@ import os
 from itertools import permutations
 
 import vectorbtpro as vbt
-from vectorbtpro.generic import nb
-from vectorbtpro.generic import enums
-
 from tests.utils import *
+from vectorbtpro.generic import enums
+from vectorbtpro.generic import nb
 
 
 # ############# Global ############# #

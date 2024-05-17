@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
@@ -879,7 +879,7 @@ def broadcast(
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
         clean_index_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.clean_index`.
-        template_context (dict): Template context.
+        template_context (dict): Context used to substitute templates.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 

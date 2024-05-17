@@ -16,7 +16,7 @@ a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`
 ... ).get()
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> size = pd.DataFrame({
@@ -103,13 +103,13 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_dict
-from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.generic.enums import RangeStatus, range_dt
+from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderType, OrderPriceStatus
-from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
+from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
@@ -247,10 +247,20 @@ class Orders(PriceRecords):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -498,7 +508,6 @@ Orders.override_field_config_doc(__pdoc__)
 Orders.override_metrics_doc(__pdoc__)
 Orders.override_subplots_doc(__pdoc__)
 
-
 fs_orders_field_config = ReadonlyConfig(
     dict(
         dtype=fs_order_dt,
@@ -662,9 +671,9 @@ class FSOrders(Orders):
         return self.map_array(duration, **kwargs)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
-        start=Orders.metrics["start"],
-        end=Orders.metrics["end"],
-        period=Orders.metrics["period"],
+        start_index=Orders.metrics["start_index"],
+        end_index=Orders.metrics["end_index"],
+        total_duration=Orders.metrics["total_duration"],
         total_records=Orders.metrics["total_records"],
         side_counts=Orders.metrics["side_counts"],
         type_counts=dict(

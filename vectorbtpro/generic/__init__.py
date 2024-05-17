@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from vectorbtpro.generic.plotting import *
     from vectorbtpro.generic.price_records import *
     from vectorbtpro.generic.ranges import *
+    from vectorbtpro.generic.sim_range import *
     from vectorbtpro.generic.stats_builder import *
 
 __exclude_from__all__ = [

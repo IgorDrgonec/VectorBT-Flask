@@ -131,4 +131,4 @@ def split_range_by_gap_nb(range_: tp.Array1d) -> tp.Tuple[tp.Array1d, tp.Array1d
             k += 1
             start_idxs_out[k] = i
     stop_idxs_out[k] = len(range_)
-    return start_idxs_out[:k + 1], stop_idxs_out[:k + 1]
+    return start_idxs_out[: k + 1], stop_idxs_out[: k + 1]

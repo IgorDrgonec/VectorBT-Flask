@@ -9,9 +9,9 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
+from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = []
 
@@ -90,7 +90,7 @@ def generate_gbm_data_1d_nb(
         else:
             prev_value = out[i - 1]
         rand = np.random.standard_normal()
-        out[i] = prev_value * np.exp((mean - 0.5 * std ** 2) * dt + std * np.sqrt(dt) * rand)
+        out[i] = prev_value * np.exp((mean - 0.5 * std**2) * dt + std * np.sqrt(dt) * rand)
 
     return out
 

@@ -132,14 +132,15 @@ from numba import config as nb_config
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
 from vectorbtpro.utils.config import Config
-from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 from vectorbtpro.utils.module_ import check_installed
+from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 
 __all__ = [
     "settings",
 ]
 
 __pdoc__ = {}
+
 
 # ############# Settings sub-configs ############# #
 
@@ -199,7 +200,8 @@ importing = frozen_cfg(
 )
 """_"""
 
-__pdoc__["importing"] = Sub("""Sub-config with settings applied on importing.
+__pdoc__["importing"] = Sub(
+    """Sub-config with settings applied on importing.
     
 Disabling these options will make vectorbt load faster, but will limit the flexibility of accessing
 various features of the package.
@@ -211,7 +213,8 @@ various features of the package.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["importing"] = importing
 
@@ -226,7 +229,8 @@ caching = frozen_cfg(
 )
 """_"""
 
-__pdoc__["caching"] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
+__pdoc__["caching"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
 `vectorbtpro.utils.caching`, and cacheable decorators in `vectorbtpro.utils.decorators`.
 
 !!! hint
@@ -236,7 +240,8 @@ __pdoc__["caching"] = Sub("""Sub-config with settings applied across `vectorbtpr
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["caching"] = caching
 
@@ -269,7 +274,8 @@ jitting = frozen_cfg(
 )
 """_"""
 
-__pdoc__["jitting"] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
+__pdoc__["jitting"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
 `vectorbtpro.utils.jitting`.
 
 !!! note
@@ -279,7 +285,8 @@ __pdoc__["jitting"] = Sub("""Sub-config with settings applied across `vectorbtpr
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["jitting"] = jitting
 
@@ -292,11 +299,13 @@ numba = frozen_cfg(
 )
 """_"""
 
-__pdoc__["numba"] = Sub("""Sub-config with Numba-related settings.
+__pdoc__["numba"] = Sub(
+    """Sub-config with Numba-related settings.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["numba"] = numba
 
@@ -309,39 +318,58 @@ math = frozen_cfg(
 )
 """_"""
 
-__pdoc__["math"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.math_`.
+__pdoc__["math"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.math_`.
 
 !!! note
     All math settings are applied only on import.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["math"] = math
 
 execution = frozen_cfg(
+    executor_cls=None,
+    engine="SerialEngine",
+    engine_config=flex_cfg(),
     min_size=None,
     n_chunks=None,
     chunk_len=None,
+    chunk_meta=None,
     distribute="calls",
+    in_chunk_order=False,
     warmup=False,
+    cache_chunks=False,
+    chunk_cache_dir=None,
+    chunk_cache_save_kwargs=flex_cfg(
+        mkdir_kwargs=dict(
+            mkdir=True,
+        ),
+    ),
+    chunk_cache_load_kwargs=flex_cfg(),
+    pre_clear_chunk_cache=False,
+    post_clear_chunk_cache=True,
+    release_chunk_cache=False,
     pre_execute_func=None,
-    pre_execute_kwargs=None,
+    pre_execute_kwargs=flex_cfg(),
     pre_chunk_func=None,
-    pre_chunk_kwargs=None,
+    pre_chunk_kwargs=flex_cfg(),
     post_chunk_func=None,
-    post_chunk_kwargs=None,
+    post_chunk_kwargs=flex_cfg(),
     post_execute_func=None,
-    post_execute_kwargs=None,
+    post_execute_kwargs=flex_cfg(),
     post_execute_on_sorted=False,
     show_progress=True,
     pbar_kwargs=flex_cfg(),
     template_context=flex_cfg(),
+    merge_to_engine_config=True,
     engines=flex_cfg(
         serial=flex_cfg(
             cls="SerialEngine",
-            show_progress=False,
+            show_progress=True,
             pbar_kwargs=flex_cfg(),
             clear_cache=False,
             collect_garbage=False,
@@ -391,11 +419,13 @@ execution = frozen_cfg(
 )
 """_"""
 
-__pdoc__["execution"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.execution`.
+__pdoc__["execution"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.execution`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["execution"] = execution
 
@@ -419,13 +449,15 @@ chunking = frozen_cfg(
     silence_warnings=False,
     forward_kwargs_as=flex_cfg(),
     execute_kwargs=flex_cfg(),
+    merge_to_execute_kwargs=True,
     options=flex_cfg(),
     override_setup_options=flex_cfg(),
     override_options=flex_cfg(),
 )
 """_"""
 
-__pdoc__["chunking"] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
+__pdoc__["chunking"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
 and `vectorbtpro.utils.chunking`.
 
 !!! note
@@ -433,7 +465,8 @@ and `vectorbtpro.utils.chunking`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["chunking"] = chunking
 
@@ -466,14 +499,17 @@ params = frozen_cfg(
     return_meta=False,
     return_param_index=False,
     execute_kwargs=flex_cfg(),
+    merge_to_execute_kwargs=True,
 )
 """_"""
 
-__pdoc__["params"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.params`.
+__pdoc__["params"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.params`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["params"] = params
 
@@ -484,11 +520,13 @@ template = frozen_cfg(
 )
 """_"""
 
-__pdoc__["template"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.template`.
+__pdoc__["template"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.template`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["template"] = template
 
@@ -514,11 +552,13 @@ pickling = frozen_cfg(
 )
 """_"""
 
-__pdoc__["pickling"] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.pickling`.
+__pdoc__["pickling"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.pickling`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["pickling"] = pickling
 
@@ -527,11 +567,13 @@ config = frozen_cfg(
 )
 """_"""
 
-__pdoc__["config"] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
+__pdoc__["config"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["config"] = config
 
@@ -546,11 +588,13 @@ configured = frozen_cfg(
 )
 """_"""
 
-__pdoc__["configured"] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
+__pdoc__["configured"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["configured"] = configured
 
@@ -573,11 +617,13 @@ broadcasting = frozen_cfg(
 )
 """_"""
 
-__pdoc__["broadcasting"] = Sub("""Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
+__pdoc__["broadcasting"] = Sub(
+    """Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["broadcasting"] = broadcasting
 
@@ -587,14 +633,16 @@ indexing = frozen_cfg(
 )
 """_"""
 
-__pdoc__["indexing"] = Sub("""Sub-config with settings applied to indexing functions across `vectorbtpro.base`.
+__pdoc__["indexing"] = Sub(
+    """Sub-config with settings applied to indexing functions across `vectorbtpro.base`.
     
 !!! note
     Options `rotate_rows` and `rotate_cols` are applied only on import. 
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["indexing"] = indexing
 
@@ -613,14 +661,16 @@ wrapping = frozen_cfg(
 )
 """_"""
 
-__pdoc__["wrapping"] = Sub("""Sub-config with settings applied across `vectorbtpro.base.wrapping`.
+__pdoc__["wrapping"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.base.wrapping`.
 
 ```python
 ${config_doc}
 ```
 
 When enabling `max_precision` and running your code for the first time, make sure to enable 
-`prec_check_bounds`. After that, you can safely disable it to slightly increase performance.""")
+`prec_check_bounds`. After that, you can safely disable it to slightly increase performance."""
+)
 
 _settings["wrapping"] = wrapping
 
@@ -629,11 +679,13 @@ resampling = frozen_cfg(
 )
 """_"""
 
-__pdoc__["resampling"] = Sub("""Sub-config with settings applied across `vectorbtpro.base.resampling`.
+__pdoc__["resampling"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.base.resampling`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["resampling"] = resampling
 
@@ -648,14 +700,19 @@ datetime = frozen_cfg(
     dateparser_kwargs=flex_cfg(),
     freq_from_n=20,
     tz_naive_ns=True,
+    readable=frozen_cfg(
+        drop_tz=True,
+    ),
 )
 """_"""
 
-__pdoc__["datetime"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
+__pdoc__["datetime"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["datetime"] = datetime
 
@@ -815,7 +872,7 @@ data = frozen_cfg(
             tz="utc",
             klines_type="spot",
             limit=1000,
-            delay=500,
+            delay=0.5,
             show_progress=True,
             pbar_kwargs=flex_cfg(),
             silence_warnings=False,
@@ -869,7 +926,7 @@ data = frozen_cfg(
             adjusted=True,
             limit=50000,
             params=flex_cfg(),
-            delay=500,
+            delay=0.5,
             retries=3,
             show_progress=True,
             pbar_kwargs=flex_cfg(),
@@ -922,8 +979,12 @@ data = frozen_cfg(
             extended_session=False,
             pro_data=True,
             limit=20000,
+            delay=0.5,
+            retries=3,
             search=flex_cfg(
-                delay=None,
+                pages=None,
+                delay=0.5,
+                retries=3,
                 show_progress=True,
                 pbar_kwargs=flex_cfg(),
             ),
@@ -966,7 +1027,8 @@ data = frozen_cfg(
 )
 """_"""
 
-__pdoc__["data"] = Sub("""Sub-config with settings applied across `vectorbtpro.data`.
+__pdoc__["data"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.data`.
 
 ```python
 ${config_doc}
@@ -981,7 +1043,8 @@ CCXT:
     
 Alpaca:
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
-""")
+"""
+)
 
 _settings["data"] = data
 
@@ -1077,13 +1140,15 @@ plotting = frozen_cfg(
 )
 """_"""
 
-__pdoc__["plotting"] = Sub("""Sub-config with settings applied to Plotly figures 
+__pdoc__["plotting"] = Sub(
+    """Sub-config with settings applied to Plotly figures 
 created from `vectorbtpro.utils.figure`.
 
 ```python
 ${config_doc}
 ```
-""")
+"""
+)
 
 _settings["plotting"] = plotting
 
@@ -1113,12 +1178,14 @@ stats_builder = frozen_cfg(
 )
 """_"""
 
-__pdoc__["stats_builder"] = Sub("""Sub-config with settings applied to 
+__pdoc__["stats_builder"] = Sub(
+    """Sub-config with settings applied to 
 `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["stats_builder"] = stats_builder
 
@@ -1158,12 +1225,14 @@ plots_builder = frozen_cfg(
 )
 """_"""
 
-__pdoc__["plots_builder"] = Sub("""Sub-config with settings applied to 
+__pdoc__["plots_builder"] = Sub(
+    """Sub-config with settings applied to 
 `vectorbtpro.generic.plots_builder.PlotsBuilderMixin`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["plots_builder"] = plots_builder
 
@@ -1187,11 +1256,13 @@ generic = frozen_cfg(
 )
 """_"""
 
-__pdoc__["generic"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
+__pdoc__["generic"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["generic"] = generic
 
@@ -1201,11 +1272,13 @@ ranges = frozen_cfg(
 )
 """_"""
 
-__pdoc__["ranges"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
+__pdoc__["ranges"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["ranges"] = ranges
 
@@ -1228,11 +1301,13 @@ splitter = frozen_cfg(
 )
 """_"""
 
-__pdoc__["splitter"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.splitting.base.Splitter`.
+__pdoc__["splitter"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.splitting.base.Splitter`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["splitter"] = splitter
 
@@ -1246,11 +1321,13 @@ drawdowns = frozen_cfg(
 )
 """_"""
 
-__pdoc__["drawdowns"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
+__pdoc__["drawdowns"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["drawdowns"] = drawdowns
 
@@ -1262,11 +1339,13 @@ ohlcv = frozen_cfg(
 )
 """_"""
 
-__pdoc__["ohlcv"] = Sub("""Sub-config with settings applied across `vectorbtpro.ohlcv`.
+__pdoc__["ohlcv"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.ohlcv`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["ohlcv"] = ohlcv
 
@@ -1287,11 +1366,13 @@ signals = frozen_cfg(
 )
 """_"""
 
-__pdoc__["signals"] = Sub("""Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
+__pdoc__["signals"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["signals"] = signals
 
@@ -1309,6 +1390,7 @@ returns = frozen_cfg(
         levy_alpha=2.0,
         required_return=0.0,
         cutoff=0.05,
+        period=None,
     ),
     stats=flex_cfg(
         filters=flex_cfg(
@@ -1333,11 +1415,13 @@ returns = frozen_cfg(
 )
 """_"""
 
-__pdoc__["returns"] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
+__pdoc__["returns"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["returns"] = returns
 
@@ -1346,11 +1430,13 @@ qs_adapter = frozen_cfg(
 )
 """_"""
 
-__pdoc__["qs_adapter"] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
+__pdoc__["qs_adapter"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["qs_adapter"] = qs_adapter
 
@@ -1360,11 +1446,13 @@ records = frozen_cfg(
 )
 """_"""
 
-__pdoc__["records"] = Sub("""Sub-config with settings applied to `vectorbtpro.records.base.Records`.
+__pdoc__["records"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.records.base.Records`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["records"] = records
 
@@ -1387,11 +1475,13 @@ mapped_array = frozen_cfg(
 )
 """_"""
 
-__pdoc__["mapped_array"] = Sub("""Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
+__pdoc__["mapped_array"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["mapped_array"] = mapped_array
 
@@ -1401,11 +1491,13 @@ orders = frozen_cfg(
 )
 """_"""
 
-__pdoc__["orders"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
+__pdoc__["orders"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["orders"] = orders
 
@@ -1420,11 +1512,13 @@ trades = frozen_cfg(
 )
 """_"""
 
-__pdoc__["trades"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
+__pdoc__["trades"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["trades"] = trades
 
@@ -1433,11 +1527,13 @@ logs = frozen_cfg(
 )
 """_"""
 
-__pdoc__["logs"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
+__pdoc__["logs"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["logs"] = logs
 
@@ -1627,11 +1723,13 @@ portfolio = frozen_cfg(
 )
 """_"""
 
-__pdoc__["portfolio"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
+__pdoc__["portfolio"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["portfolio"] = portfolio
 
@@ -1699,11 +1797,13 @@ pfopt = frozen_cfg(
 )
 """_"""
 
-__pdoc__["pfopt"] = Sub("""Sub-config with settings applied across `vectorbtpro.portfolio.pfopt`.
+__pdoc__["pfopt"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.portfolio.pfopt`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["pfopt"] = pfopt
 
@@ -1722,7 +1822,8 @@ messaging = frozen_cfg(
 )
 """_"""
 
-__pdoc__["messaging"] = Sub("""Sub-config with settings applied across `vectorbtpro.messaging`.
+__pdoc__["messaging"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.messaging`.
 
 ```python
 ${config_doc}
@@ -1739,22 +1840,36 @@ python-telegram-bot:
 GIPHY:
     Sub-config with settings applied to 
     [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
-""")
+"""
+)
 
 _settings["messaging"] = messaging
 
 pbar = frozen_cfg(
     disable=False,
+    disable_desc=False,
+    disable_registry=False,
+    disable_machinery=False,
     type="tqdm_auto",
-    kwargs=flex_cfg(),
+    reuse=True,
+    kwargs=flex_cfg(
+        delay=2,
+    ),
+    desc_kwargs=flex_cfg(
+        as_postfix=True,
+        refresh=False,
+    ),
+    silence_warnings=False,
 )
 """_"""
 
-__pdoc__["pbar"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.pbar`.
+__pdoc__["pbar"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.pbar`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["pbar"] = pbar
 
@@ -1768,11 +1883,13 @@ path = frozen_cfg(
 )
 """_"""
 
-__pdoc__["path"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.path_`.
+__pdoc__["path"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.path_`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["path"] = path
 
@@ -1784,11 +1901,13 @@ search = frozen_cfg(
 )
 """_"""
 
-__pdoc__["search"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.search`.
+__pdoc__["search"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.search`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
 _settings["search"] = search
 

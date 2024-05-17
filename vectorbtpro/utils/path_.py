@@ -2,11 +2,12 @@
 
 """Utilities for working with paths."""
 
-from pathlib import Path
+import shutil
 from glob import glob
 from itertools import islice
+from pathlib import Path
+
 import humanize
-import shutil
 
 from vectorbtpro import _typing as tp
 
@@ -84,7 +85,7 @@ def dir_size(dir_path: tp.PathLike, readable: bool = True, **kwargs) -> tp.Union
     dir_path = Path(dir_path)
     if not dir_exists(dir_path):
         raise FileNotFoundError(f"Directory '{dir_path}' not found")
-    n_bytes = sum(path.stat().st_size for path in dir_path.glob('**/*') if path.is_file())
+    n_bytes = sum(path.stat().st_size for path in dir_path.glob("**/*") if path.is_file())
     if readable:
         return humanize.naturalsize(n_bytes, **kwargs)
     return n_bytes

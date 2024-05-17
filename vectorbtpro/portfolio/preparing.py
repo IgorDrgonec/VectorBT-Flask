@@ -7,26 +7,28 @@ from collections import namedtuple
 from functools import cached_property as cachedproperty
 
 import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.preparing import BasePreparer
-from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
-from vectorbtpro.base.reshaping import to_2d_array, broadcast_array_to, broadcast_arrays, broadcast
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexing import AutoIdxr
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
+from vectorbtpro.base.indexing import AutoIdxr
+from vectorbtpro.base.preparing import BasePreparer
+from vectorbtpro.base.reshaping import to_2d_array, broadcast_array_to, broadcast
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.data.base import OHLCDataMixin, Data
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.signals import nb as signals_nb
+from vectorbtpro.generic.sim_range import SimRangeMixin
 from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.orders import FSOrders
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.signals import nb as signals_nb
 from vectorbtpro.utils import checks, chunking as ch
 from vectorbtpro.utils.config import Configured, merge_dicts, ReadonlyConfig
 from vectorbtpro.utils.mapping import to_field_mapping
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates, RepFunc
-from vectorbtpro.data.base import OHLCDataMixin, Data
 
 __all__ = [
     "PFPrepResult",
@@ -38,7 +40,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
 
 PFPrepResultT = tp.TypeVar("PFPrepResultT", bound="PFPrepResult")
 
@@ -120,7 +121,9 @@ base_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["base_arg_config"] = f"""Argument config for `BasePFPreparer`.
+__pdoc__[
+    "base_arg_config"
+] = f"""Argument config for `BasePFPreparer`.
 
 ```python
 {base_arg_config.prettify()}
@@ -163,15 +166,31 @@ class BasePFPreparer(BasePreparer):
         call_seq = self["call_seq"]
         return checks.is_int(call_seq) and call_seq == enums.CallSeqType.Auto
 
+    @classmethod
+    def parse_data(
+        cls,
+        data: tp.Union[None, OHLCDataMixin, str, tp.ArrayLike],
+        all_ohlc: bool = False,
+    ) -> tp.Optional[OHLCDataMixin]:
+        """Parse an instance with OHLC features."""
+        if data is None:
+            return None
+        if isinstance(data, OHLCDataMixin):
+            return data
+        if isinstance(data, str):
+            return Data.from_data_str(data)
+        if isinstance(data, pd.DataFrame):
+            ohlcv_acc = data.vbt.ohlcv
+            if all_ohlc and ohlcv_acc.has_ohlc:
+                return ohlcv_acc
+            if not all_ohlc and ohlcv_acc.has_any_ohlc:
+                return ohlcv_acc
+        return None
+
     @cachedproperty
     def data(self) -> tp.Optional[OHLCDataMixin]:
         """Argument `data`."""
-        data = self["data"]
-        if data is None:
-            return None
-        if isinstance(data, str):
-            return Data.from_data_str(data)
-        return data
+        return self.parse_data(self["data"])
 
     # ############# Before broadcasting ############# #
 
@@ -380,16 +399,6 @@ class BasePFPreparer(BasePreparer):
             require_kwargs=self.broadcast_kwargs.get("require_kwargs", {}),
         )
 
-    def prepare_sim_start_value(self, value: tp.Scalar) -> int:
-        """Prepare a single value of `sim_start`."""
-        auto_idxr = AutoIdxr(value, indexer_method="bfill", below_to_zero=True)
-        return auto_idxr.get(self.wrapper.index, freq=self.wrapper.freq)
-
-    def prepare_sim_end_value(self, value: tp.Scalar) -> int:
-        """Prepare a single value of `sim_end`."""
-        auto_idxr = AutoIdxr(value, indexer_method="bfill", above_to_len=True)
-        return auto_idxr.get(self.wrapper.index, freq=self.wrapper.freq)
-
     @cachedproperty
     def auto_sim_start(self) -> tp.Optional[tp.ArrayLike]:
         """Get automatic `sim_start`"""
@@ -417,10 +426,10 @@ class BasePFPreparer(BasePreparer):
             new_sim_start = sim_start_arr
         else:
             if sim_start_arr.ndim == 0:
-                return self.prepare_sim_start_value(sim_start)
+                return SimRangeMixin.resolve_sim_start_value(sim_start, wrapper=self.wrapper)
             new_sim_start = np.empty(len(sim_start), dtype=np.int_)
             for i in range(len(sim_start)):
-                new_sim_start[i] = self.prepare_sim_start_value(sim_start[i])
+                new_sim_start[i] = SimRangeMixin.resolve_sim_start_value(sim_start[i], wrapper=self.wrapper)
         return self.align_pc_arr(
             new_sim_start,
             group_lens=self.sim_group_lens,
@@ -447,10 +456,10 @@ class BasePFPreparer(BasePreparer):
             new_sim_end = sim_end_arr
         else:
             if sim_end_arr.ndim == 0:
-                return self.prepare_sim_end_value(sim_end)
+                return SimRangeMixin.resolve_sim_end_value(sim_end, wrapper=self.wrapper)
             new_sim_end = np.empty(len(sim_end), dtype=np.int_)
             for i in range(len(sim_end)):
-                new_sim_end[i] = self.prepare_sim_end_value(sim_end[i])
+                new_sim_end[i] = SimRangeMixin.resolve_sim_end_value(sim_end[i], wrapper=self.wrapper)
         return self.align_pc_arr(
             new_sim_end,
             group_lens=self.sim_group_lens,
@@ -635,7 +644,9 @@ order_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["order_arg_config"] = f"""Argument config for order-related information.
+__pdoc__[
+    "order_arg_config"
+] = f"""Argument config for order-related information.
 
 ```python
 {order_arg_config.prettify()}
@@ -671,7 +682,9 @@ fo_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["fo_arg_config"] = f"""Argument config for `FOPreparer`.
+__pdoc__[
+    "fo_arg_config"
+] = f"""Argument config for `FOPreparer`.
 
 ```python
 {fo_arg_config.prettify()}
@@ -878,13 +891,13 @@ fs_arg_config = ReadonlyConfig(
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
         ),
         adjust_func_nb=dict(),
-        adjust_args=dict(substitute_templates=True),
+        adjust_args=dict(type=tuple, substitute_templates=True),
         signal_func_nb=dict(),
-        signal_args=dict(substitute_templates=True),
+        signal_args=dict(type=tuple, substitute_templates=True),
         post_signal_func_nb=dict(),
-        post_signal_args=dict(substitute_templates=True),
+        post_signal_args=dict(type=tuple, substitute_templates=True),
         post_segment_func_nb=dict(),
-        post_segment_args=dict(substitute_templates=True),
+        post_segment_args=dict(type=tuple, substitute_templates=True),
         order_mode=dict(),
         val_price=dict(
             broadcast=True,
@@ -1089,7 +1102,9 @@ fs_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["fs_arg_config"] = f"""Argument config for `FSPreparer`.
+__pdoc__[
+    "fs_arg_config"
+] = f"""Argument config for `FSPreparer`.
 
 ```python
 {fs_arg_config.prettify()}
@@ -1736,34 +1751,33 @@ class FSPreparer(BasePFPreparer):
 
 FSPreparer.override_arg_config_doc(__pdoc__)
 
-
 fof_arg_config = ReadonlyConfig(
     dict(
         segment_mask=dict(),
         call_pre_segment=dict(),
         call_post_segment=dict(),
         pre_sim_func_nb=dict(),
-        pre_sim_args=dict(substitute_templates=True),
+        pre_sim_args=dict(type=tuple, substitute_templates=True),
         post_sim_func_nb=dict(),
-        post_sim_args=dict(substitute_templates=True),
+        post_sim_args=dict(type=tuple, substitute_templates=True),
         pre_group_func_nb=dict(),
-        pre_group_args=dict(substitute_templates=True),
+        pre_group_args=dict(type=tuple, substitute_templates=True),
         post_group_func_nb=dict(),
-        post_group_args=dict(substitute_templates=True),
+        post_group_args=dict(type=tuple, substitute_templates=True),
         pre_row_func_nb=dict(),
-        pre_row_args=dict(substitute_templates=True),
+        pre_row_args=dict(type=tuple, substitute_templates=True),
         post_row_func_nb=dict(),
-        post_row_args=dict(substitute_templates=True),
+        post_row_args=dict(type=tuple, substitute_templates=True),
         pre_segment_func_nb=dict(),
-        pre_segment_args=dict(substitute_templates=True),
+        pre_segment_args=dict(type=tuple, substitute_templates=True),
         post_segment_func_nb=dict(),
-        post_segment_args=dict(substitute_templates=True),
+        post_segment_args=dict(type=tuple, substitute_templates=True),
         order_func_nb=dict(),
-        order_args=dict(substitute_templates=True),
+        order_args=dict(type=tuple, substitute_templates=True),
         flex_order_func_nb=dict(),
-        flex_order_args=dict(substitute_templates=True),
+        flex_order_args=dict(type=tuple, substitute_templates=True),
         post_order_func_nb=dict(),
-        post_order_args=dict(substitute_templates=True),
+        post_order_args=dict(type=tuple, substitute_templates=True),
         ffill_val_price=dict(),
         update_value=dict(),
         fill_pos_info=dict(),
@@ -1775,7 +1789,9 @@ fof_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["fof_arg_config"] = f"""Argument config for `FOFPreparer`.
+__pdoc__[
+    "fof_arg_config"
+] = f"""Argument config for `FOFPreparer`.
 
 ```python
 {fof_arg_config.prettify()}
@@ -1971,10 +1987,6 @@ class FOFPreparer(BasePFPreparer):
         sim_start = self["sim_start"]
         if sim_start is None:
             return None
-        if self.row_wise:
-            if checks.is_complex_sequence(sim_start):
-                raise ValueError("Simulation start must be a scalar in a row-wise simulation mode")
-            return self.prepare_sim_start_value(sim_start)
         return BasePFPreparer.sim_start.func(self)
 
     @cachedproperty
@@ -1982,10 +1994,6 @@ class FOFPreparer(BasePFPreparer):
         sim_end = self["sim_end"]
         if sim_end is None:
             return None
-        if self.row_wise:
-            if checks.is_complex_sequence(sim_end):
-                raise ValueError("Simulation end must be a scalar in a row-wise simulation mode")
-            return self.prepare_sim_end_value(sim_end)
         return BasePFPreparer.sim_end.func(self)
 
     @cachedproperty
@@ -2099,7 +2107,9 @@ fdof_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__["fdof_arg_config"] = f"""Argument config for `FDOFPreparer`.
+__pdoc__[
+    "fdof_arg_config"
+] = f"""Argument config for `FDOFPreparer`.
 
 ```python
 {fdof_arg_config.prettify()}

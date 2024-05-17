@@ -7,9 +7,9 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.indicators import nb
-from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.indicators.configs import flex_elem_param_config
 from vectorbtpro.indicators.enums import Pivot, TrendMode
+from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.config import merge_dicts
 
 __all__ = [

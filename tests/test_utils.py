@@ -7,12 +7,13 @@ from datetime import datetime as _datetime, timedelta as _timedelta, time as _ti
 from functools import wraps
 from itertools import product, combinations
 
-from pandas.tseries.frequencies import to_offset
 import pytest
 from numba import njit
 from numba.core.registry import CPUDispatcher
+from pandas.tseries.frequencies import to_offset
 
 import vectorbtpro as vbt
+from tests.utils import *
 from vectorbtpro.utils import (
     checks,
     config,
@@ -34,8 +35,6 @@ from vectorbtpro.utils import (
     chunking,
     jitting,
 )
-
-from tests.utils import *
 
 pathos_available = True
 try:

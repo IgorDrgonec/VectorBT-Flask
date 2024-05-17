@@ -3,9 +3,9 @@
 """Module with `SyntheticData`."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.data.custom.custom import CustomData
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.data.custom.custom import CustomData
 
 __all__ = [
     "SyntheticData",

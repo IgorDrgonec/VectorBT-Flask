@@ -10,6 +10,7 @@ from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepEval
 
 __all__ = [
+    "ChunkableRegistry",
     "ch_reg",
     "register_chunkable",
 ]
@@ -44,7 +45,7 @@ class ChunkedSetup(DefineMixin):
 
 
 class ChunkableRegistry:
-    """Class that registers chunkable functions."""
+    """Class for registering chunkable functions."""
 
     def __init__(self) -> None:
         self._setups = {}

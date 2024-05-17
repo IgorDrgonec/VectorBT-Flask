@@ -8,3 +8,4 @@ if TYPE_CHECKING:
     from vectorbtpro.registries.ca_registry import *
     from vectorbtpro.registries.ch_registry import *
     from vectorbtpro.registries.jit_registry import *
+    from vectorbtpro.registries.pbar_registry import *

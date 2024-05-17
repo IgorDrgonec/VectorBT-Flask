@@ -21,7 +21,7 @@ Using `Drawdowns.from_price`, you can generate drawdown records for any time ser
 ... ).get('Close')
 ```
 
-[=100% "100%"]{: .candystripe}
+[=100% "100%"]{: .candystripe .candystripe-animate }
 
 ```pycon
 >>> price = price.rename(None)
@@ -284,15 +284,21 @@ class Drawdowns(Ranges):
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         attach_data: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> DrawdownsT:
         """Build `Drawdowns` from price.
 
         `**kwargs` will be passed to `Drawdowns.__init__`."""
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+
         close_arr = to_2d_array(close)
         open_arr = to_2d_array(open) if open is not None else None
         high_arr = to_2d_array(high) if high is not None else None
@@ -300,8 +306,18 @@ class Drawdowns(Ranges):
 
         func = jit_reg.resolve_option(nb.get_drawdowns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        records_arr = func(open=open_arr, high=high_arr, low=low_arr, close=close_arr)
-        wrapper = ArrayWrapper.from_obj(close, **resolve_dict(wrapper_kwargs))
+        records_arr = func(
+            open=open_arr,
+            high=high_arr,
+            low=low_arr,
+            close=close_arr,
+            sim_start=sim_start,
+            sim_end=sim_end,
+        )
+        if wrapper is None:
+            wrapper = ArrayWrapper.from_obj(close, **resolve_dict(wrapper_kwargs))
+        elif len(wrapper_kwargs) > 0:
+            wrapper = wrapper.replace(**wrapper_kwargs)
         return cls(
             wrapper,
             records_arr,
@@ -637,10 +653,20 @@ class Drawdowns(Ranges):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
-            period=dict(
-                title="Period",
+            start_index=dict(
+                title="Start Index",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end_index=dict(
+                title="End Index",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            total_duration=dict(
+                title="Total Duration",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
@@ -916,21 +942,21 @@ class Drawdowns(Ranges):
             recovery_return = self_col.recovery_return.values
             status = self_col.get_field_arr("status")
 
-            decline_duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
-                self_col.decline_duration.values,
-                to_pd=True,
-                silence_warnings=True
-            ).astype(str))
-            recovery_duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
-                self_col.recovery_duration.values,
-                to_pd=True,
-                silence_warnings=True
-            ).astype(str))
-            duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
-                self_col.duration.values,
-                to_pd=True,
-                silence_warnings=True
-            ).astype(str))
+            decline_duration = to_1d_array(
+                self_col.wrapper.arr_to_timedelta(
+                    self_col.decline_duration.values, to_pd=True, silence_warnings=True
+                ).astype(str)
+            )
+            recovery_duration = to_1d_array(
+                self_col.wrapper.arr_to_timedelta(
+                    self_col.recovery_duration.values, to_pd=True, silence_warnings=True
+                ).astype(str)
+            )
+            duration = to_1d_array(
+                self_col.wrapper.arr_to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True).astype(
+                    str
+                )
+            )
 
             # Peak and recovery at same time -> recovery wins
             peak_mask = (start_val != np.roll(end_val, 1)) | (start_idx != np.roll(end_idx, 1))

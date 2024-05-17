@@ -3,13 +3,13 @@
 """Base class for working with records that can make use of OHLC data."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.generic import nb
 from vectorbtpro.records.base import Records
-from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.records.decorators import attach_shortcut_properties
+from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import ReadonlyConfig
 
@@ -316,10 +316,9 @@ class PriceRecords(Records):
         """Get a mapped array with the closing time of the bar."""
         if self.wrapper.freq is None:
             raise ValueError("Must provide frequency")
-        return self.map_array(Resampler.get_rbound_index(
-            index=self.wrapper.index[self.idx_arr],
-            freq=self.wrapper.freq
-        ), **kwargs)
+        return self.map_array(
+            Resampler.get_rbound_index(index=self.wrapper.index[self.idx_arr], freq=self.wrapper.freq), **kwargs
+        )
 
     def get_bar_open(self, **kwargs) -> MappedArray:
         """Get a mapped array with the opening price of the bar."""

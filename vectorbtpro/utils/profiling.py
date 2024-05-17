@@ -4,8 +4,8 @@
 
 import tracemalloc
 from datetime import timedelta
-from timeit import default_timer, Timer as Timer_timeit
 from functools import wraps, partial
+from timeit import default_timer, Timer as Timer_timeit
 
 import humanize
 
@@ -104,10 +104,13 @@ def with_timer(
             with Timer(**timer_kwargs) as timer:
                 out = func(*args, **kwargs)
             elapsed = timer.elapsed(**elapsed_kwargs)
-            print_func(print_format.format(
-                func_name=func.__qualname__,
-                elapsed=elapsed,
-            ), **print_kwargs)
+            print_func(
+                print_format.format(
+                    func_name=func.__qualname__,
+                    elapsed=elapsed,
+                ),
+                **print_kwargs,
+            )
             return out
 
         return wrapper
@@ -170,10 +173,13 @@ def with_timeit(
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             elapsed = timeit(partial(func, *args, **kwargs), **timeit_kwargs)
-            print_func(print_format.format(
-                func_name=func.__qualname__,
-                elapsed=elapsed,
-            ), **print_kwargs)
+            print_func(
+                print_format.format(
+                    func_name=func.__qualname__,
+                    elapsed=elapsed,
+                ),
+                **print_kwargs,
+            )
             return func(*args, **kwargs)
 
         return wrapper
@@ -270,11 +276,14 @@ def with_memtracer(
         def wrapper(*args, **kwargs) -> tp.Any:
             with MemTracer(**memtracer_kwargs) as memtracer:
                 out = func(*args, **kwargs)
-            print_func(print_format.format(
-                func_name=func.__qualname__,
-                peak_usage=memtracer.peak_usage(**usage_kwargs),
-                final_usage=memtracer.final_usage(**usage_kwargs),
-            ), **print_kwargs)
+            print_func(
+                print_format.format(
+                    func_name=func.__qualname__,
+                    peak_usage=memtracer.peak_usage(**usage_kwargs),
+                    final_usage=memtracer.final_usage(**usage_kwargs),
+                ),
+                **print_kwargs,
+            )
             return out
 
         return wrapper

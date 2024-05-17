@@ -2,14 +2,14 @@
 
 """Module with `FileData`."""
 
-from pathlib import Path
-from glob import glob
 import re
+from glob import glob
+from pathlib import Path
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
 from vectorbtpro.data.base import key_dict
 from vectorbtpro.data.custom.local import LocalData
+from vectorbtpro.utils import checks
 
 __all__ = [
     "FileData",

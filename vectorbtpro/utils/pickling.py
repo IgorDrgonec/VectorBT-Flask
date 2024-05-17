@@ -2,20 +2,20 @@
 
 """Utilities for pickling."""
 
-import humanize
 import ast
 from pathlib import Path
 
+import humanize
 import numpy as np
 import pandas as pd
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.attr_ import DefineMixin, define
-from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
+from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import Prettified, prettify_dict
+from vectorbtpro.utils.path_ import check_mkdir
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
@@ -215,7 +215,7 @@ def loads(bytes_: bytes, compression: tp.Union[None, bool, str] = None, **kwargs
 
 
 def save(
-    obj: object,
+    obj: tp.Any,
     path: tp.Optional[tp.PathLike] = None,
     mkdir_kwargs: tp.KwargsLike = None,
     compression: tp.Union[None, bool, str] = None,
@@ -244,7 +244,7 @@ def save(
     return path
 
 
-def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> object:
+def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> tp.Any:
     """Read a byte stream from a file and unpickle.
 
     Can recognize the compression algorithm based on the extension (see `dumps` for options).
@@ -333,7 +333,7 @@ def get_class_from_id(class_id: str) -> tp.Optional[tp.Type]:
     raise ValueError(f"Please register an instance of RecInfo for '{class_id}'")
 
 
-def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> object:
+def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> tp.Any:
     """Reconstruct an instance using a class and a reconstruction state."""
     from vectorbtpro.utils.module_ import find_class
 

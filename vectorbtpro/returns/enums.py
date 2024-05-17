@@ -31,7 +31,7 @@ class RollSharpeAIS(tp.NamedTuple):
 __pdoc__[
     "RollSharpeAIS"
 ] = """A named tuple representing the input state of 
-`vectorbtpro.returns.nb.rolling_sharpe_acc_nb`."""
+`vectorbtpro.returns.nb.rolling_sharpe_ratio_acc_nb`."""
 
 
 class RollSharpeAOS(tp.NamedTuple):
@@ -44,4 +44,4 @@ class RollSharpeAOS(tp.NamedTuple):
 __pdoc__[
     "RollSharpeAOS"
 ] = """A named tuple representing the output state of 
-`vectorbtpro.returns.nb.rolling_sharpe_acc_nb`."""
+`vectorbtpro.returns.nb.rolling_sharpe_ratio_acc_nb`."""

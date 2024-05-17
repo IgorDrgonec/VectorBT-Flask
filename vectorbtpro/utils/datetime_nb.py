@@ -5,82 +5,82 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.datetime_ import DTCNT
 from vectorbtpro.utils.formatting import prettify
-from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = []
 
 __pdoc__ = {}
 
 us_ns = 1000
-"""Microsecond (nanoseconds)."""
+"""Microsecond in nanoseconds."""
 
 ms_ns = us_ns * 1000
-"""Millisecond (nanoseconds)."""
+"""Millisecond in nanoseconds."""
 
 s_ns = ms_ns * 1000
-"""Second (nanoseconds)."""
+"""Second in nanoseconds."""
 
 m_ns = s_ns * 60
-"""Minute (nanoseconds)."""
+"""Minute in nanoseconds."""
 
 h_ns = m_ns * 60
-"""Hour (nanoseconds)."""
+"""Hour in nanoseconds."""
 
 d_ns = h_ns * 24
-"""Day (nanoseconds)."""
+"""Day in nanoseconds."""
 
 w_ns = d_ns * 7
-"""Week (nanoseconds)."""
+"""Week in nanoseconds."""
 
 y_ns = (d_ns * 438291) // 1200
-"""Year (nanoseconds)."""
+"""Year in nanoseconds."""
 
 q_ns = y_ns // 4
-"""Quarter (nanoseconds)."""
+"""Quarter in nanoseconds."""
 
 mo_ns = q_ns // 3
-"""Month (nanoseconds)."""
+"""Month in nanoseconds."""
 
 semi_mo_ns = mo_ns // 2
-"""Semi-month (nanoseconds)."""
+"""Semi-month in nanoseconds."""
 
 ns_td = np.timedelta64(1, "ns")
-"""Nanosecond (timedelta)."""
+"""Nanosecond as a timedelta."""
 
 us_td = np.timedelta64(us_ns, "ns")
-"""Microsecond (timedelta)."""
+"""Microsecond as a timedelta."""
 
 ms_td = np.timedelta64(ms_ns, "ns")
-"""Millisecond (timedelta)."""
+"""Millisecond as a timedelta."""
 
 s_td = np.timedelta64(s_ns, "ns")
-"""Second (timedelta)."""
+"""Second as a timedelta."""
 
 m_td = np.timedelta64(m_ns, "ns")
-"""Minute (timedelta)."""
+"""Minute as a timedelta."""
 
 h_td = np.timedelta64(h_ns, "ns")
-"""Hour (timedelta)."""
+"""Hour as a timedelta."""
 
 d_td = np.timedelta64(d_ns, "ns")
-"""Day (timedelta)."""
+"""Day as a timedelta."""
 
 w_td = np.timedelta64(w_ns, "ns")
-"""Week (timedelta)."""
+"""Week as a timedelta."""
 
 semi_mo_td = np.timedelta64(semi_mo_ns, "ns")
-"""Semi-month (timedelta)."""
+"""Semi-month as a timedelta."""
 
 mo_td = np.timedelta64(mo_ns, "ns")
-"""Month (timedelta)."""
+"""Month as a timedelta."""
 
 q_td = np.timedelta64(q_ns, "ns")
-"""Quarter (timedelta)."""
+"""Quarter as a timedelta."""
 
 y_td = np.timedelta64(y_ns, "ns")
-"""Year (timedelta)."""
+"""Year as a timedelta."""
 
 unix_epoch_dt = np.datetime64(0, "ns")
 """Unix epoch (datetime)."""
@@ -550,7 +550,7 @@ def within_periodic_dtc_nb(
             prev_status=prev_status,
             closed_start=closed_start,
             closed_end=closed_end,
-            is_last=is_last
+            is_last=is_last,
         )
         status_before_end = within_fixed_dtc_nb(
             c,
@@ -559,7 +559,7 @@ def within_periodic_dtc_nb(
             prev_status=prev_status,
             closed_start=closed_start,
             closed_end=closed_end,
-            is_last=is_last
+            is_last=is_last,
         )
         if status_after_start == DTCS.O and status_before_end == DTCS.O:
             return DTCS.O
@@ -578,7 +578,7 @@ def within_periodic_dtc_nb(
         prev_status=prev_status,
         closed_start=closed_start,
         closed_end=closed_end,
-        is_last=is_last
+        is_last=is_last,
     )
 
 

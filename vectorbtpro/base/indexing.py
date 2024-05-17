@@ -2,23 +2,23 @@
 
 """Classes and functions for indexing."""
 
-from functools import partial
 import functools
 from datetime import time
+from functools import partial
 
 import numpy as np
 import pandas as pd
-from pandas.tseries.frequencies import to_offset
+from pandas.tseries.offsets import BaseOffset
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
-from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.config import hdict, merge_dicts
-from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
+from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.selection import PosSel, LabelSel
-from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils.template import CustomTemplate
 
 __all__ = [
     "PandasIndexer",
@@ -1036,8 +1036,7 @@ class PointIdxr(UniIdxr, DefineMixin):
     add_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `on`.
     
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+    Gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`."""
 
     kind: tp.Optional[str] = define.field(default=None)
     """Kind of data in `on`: indices or labels.
@@ -1167,11 +1166,13 @@ def get_index_points(
         start = dt.try_align_dt_to_index(start, index)
     if end is not None and isinstance(end, str):
         end = dt.try_align_dt_to_index(end, index)
+    if every is not None and not checks.is_int(every):
+        every = dt.to_freq(every)
 
     start_used = False
     end_used = False
     if at_time is not None and every is None and on is None:
-        every = "D"
+        every = pd.Timedelta(days=1)
     if every is not None:
         start_used = True
         end_used = True
@@ -1328,8 +1329,7 @@ class RangeIdxr(UniIdxr, DefineMixin):
     If `lookback_period` is set, `start` becomes `end-lookback_period`. If `every` is not None, 
     the sequence is generated from `start+lookback_period` to `end` and then assigned to `end`.
 
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html).
+    If string, gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`.
     If integer, gets multiplied by the frequency of the index if the index is not integer."""
 
     start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = define.field(default=None)
@@ -1370,14 +1370,12 @@ class RangeIdxr(UniIdxr, DefineMixin):
     add_start_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `start`.
 
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+    If string, gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`."""
 
     add_end_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `end`.
 
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+    If string, gets converted to a proper offset/timedelta using `vectorbtpro.utils.datetime_.to_freq`."""
 
     kind: tp.Optional[str] = define.field(default=None)
     """Kind of data in `on`: indices, labels or bounds.
@@ -1657,11 +1655,10 @@ def get_index_ranges(
                 except Exception as e:
                     end = pd.Index([end])
         naive_index = index
+    if every is not None and not checks.is_int(every):
+        every = dt.to_freq(every)
     if lookback_period is not None and not checks.is_int(lookback_period):
-        try:
-            lookback_period = to_offset(lookback_period)
-        except Exception as e:
-            lookback_period = to_offset(pd.Timedelta(lookback_period))
+        lookback_period = dt.to_freq(lookback_period)
     if fixed_start and lookback_period is not None:
         raise ValueError("Cannot use fixed_start and lookback_period together")
     if exact_start and lookback_period is not None:
@@ -1669,7 +1666,7 @@ def get_index_ranges(
 
     if start_time is not None or end_time is not None:
         if every is None and start is None and end is None:
-            every = "D"
+            every = pd.Timedelta(days=1)
     if every is not None:
         if not fixed_start:
             if start_time is None and end_time is not None:
@@ -1745,14 +1742,27 @@ def get_index_ranges(
             else:
                 if checks.is_int(lookback_period):
                     lookback_period *= dt.infer_index_freq(naive_index, freq=index_freq)
-                end = dt.date_range(
-                    start_date + lookback_period,
-                    end_date,
-                    freq=every,
-                    normalize=normalize_every,
-                    inclusive="both",
-                )
-                start = end - lookback_period
+                if isinstance(lookback_period, BaseOffset):
+                    end = dt.date_range(
+                        start_date,
+                        end_date,
+                        freq=every,
+                        normalize=normalize_every,
+                        inclusive="both",
+                    )
+                    start = end - lookback_period
+                    start_mask = start >= start_date
+                    start = start[start_mask]
+                    end = end[start_mask]
+                else:
+                    end = dt.date_range(
+                        start_date + lookback_period,
+                        end_date,
+                        freq=every,
+                        normalize=normalize_every,
+                        inclusive="both",
+                    )
+                    start = end - lookback_period
             kind = "bounds"
             lookback_period = None
 

@@ -1,12 +1,10 @@
 import os
-from datetime import datetime
 
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.portfolio.enums import *
-
 from tests.utils import *
+from vectorbtpro.portfolio.enums import *
 
 seed = 42
 
@@ -14,9 +12,7 @@ day_dt = np.timedelta64(86400000000000)
 
 price = pd.Series(
     [1.0, 2.0, 3.0, 4.0, 5.0],
-    index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 price_wide = price.vbt.tile(3, keys=["a", "b", "c"])
 
@@ -2396,6 +2392,9 @@ class TestFromOrders:
             from_orders_both(size=order_size_wide, sim_start=1).order_records,
             from_orders_both(size=_order_size_wide).order_records,
         )
+        np.testing.assert_array_equal(
+            from_orders_both(size=order_size_wide, sim_start=1).sim_start, np.array([1, 1, 1])
+        )
         assert_records_close(
             from_orders_both(size=order_size_wide, sim_start=1).order_records,
             from_orders_both(size=_order_size_wide, sim_start="auto").order_records,
@@ -2406,6 +2405,7 @@ class TestFromOrders:
             from_orders_both(size=order_size_wide, sim_end=2).order_records,
             from_orders_both(size=_order_size_wide).order_records,
         )
+        np.testing.assert_array_equal(from_orders_both(size=order_size_wide, sim_end=2).sim_end, np.array([2, 2, 2]))
         assert_records_close(
             from_orders_both(size=order_size_wide, sim_end=2).order_records,
             from_orders_both(size=_order_size_wide, sim_end="auto").order_records,
@@ -2418,6 +2418,9 @@ class TestFromOrders:
             from_orders_both(size=order_size_wide, sim_start=[1, 2, 3]).order_records,
             from_orders_both(size=_order_size_wide).order_records,
         )
+        np.testing.assert_array_equal(
+            from_orders_both(size=order_size_wide, sim_start=[1, 2, 3]).sim_start, np.array([1, 2, 3])
+        )
         assert_records_close(
             from_orders_both(size=order_size_wide, sim_start=[1, 2, 3]).order_records,
             from_orders_both(size=_order_size_wide, sim_start="auto").order_records,
@@ -2427,6 +2430,10 @@ class TestFromOrders:
         assert_records_close(
             from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 2, 3]).order_records,
             from_orders_both(size=_order_size_wide, group_by=[0, 0, 1]).order_records,
+        )
+        np.testing.assert_array_equal(
+            from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 2, 3]).sim_start,
+            np.array([1, 3]),
         )
         assert_records_close(
             from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 2, 3]).order_records,

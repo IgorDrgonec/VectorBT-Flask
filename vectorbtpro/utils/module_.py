@@ -2,16 +2,16 @@
 
 """Utilities for modules."""
 
-import warnings
 import importlib
 import importlib.util
 import inspect
 import pkgutil
 import sys
+import urllib.request
+import warnings
+import webbrowser
 from pathlib import Path
 from types import ModuleType, FunctionType
-import webbrowser
-import urllib.request
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._opt_deps import opt_dep_config
@@ -27,11 +27,12 @@ __all__ = [
 
 __pdoc__ = {}
 
-
 package_shortcut_config = HybridConfig(dict(vbt="vectorbtpro", pd="pandas", np="numpy", nb="numba"))
 """_"""
 
-__pdoc__["package_shortcut_config"] = f"""Config for package shortcuts.
+__pdoc__[
+    "package_shortcut_config"
+] = f"""Config for package shortcuts.
 
 ```python
 {package_shortcut_config.prettify()}

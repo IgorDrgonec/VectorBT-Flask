@@ -296,9 +296,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         # Check subplot_settings
         missed_keys = set(subplot_settings.keys()).difference(set(subplots_dct.keys()))
         if len(missed_keys) > 0:
-            raise ValueError(
-                f"Keys {missed_keys} in subplot_settings could not be matched with any subplot"
-            )
+            raise ValueError(f"Keys {missed_keys} in subplot_settings could not be matched with any subplot")
 
         # Merge settings
         opt_arg_names_dct = {}
@@ -342,9 +340,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                     subplots_dct.pop(subplot_name, None)
                     continue
 
-            custom_arg_names = set(_subplot_settings.keys()).union(
-                set(passed_subplot_settings.keys())
-            )
+            custom_arg_names = set(_subplot_settings.keys()).union(set(passed_subplot_settings.keys()))
             opt_arg_names = set(opt_settings.keys())
             custom_reself = reself.resolve_self(
                 cond_kwargs=merged_settings,
@@ -396,11 +392,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                     if to_remove:
                         if to_check and warning_message is not None and not _silence_warnings:
                             warnings.warn(warning_message)
-                        if (
-                            inv_to_check
-                            and inv_warning_message is not None
-                            and not _silence_warnings
-                        ):
+                        if inv_to_check and inv_warning_message is not None and not _silence_warnings:
                             warnings.warn(inv_warning_message)
 
                         subplots_dct.pop(subplot_name, None)
@@ -611,9 +603,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                     if resolve_path_arg:
                                         if call_attr:
                                             cond_kwargs = {
-                                                k: v
-                                                for k, v in _final_kwargs.items()
-                                                if k in _opt_arg_names
+                                                k: v for k, v in _final_kwargs.items() if k in _opt_arg_names
                                             }
                                             out = custom_reself.resolve_attr(
                                                 attr,  # do not pass _attr, important for caching
@@ -730,7 +720,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         found_ids = dict()
         unique_idx = 0
         for trace in fig.data:
-            if trace["showlegend"] and trace["legendgroup"] is None:
+            if trace["showlegend"] is not False and trace["legendgroup"] is None:
                 if "name" in trace:
                     name = trace["name"]
                 else:

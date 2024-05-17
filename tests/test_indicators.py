@@ -3,12 +3,10 @@ from collections import namedtuple
 from datetime import datetime
 from itertools import product
 
-import numpy as np
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-
 from tests.utils import *
 
 ta_available = True
@@ -56,9 +54,7 @@ def teardown_module():
 
 ts = pd.DataFrame(
     {"a": [1.0, 2.0, 3.0, 4.0, 5.0], "b": [5.0, 4.0, 3.0, 2.0, 1.0], "c": [1.0, 2.0, 3.0, 2.0, 1.0]},
-    index=pd.DatetimeIndex(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5),
 )
 
 
@@ -2182,7 +2178,7 @@ class TestFactory:
                     4.333333333333333,
                 ],
                 index=pd.Index(
-                    ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max"],
+                    ["Start Index", "End Index", "Total Duration", "Count", "Mean", "Std", "Min", "Median", "Max"],
                     dtype="object",
                 ),
                 name="agg_stats",
@@ -2317,9 +2313,9 @@ class TestFactory:
                 ],
                 index=pd.Index(
                     [
-                        "Start",
-                        "End",
-                        "Period",
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
                         "Total",
                         "Rate [%]",
                         "First Index",
@@ -2357,7 +2353,14 @@ class TestFactory:
             pd.Series(
                 [0.0, 1.0, 2.0, 0.5, 0.5, 1.0],
                 index=pd.Index(
-                    ["Start", "End", "Period", "Value Counts: None", "Value Counts: Hello", "Value Counts: World"],
+                    [
+                        "Start Index",
+                        "End Index",
+                        "Total Duration",
+                        "Value Counts: None",
+                        "Value Counts: Hello",
+                        "Value Counts: World",
+                    ],
                     dtype="object",
                 ),
                 name="agg_stats",
@@ -2786,7 +2789,8 @@ class TestFactory:
             vbt.IF.from_talib("MACD", fastperiod=2, slowperiod=3, signalperiod=4).run(ts["a"]).macdsignal,
         )
 
-        I = vbt.IndicatorFactory.from_expr("""
+        I = vbt.IndicatorFactory.from_expr(
+            """
         @settings({
             'factory_kwargs': {
                 'input_names': ['ts1', 'ts2'], 
@@ -2799,7 +2803,8 @@ class TestFactory:
         o1 = rolling_mean(ts1, window1)
         o2 = rolling_mean(ts2, window2)
         o1, o2
-        """)
+        """
+        )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
         assert_frame_equal(I.run(ts, ts * 2).o3, ts.vbt.rolling_mean(2))
@@ -2825,7 +2830,8 @@ class TestFactory:
         assert I.param_names == ("window1", "window2")
         assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
         assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
-        I = vbt.IndicatorFactory.from_expr("""
+        I = vbt.IndicatorFactory.from_expr(
+            """
         @settings({
             'factory_kwargs': {
                 'input_names': ['ts1', 'ts2'], 
@@ -2844,7 +2850,8 @@ class TestFactory:
         o1 = rolling_mean(ts1, window1)
         o2 = rolling_mean(ts2, window2)
         o1, o2
-        """)
+        """
+        )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
         assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))

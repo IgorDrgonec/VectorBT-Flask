@@ -5,8 +5,8 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base.flex_indexing import flex_select_nb
+from vectorbtpro.registries.jit_registry import register_jitted
 
 
 @register_jitted(cache=True)

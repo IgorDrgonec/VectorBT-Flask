@@ -10,13 +10,7 @@ Run for the examples below:
 >>> price = pd.DataFrame({
 ...     'a': [1, 2, 3, 4, 5],
 ...     'b': [5, 4, 3, 2, 1]
-... }, index=pd.Index([
-...     datetime(2020, 1, 1),
-...     datetime(2020, 1, 2),
-...     datetime(2020, 1, 3),
-...     datetime(2020, 1, 4),
-...     datetime(2020, 1, 5),
-... ])).astype(float)
+... }, index=pd.date_range("2020", periods=5)).astype(float)
 >>> price
             a    b
 2020-01-01  1.0  5.0
@@ -26,15 +20,14 @@ Run for the examples below:
 2020-01-05  5.0  1.0
 ```"""
 
+import fnmatch
 import functools
 import inspect
 import itertools
 import re
 import warnings
 from collections import Counter, OrderedDict
-from datetime import datetime, timedelta
 from types import ModuleType
-import fnmatch
 
 import numpy as np
 import pandas as pd
@@ -44,8 +37,8 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref
 from vectorbtpro.base.merging import row_stack_arrays, column_stack_arrays
+from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
@@ -53,12 +46,14 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured, HybridConfig
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
+from vectorbtpro.utils.module_ import search_package_for_funcs
 from vectorbtpro.utils.params import (
     to_typed_list,
     broadcast_params,
@@ -75,8 +70,6 @@ from vectorbtpro.utils.parsing import (
 )
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates, Rep
-from vectorbtpro.utils.module_ import search_package_for_funcs
-from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 
 __all__ = [
     "IndicatorBase",
@@ -119,7 +112,7 @@ def prepare_params(
 
     Resolves references and performs broadcasting to the input shape.
 
-    Returns prepared parameters as well as whether the user provided multiple parameters."""
+    Returns prepared parameters as well as whether the user provided a single parameter combination."""
     # Resolve references
     if context is None:
         context = {}
@@ -129,7 +122,7 @@ def prepare_params(
     params = [pool[k] for k in param_names]
 
     new_params = []
-    params_are_multiple = False
+    single_comb = True
     for i, param_values in enumerate(params):
         # Resolve settings
         _param_settings = resolve_dict(param_settings[i])
@@ -153,7 +146,7 @@ def prepare_params(
         template = _param_settings.get("template", None)
 
         if not is_single_param_value(param_values, is_tuple, is_array_like):
-            params_are_multiple = True
+            single_comb = False
         new_param_values = params_to_list(param_values, is_tuple, is_array_like)
         if template is not None:
             new_param_values = [
@@ -198,7 +191,7 @@ def prepare_params(
             else:
                 new_param_values = _new_param_values
         new_params.append(new_param_values)
-    return new_params, params_are_multiple
+    return new_params, single_comb
 
 
 def build_columns(
@@ -211,11 +204,9 @@ def build_columns(
     per_column: bool = False,
     ignore_ranges: bool = False,
     **kwargs,
-) -> tp.Tuple[tp.List[tp.Index], tp.Index]:
+) -> dict:
     """For each parameter in `params`, create a new column level with parameter values
-    and stack it on top of `input_columns`.
-
-    Returns a list of parameter indexes and new columns."""
+    and stack it on top of `input_columns`."""
     if level_names is not None:
         checks.assert_len_equal(params, level_names)
     if hide_levels is None:
@@ -223,7 +214,9 @@ def build_columns(
     input_columns = indexes.to_any_index(input_columns)
 
     param_indexes = []
-    visible_param_indexes = []
+    rep_param_indexes = []
+    vis_param_indexes = []
+    vis_rep_param_indexes = []
     for i in range(len(params)):
         param_values = params[i]
         level_name = None
@@ -242,37 +235,55 @@ def build_columns(
             param_values = apply_mapping(param_values, dtype)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
+
         if per_column:
             param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
-        else:
-            if _per_column:
-                param_index = None
-                for p in param_values:
-                    bc_param = broadcast_array_to(p, len(input_columns))
-                    _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
-                    if param_index is None:
-                        param_index = _param_index
-                    else:
-                        param_index = param_index.append(_param_index)
-                if len(param_index) == 1 and len(input_columns) > 1:
-                    # When using flexible column-wise parameters
-                    param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
-            else:
-                param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
+            repeat_index = False
+        elif _per_column:
+            param_index = None
+            for p in param_values:
+                bc_param = broadcast_array_to(p, len(input_columns))
+                _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
+                if param_index is None:
+                    param_index = _param_index
+                else:
+                    param_index = param_index.append(_param_index)
+            if len(param_index) == 1 and len(input_columns) > 1:
                 param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
+            repeat_index = False
+        else:
+            param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
+            repeat_index = True
+
         if _post_index_func is not None:
             param_index = _post_index_func(param_index)
+        if repeat_index:
+            rep_param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
+        else:
+            rep_param_index = param_index
         param_indexes.append(param_index)
+        rep_param_indexes.append(rep_param_index)
         if i not in hide_levels and (level_names is None or level_names[i] not in hide_levels):
-            visible_param_indexes.append(param_index)
+            vis_param_indexes.append(param_index)
+            vis_rep_param_indexes.append(rep_param_index)
+
     if not per_column:
         n_param_values = len(params[0]) if len(params) > 0 else 1
         input_columns = indexes.tile_index(input_columns, n_param_values, ignore_ranges=ignore_ranges)
-    if len(visible_param_indexes) > 0:
-        stacked_columns = indexes.stack_indexes([*visible_param_indexes, input_columns], **kwargs)
+    if len(vis_param_indexes) > 0:
+        param_index = indexes.stack_indexes(vis_param_indexes, **kwargs)
+        final_index = indexes.stack_indexes([*vis_rep_param_indexes, input_columns], **kwargs)
     else:
-        stacked_columns = input_columns
-    return param_indexes, stacked_columns
+        param_index = None
+        final_index = input_columns
+    return dict(
+        param_indexes=rep_param_indexes,
+        rep_param_indexes=rep_param_indexes,
+        vis_param_indexes=vis_param_indexes,
+        vis_rep_param_indexes=vis_rep_param_indexes,
+        param_index=param_index,
+        final_index=final_index,
+    )
 
 
 def combine_objs(
@@ -346,21 +357,21 @@ class IndicatorBase(Analyzable):
         output_names = object.__getattribute__(self, "output_names")
         if len(output_names) == 1:
             if k.startswith("output") and "output" not in output_names:
-                new_k = k[len("output"):]
+                new_k = k[len("output") :]
                 if len(new_k) == 0 or not new_k[0].isalnum():
                     try:
                         return object.__getattribute__(self, output_names[0] + new_k)
                     except AttributeError:
                         pass
             if k.startswith(short_name) and short_name not in output_names:
-                new_k = k[len(short_name):]
+                new_k = k[len(short_name) :]
                 if len(new_k) == 0 or not new_k[0].isalnum():
                     try:
                         return object.__getattribute__(self, output_names[0] + new_k)
                     except AttributeError:
                         pass
             if k.lower().startswith(short_name.lower()) and short_name.lower() not in output_names:
-                new_k = k[len(short_name):].lower()
+                new_k = k[len(short_name) :].lower()
                 if len(new_k) == 0 or not new_k[0].isalnum():
                     try:
                         return object.__getattribute__(self, output_names[0] + new_k)
@@ -400,6 +411,9 @@ class IndicatorBase(Analyzable):
         pass_packed: bool = False,
         pass_input_shape: tp.Optional[bool] = None,
         pass_wrapper: bool = False,
+        pass_param_index: bool = False,
+        pass_final_index: bool = False,
+        pass_single_comb: bool = False,
         level_names: tp.Optional[tp.Sequence[str]] = None,
         hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
         build_col_kwargs: tp.KwargsLike = None,
@@ -448,7 +462,7 @@ class IndicatorBase(Analyzable):
                 and this method will substitute them by their corresponding broadcasted objects.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`
                 to broadcast inputs.
-            template_context (dict): Mapping used to substitute templates in `args` and `kwargs`.
+            template_context (dict): Context used to substitute templates in `args` and `kwargs`.
             params (mapping or sequence of any): A mapping or sequence of parameters.
 
                 Use mapping to also supply names. If sequence, will convert to a mapping using `param_{i}` key.
@@ -507,6 +521,9 @@ class IndicatorBase(Analyzable):
 
                 Defaults to True if `require_input_shape` is True, otherwise to False.
             pass_wrapper (bool): Whether to pass the input wrapper to `custom_func` as keyword argument.
+            pass_param_index (bool): Whether to pass parameter index.
+            pass_final_index (bool): Whether to pass final index.
+            pass_single_comb (bool): Whether to pass whether there is only one parameter combination.
             level_names (list of str): A list of column level names corresponding to each parameter.
 
                 Must have the same length as `params`.
@@ -678,7 +695,7 @@ class IndicatorBase(Analyzable):
             ),
             template_context,
         )
-        param_list, params_are_multiple = prepare_params(
+        param_list, single_comb = prepare_params(
             param_list,
             param_names,
             param_settings,
@@ -731,6 +748,28 @@ class IndicatorBase(Analyzable):
         else:
             param_list_ready = param_list_unique
         n_unique_param_values = len(param_list_unique[0]) if len(param_list_unique) > 0 else 1
+
+        # Build column hierarchy for execution
+        if len(param_list) > 0 and input_columns is not None and (pass_param_index or pass_final_index):
+            # Build new column levels on top of input levels
+            build_columns_meta = build_columns(
+                param_list,
+                input_columns,
+                level_names=level_names,
+                hide_levels=hide_levels,
+                single_value=single_value,
+                param_settings=param_settings,
+                per_column=per_column,
+                **build_col_kwargs,
+            )
+            rep_param_indexes = build_columns_meta["rep_param_indexes"]
+            param_index = build_columns_meta["param_index"]
+            final_index = build_columns_meta["final_index"]
+        else:
+            # Some indicators don't have any params
+            rep_param_indexes = None
+            param_index = None
+            final_index = None
 
         # Prepare in-place outputs
         in_output_list_ready = []
@@ -798,6 +837,12 @@ class IndicatorBase(Analyzable):
                 func_kwargs["input_shape"] = input_shape_ready
             if pass_wrapper:
                 func_kwargs["wrapper"] = wrapper_ready
+            if pass_param_index:
+                func_kwargs["param_index"] = param_index
+            if pass_final_index:
+                func_kwargs["final_index"] = final_index
+            if pass_single_comb:
+                func_kwargs["single_comb"] = single_comb
             if pass_per_column:
                 func_kwargs["per_column"] = per_column
 
@@ -931,19 +976,23 @@ class IndicatorBase(Analyzable):
         if input_columns is None:
             input_columns = pd.RangeIndex(start=0, step=1, stop=input_shape[1] if len(input_shape) > 1 else 1)
 
-        # Build column hierarchy and create mappers
+        # Build column hierarchy for indicator instance
         if len(param_list) > 0:
-            # Build new column levels on top of input levels
-            param_indexes, new_columns = build_columns(
-                param_list,
-                input_columns,
-                level_names=level_names,
-                hide_levels=hide_levels,
-                single_value=single_value,
-                param_settings=param_settings,
-                per_column=per_column,
-                **build_col_kwargs,
-            )
+            if final_index is None:
+                # Build new column levels on top of input levels
+                build_columns_meta = build_columns(
+                    param_list,
+                    input_columns,
+                    level_names=level_names,
+                    hide_levels=hide_levels,
+                    single_value=single_value,
+                    param_settings=param_settings,
+                    per_column=per_column,
+                    **build_col_kwargs,
+                )
+                rep_param_indexes = build_columns_meta["rep_param_indexes"]
+                final_index = build_columns_meta["final_index"]
+
             # Build a mapper that maps old columns in inputs to new columns
             # Instead of tiling all inputs to the shape of outputs and wasting memory,
             # we just keep a mapper and perform the tiling when needed
@@ -954,18 +1003,18 @@ class IndicatorBase(Analyzable):
                 else:
                     input_mapper = np.tile(np.arange(len(input_columns)), n_param_values)
             # Build mappers to easily map between parameters and columns
-            mapper_list = [param_indexes[i] for i in range(len(param_list))]
+            mapper_list = [rep_param_indexes[i] for i in range(len(param_list))]
         else:
             # Some indicators don't have any params
-            new_columns = input_columns
+            final_index = input_columns
             input_mapper = None
             mapper_list = []
 
         # Return artifacts: no pandas objects, just a wrapper and NumPy arrays
         new_ndim = len(input_shape) if output_list[0].shape[1] == 1 else output_list[0].ndim
-        if new_ndim == 1 and params_are_multiple:
+        if new_ndim == 1 and not single_comb:
             new_ndim = 2
-        wrapper = ArrayWrapper(input_index, new_columns, new_ndim, **wrapper_kwargs)
+        wrapper = ArrayWrapper(input_index, final_index, new_ndim, **wrapper_kwargs)
 
         return (
             wrapper,
@@ -1801,11 +1850,13 @@ class IndicatorFactory(Configured):
                 attr_stats.__name__ = f"{attr_name}_stats"
                 attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
-                attr_stats.__doc__ = inspect.cleandoc("""Stats of `{attr_name}` based on the following mapping: 
+                attr_stats.__doc__ = inspect.cleandoc(
+                    """Stats of `{attr_name}` based on the following mapping: 
 
                     ```python
                     {dtype}
-                    ```""").format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
+                    ```"""
+                ).format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
 
             elif np.issubdtype(dtype, np.number):
@@ -2750,6 +2801,9 @@ Other keyword arguments are passed to `{0}.run`.
             use_cache: tp.Union[bool, CacheOutputT] = True,
             jitted_loop: bool = False,
             jitted_warmup: bool = False,
+            param_index: tp.Optional[tp.Index] = None,
+            final_index: tp.Optional[tp.Index] = None,
+            single_comb: bool = False,
             execute_kwargs: tp.KwargsLike = None,
             **_kwargs,
         ) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
@@ -2783,15 +2837,15 @@ Other keyword arguments are passed to `{0}.run`.
 
             # Append positional arguments
             more_args = ()
-            for key in kwargs_as_args:
-                if key == "per_column":
+            for k in kwargs_as_args:
+                if k == "per_column":
                     value = per_column
-                elif key == "takes_1d":
+                elif k == "takes_1d":
                     value = per_column
-                elif key == "split_columns":
+                elif k == "split_columns":
                     value = per_column
                 else:
-                    value = _kwargs.pop(key)  # important: remove from kwargs
+                    value = _kwargs.pop(k)  # important: remove from kwargs
                 more_args += (value,)
 
             # Resolve the number of parameters
@@ -2993,8 +3047,12 @@ Other keyword arguments are passed to `{0}.run`.
                 _param_tuple += (_params,)
             if not per_column and (takes_1d or split_columns):
                 _n_params = n_params * n_cols
+                keys = final_index
             else:
                 _n_params = n_params
+                keys = param_index
+            execute_kwargs = merge_dicts(dict(show_progress=False if single_comb else None), execute_kwargs)
+            execute_kwargs["keys"] = keys
 
             if pass_per_column:
                 if "per_column" not in kwargs_as_args:
@@ -3054,7 +3112,14 @@ Other keyword arguments are passed to `{0}.run`.
                 execute_kwargs=execute_kwargs,
             )
 
-        return self.with_custom_func(custom_func, pass_packed=True, **kwargs)
+        return self.with_custom_func(
+            custom_func,
+            pass_packed=True,
+            pass_param_index=True,
+            pass_final_index=True,
+            pass_single_comb=True,
+            **kwargs,
+        )
 
     # ############# Exploration ############# #
 
@@ -3643,7 +3708,7 @@ Other keyword arguments are passed to `{0}.run`.
         # To get output names, we need to run the indicator
         test_df = pd.DataFrame(
             {c: np.random.uniform(1, 10, size=(test_index_len,)) for c in input_names},
-            index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(test_index_len)],
+            index=pd.date_range("2020", periods=test_index_len),
         )
         new_args = merge_dicts({c: test_df[c] for c in input_names}, kwargs)
         result = suppress_stdout(func)(**new_args)

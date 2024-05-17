@@ -71,9 +71,7 @@ if settings["importing"]["auto_import"]:
             if hasattr(module, "__all__") and relative_name not in package.__exclude_from__all__:
                 for k in module.__all__:
                     if hasattr(package, k) and getattr(package, k) is not getattr(module, k):
-                        raise ValueError(
-                            f"Attempt to override '{k}' in '{package.__name__}' from '{mod_name}'"
-                        )
+                        raise ValueError(f"Attempt to override '{k}' in '{package.__name__}' from '{mod_name}'")
                     setattr(package, k, getattr(module, k))
                     package.__all__.append(k)
         return package
@@ -88,22 +86,36 @@ if settings["importing"]["auto_import"]:
     from vectorbtpro.returns import nb as ret_nb, enums as ret_enums
     from vectorbtpro.signals import nb as sig_nb, enums as sig_enums
     from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
+    from vectorbtpro.utils.datetime_ import (
+        to_offset as offset,
+        to_timedelta as timedelta,
+        to_freq as freq,
+        to_timezone as timezone,
+        to_timestamp as timestamp,
+        to_local_timestamp as local_timestamp,
+        to_utc_timestamp as utc_timestamp,
+        to_datetime as datetime,
+        to_local_datetime as local_datetime,
+        to_utc_datetime as utc_datetime,
+    )
 
 
 def _import_more_stuff():
     from functools import partial
     from itertools import combinations, product
     from collections import namedtuple
-    from datetime import datetime, timedelta, time
-    from time import sleep
+    from time import sleep, time as utc_time
+    from pathlib import Path
 
     import numpy as np
     import pandas as pd
     from numba import njit, prange
 
-    X = True
-    O = False
-    N = None
+    X = T = true = True
+    O = F = false = False
+    N = none = None
+    nan = float("nan")
+    inf = float("inf")
     return locals()
 
 
@@ -126,6 +138,29 @@ elif star_import.lower() == "none":
     __all__ = []
 else:
     raise ValueError(f"Invalid option '{star_import}'")
+
+
+def whats_imported():
+    """Print references and their values that got imported when running `from vectorbtpro import *`."""
+    import pandas as pd
+
+    from vectorbtpro.utils.formatting import ptable
+    from vectorbtpro.utils.module_ import get_refname
+
+    values = {}
+    for k, v in imported_stuff.items():
+        refname = get_refname(v)
+        if refname is not None and str(v).startswith("<"):
+            values[k] = refname
+        else:
+            values[k] = str(v)
+    sr = pd.Series(values, name="value")
+    sr.index.name = "reference"
+    ptable(sr)
+
+
+if "__all__" in globals():
+    __all__.append("whats_imported")
 
 __pdoc__ = dict()
 __pdoc__["_settings"] = True

@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.pbar import ProgressBar
 
 __all__ = [
     "save_animation",
@@ -63,9 +63,27 @@ def save_animation(
             Will be translated to `duration` by `1000 / fps`.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
-        pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+        pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`.
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
+
+    Usage:
+        ```pycon
+        >>> from vectorbtpro import *
+
+        >>> def plot_data_window(index, data):
+        ...     return data.loc[index].plot()
+
+        >>> data = vbt.YFData.pull("BTC-USD", start="2020", end="2021")
+        >>> vbt.save_animation(
+        ...     "plot_data_window.gif",
+        ...     data.index,
+        ...     plot_data_window,
+        ...     data,
+        ...     delta=90,
+        ...     step=10
+        ... )
+        ```
     """
     from vectorbtpro.utils.module_ import assert_can_import
 
@@ -79,21 +97,30 @@ def save_animation(
         writer_kwargs["duration"] = 1000 / fps
     if pbar_kwargs is None:
         pbar_kwargs = {}
+    if "bar_id" not in pbar_kwargs:
+        pbar_kwargs["bar_id"] = "save_animation"
     if to_image_kwargs is None:
         to_image_kwargs = {}
     if delta is None:
         delta = len(index) // 2
 
     with imageio.get_writer(fname, **writer_kwargs) as writer:
-        pbar = get_pbar(range(0, len(index) - delta + 1, step), show_progress=show_progress, **pbar_kwargs)
-        for i in pbar:
-            pbar.set_description("{} - {}".format(str(index[i]), str(index[i + delta - 1])))
-            fig = plot_func(index[i : i + delta], *args, **kwargs)
-            if fig is None:
-                continue
-            if isinstance(fig, (go.Figure, go.FigureWidget)):
-                fig = fig.to_image(format="png", **to_image_kwargs)
-            if not isinstance(fig, np.ndarray):
-                fig = imageio.imread(fig)
-            writer.append_data(fig)
-        pbar.close()
+        index_steps = range(0, len(index) - delta + 1, step)
+        with ProgressBar(index_steps, show_progress=show_progress, **pbar_kwargs) as pbar:
+            pbar.set_description("{} → {}".format(str(index[0]), str(index[0 + delta - 1])))
+
+            for i in range(len(index_steps)):
+                j = index_steps[i]
+                fig = plot_func(index[j : j + delta], *args, **kwargs)
+                if fig is None:
+                    continue
+                if isinstance(fig, (go.Figure, go.FigureWidget)):
+                    fig = fig.to_image(format="png", **to_image_kwargs)
+                if not isinstance(fig, np.ndarray):
+                    fig = imageio.imread(fig)
+                writer.append_data(fig)
+
+                if i + 1 < len(index_steps):
+                    next_j = index_steps[i + 1]
+                    pbar.set_description("{} → {}".format(str(index[next_j]), str(index[next_j + delta - 1])))
+                pbar.update()
