@@ -1992,6 +1992,7 @@ class PortfolioOptimizer(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         template_context: tp.KwargsLike = None,
+        group_execute_kwargs: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
         clean_index_kwargs: tp.KwargsLike = None,
@@ -2155,6 +2156,8 @@ class PortfolioOptimizer(Analyzable):
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
         param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
+        if group_execute_kwargs is None:
+            group_execute_kwargs = {}
         if execute_kwargs is None:
             execute_kwargs = {}
         if clean_index_kwargs is None:
@@ -2302,8 +2305,8 @@ class PortfolioOptimizer(Analyzable):
                     ),
                 )
             )
-        execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
-        results = execute(funcs_args, keys=group_index, **execute_kwargs)
+        group_execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), group_execute_kwargs)
+        results = execute(funcs_args, keys=group_index, **group_execute_kwargs)
         alloc_points, allocations = zip(*results)
 
         # Build column hierarchy
@@ -2826,6 +2829,7 @@ class PortfolioOptimizer(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         template_context: tp.KwargsLike = None,
+        group_execute_kwargs: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
         clean_index_kwargs: tp.KwargsLike = None,
@@ -3043,6 +3047,8 @@ class PortfolioOptimizer(Analyzable):
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
         param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
+        if group_execute_kwargs is None:
+            group_execute_kwargs = {}
         if execute_kwargs is None:
             execute_kwargs = {}
         if clean_index_kwargs is None:
@@ -3196,8 +3202,8 @@ class PortfolioOptimizer(Analyzable):
                     ),
                 )
             )
-        execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
-        results = execute(funcs_args, keys=group_index, **execute_kwargs)
+        group_execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), group_execute_kwargs)
+        results = execute(funcs_args, keys=group_index, **group_execute_kwargs)
         alloc_ranges, allocations = zip(*results)
 
         # Build column hierarchy
