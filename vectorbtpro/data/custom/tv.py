@@ -305,7 +305,7 @@ class TVClient(Configured):
         """Process raw data into a DataFrame."""
         search_result = re.search(r'"s":\[(.+?)\}\]', raw_data)
         if search_result is None:
-            raise ValueError("Couldn't parse data returned by TradingView")
+            raise ValueError("Couldn't parse data returned by TradingView: {}".format(raw_data))
         out = search_result.group(1)
         x = out.split(',{"')
         data = list()
@@ -414,7 +414,7 @@ class TVClient(Configured):
         while True:
             try:
                 result = self.ws.recv()
-                raw_data = raw_data + result + "\n"
+                raw_data += result + "\n"
             except Exception as e:
                 break
             if "series_completed" in result:
@@ -821,6 +821,8 @@ class TVData(RemoteData):
         extended_session: tp.Optional[bool] = None,
         pro_data: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
+        delay: tp.Optional[int] = None,
+        retries: tp.Optional[int] = None,
     ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
@@ -851,6 +853,8 @@ class TVData(RemoteData):
             extended_session (bool): Regular session if False, extended session if True.
             pro_data (bool): Whether to use pro data.
             limit (int): The maximum number of returned items.
+            delay (float): Time to sleep after each request (in seconds).
+            retries (int): The number of retries on failure to fetch data.
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
@@ -866,6 +870,8 @@ class TVData(RemoteData):
         extended_session = cls.resolve_custom_setting(extended_session, "extended_session")
         pro_data = cls.resolve_custom_setting(pro_data, "pro_data")
         limit = cls.resolve_custom_setting(limit, "limit")
+        delay = cls.resolve_custom_setting(delay, "delay")
+        retries = cls.resolve_custom_setting(retries, "retries")
 
         freq = timeframe
         if not isinstance(timeframe, str):
@@ -889,16 +895,24 @@ class TVData(RemoteData):
         else:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
 
-        df = client.get_hist(
-            symbol=symbol,
-            exchange=exchange,
-            interval=interval,
-            fut_contract=fut_contract,
-            adjustment=adjustment,
-            extended_session=extended_session,
-            pro_data=pro_data,
-            limit=limit,
-        )
+        for i in range(retries):
+            try:
+                df = client.get_hist(
+                    symbol=symbol,
+                    exchange=exchange,
+                    interval=interval,
+                    fut_contract=fut_contract,
+                    adjustment=adjustment,
+                    extended_session=extended_session,
+                    pro_data=pro_data,
+                    limit=limit,
+                )
+                break
+            except Exception as e:
+                if i == retries - 1:
+                    raise e
+                if delay is not None:
+                    time.sleep(delay)
         df.rename(
             columns={
                 "symbol": "Symbol",
