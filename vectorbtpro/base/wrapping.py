@@ -1871,6 +1871,20 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
             splitter_cls = Splitter
         return splitter_cls.split_and_take(self.index, self, *args, **kwargs)
 
+    def split_apply(
+        self,
+        apply_func: tp.Callable,
+        *args,
+        splitter_cls: tp.Optional[tp.Type[SplitterT]] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_apply`."""
+        from vectorbtpro.generic.splitting.base import Splitter, Takeable
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_apply(self.index, apply_func, Takeable(self), *args, **kwargs)
+
     # ############# Iteration ############# #
 
     def items(
@@ -2217,6 +2231,20 @@ class Wrapping(Configured, IndexApplier, ExtPandasIndexer, AttrResolverMixin, It
         if splitter_cls is None:
             splitter_cls = Splitter
         return splitter_cls.split_and_take(self.wrapper.index, self, *args, **kwargs)
+
+    def split_apply(
+        self,
+        apply_func: tp.Callable,
+        *args,
+        splitter_cls: tp.Optional[tp.Type[SplitterT]] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_apply`."""
+        from vectorbtpro.generic.splitting.base import Splitter, Takeable
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_apply(self.wrapper.index, apply_func, Takeable(self), *args, **kwargs)
 
     # ############# Iteration ############# #
 

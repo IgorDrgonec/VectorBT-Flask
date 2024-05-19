@@ -1757,10 +1757,8 @@ class Splitter(Analyzable):
 
         Keyword arguments `splitter_kwargs` are passed to the factory method. Keyword arguments
         `take_kwargs` are passed to `Splitter.take`. If variable keyword arguments are provided, they
-        will be used as `splitter_kwargs` if `take_kwargs` is already set, and vice versa. If
-        `splitter_kwargs` and `take_kwargs` aren't set, they will be used as `take_kwargs` if a splitter
-        instance has been built, otherwise arguments will be distributed based on the signatures of the
-        factory method and `Splitter.take`. If both arguments are set, will raise an error."""
+        will be used as `take_kwargs` if a splitter instance has been built, otherwise, arguments will
+        be distributed based on the signatures of the factory method and `Splitter.take`."""
         if splitter_kwargs is None:
             splitter_kwargs = {}
         else:
@@ -1809,7 +1807,7 @@ class Splitter(Analyzable):
         if splitter is None:
             splitter = cls.guess_method(**splitter_kwargs)
         if splitter is None:
-            raise ValueError("Must provide splitter")
+            raise ValueError("Must provide splitter or split instruction")
         if not isinstance(splitter, cls):
             if isinstance(splitter, str):
                 splitter = getattr(cls, splitter)
@@ -1821,6 +1819,91 @@ class Splitter(Analyzable):
             if k not in take_kwargs:
                 take_kwargs[k] = v
         return splitter.take(obj, template_context=template_context, **take_kwargs)
+
+    @classmethod
+    def split_and_apply(
+        cls,
+        index: tp.IndexLike,
+        apply_func: tp.Callable,
+        *apply_args,
+        splitter: tp.Union[None, str, SplitterT, tp.Callable] = None,
+        splitter_kwargs: tp.KwargsLike = None,
+        apply_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        _splitter_kwargs: tp.KwargsLike = None,
+        _apply_kwargs: tp.KwargsLike = None,
+        **var_kwargs,
+    ) -> tp.Any:
+        """Split an index and apply a function.
+
+        Argument `splitter` can be an actual `Splitter` instance, the name of a factory method
+        (such as "from_n_rolling"), or the factory method itself. If `splitter` is None,
+        the right method will be guessed based on the supplied arguments using `Splitter.guess_method`.
+
+        Keyword arguments `splitter_kwargs` are passed to the factory method. Keyword arguments
+        `apply_kwargs` are passed to `Splitter.apply`. If variable keyword arguments are provided, they
+        will be used as `apply_kwargs` if a splitter instance has been built, otherwise, arguments will
+        be distributed based on the signatures of the factory method and `Splitter.apply`."""
+        if splitter_kwargs is None:
+            splitter_kwargs = {}
+        else:
+            splitter_kwargs = dict(splitter_kwargs)
+        if apply_kwargs is None:
+            apply_kwargs = {}
+        else:
+            apply_kwargs = dict(apply_kwargs)
+        if _splitter_kwargs is None:
+            _splitter_kwargs = {}
+        if _apply_kwargs is None:
+            _apply_kwargs = {}
+        if len(var_kwargs) > 0:
+            var_splitter_kwargs = {}
+            var_apply_kwargs = {}
+            if splitter is None or not isinstance(splitter, cls):
+                apply_arg_names = get_func_arg_names(cls.apply)
+                if splitter is not None:
+                    if isinstance(splitter, str):
+                        splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
+                    else:
+                        splitter_arg_names = get_func_arg_names(splitter)
+                    for k, v in var_kwargs.items():
+                        assigned = False
+                        if k in splitter_arg_names:
+                            var_splitter_kwargs[k] = v
+                            assigned = True
+                        if k != "split" and k in apply_arg_names:
+                            var_apply_kwargs[k] = v
+                            assigned = True
+                        if not assigned:
+                            raise ValueError(f"Argument '{k}' couldn't be assigned")
+                else:
+                    for k, v in var_kwargs.items():
+                        if k == "freq":
+                            var_splitter_kwargs[k] = v
+                            var_apply_kwargs[k] = v
+                        elif k == "split" or k not in apply_arg_names:
+                            var_splitter_kwargs[k] = v
+                        else:
+                            var_apply_kwargs[k] = v
+            else:
+                var_apply_kwargs = var_kwargs
+            splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
+            apply_kwargs = merge_dicts(var_apply_kwargs, apply_kwargs)
+        if splitter is None:
+            splitter = cls.guess_method(**splitter_kwargs)
+        if splitter is None:
+            raise ValueError("Must provide splitter or split instruction")
+        if not isinstance(splitter, cls):
+            if isinstance(splitter, str):
+                splitter = getattr(cls, splitter)
+            for k, v in _splitter_kwargs.items():
+                if k not in splitter_kwargs:
+                    splitter_kwargs[k] = v
+            splitter = splitter(index, template_context=template_context, **splitter_kwargs)
+        for k, v in _apply_kwargs.items():
+            if k not in apply_kwargs:
+                apply_kwargs[k] = v
+        return splitter.apply(apply_func, *apply_args, template_context=template_context, **apply_kwargs)
 
     @classmethod
     def resolve_row_stack_kwargs(

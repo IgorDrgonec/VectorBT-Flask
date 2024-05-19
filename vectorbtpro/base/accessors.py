@@ -449,12 +449,32 @@ class BaseIDXAccessor(Configured, IndexApplier):
     # ############# Splitting ############# #
 
     def split(self, *args, splitter_cls: tp.Optional[tp.Type[SplitterT]] = None, **kwargs) -> tp.Any:
-        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_take`."""
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_take`.
+
+        !!! note
+            Splits Pandas object, not accessor!"""
         from vectorbtpro.generic.splitting.base import Splitter
 
         if splitter_cls is None:
             splitter_cls = Splitter
         return splitter_cls.split_and_take(self.obj, self.obj, *args, **kwargs)
+
+    def split_apply(
+        self,
+        apply_func: tp.Callable,
+        *args,
+        splitter_cls: tp.Optional[tp.Type[SplitterT]] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_apply`.
+
+        !!! note
+            Splits Pandas object, not accessor!"""
+        from vectorbtpro.generic.splitting.base import Splitter, Takeable
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_apply(self.obj, apply_func, Takeable(self.obj), *args, **kwargs)
 
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
@@ -1713,6 +1733,23 @@ class BaseAccessor(Wrapping):
             _take_kwargs=dict(into="reset_stacked"),
             **kwargs,
         )
+
+    def split_apply(
+        self,
+        apply_func: tp.Callable,
+        *args,
+        splitter_cls: tp.Optional[tp.Type[SplitterT]] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_apply`.
+
+        !!! note
+            Splits Pandas object, not accessor!"""
+        from vectorbtpro.generic.splitting.base import Splitter, Takeable
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_apply(self.wrapper.index, apply_func, Takeable(self.obj), *args, **kwargs)
 
     # ############# Iteration ############# #
 
