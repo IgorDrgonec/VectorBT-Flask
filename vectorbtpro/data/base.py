@@ -1703,18 +1703,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         index = None
         index_changed = False
         for k, obj in data.items():
-            obj_index = obj.index.sort_values()
             if index is None:
-                index = obj_index
+                index = obj.index
             else:
-                if not index.equals(obj_index):
+                if not index.equals(obj.index):
                     if missing == "nan":
                         if not silence_warnings:
                             warnings.warn(
                                 "Symbols have mismatching index. Setting missing data points to NaN.",
                                 stacklevel=2,
                             )
-                        index = index.union(obj_index)
+                        index = index.union(obj.index)
                         index_changed = True
                     elif missing == "drop":
                         if not silence_warnings:
@@ -1722,7 +1721,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 "Symbols have mismatching index. Dropping missing data points.",
                                 stacklevel=2,
                             )
-                        index = index.intersection(obj_index)
+                        index = index.intersection(obj.index)
                         index_changed = True
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
@@ -1884,9 +1883,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = type(data)(data)
         for k, obj in data.items():
             obj = to_pd_array(obj)
+            obj = cls_or_self.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
+            if obj.index.is_monotonic_decreasing:
+                obj = obj.iloc[::-1]
+            elif not obj.index.is_monotonic_increasing:
+                obj = obj.sort_index()
             if obj.index.has_duplicates:
                 obj = obj[~obj.index.duplicated(keep="last")]
-            obj = cls_or_self.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
             data[k] = obj
             if (isinstance(data, symbol_dict) and isinstance(last_index, symbol_dict)) or (
                 isinstance(data, feature_dict) and isinstance(last_index, feature_dict)
@@ -3206,12 +3209,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                             stop=obj.index[-1] + new_obj.shape[0],
                             step=1,
                         )
-                    new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
                     new_obj = self.prepare_tzaware_index(
                         new_obj,
                         tz_localize=self.tz_localize,
                         tz_convert=self.tz_convert,
                     )
+                    if new_obj.index.is_monotonic_decreasing:
+                        new_obj = new_obj.iloc[::-1]
+                    elif not new_obj.index.is_monotonic_increasing:
+                        new_obj = new_obj.sort_index()
+                    if new_obj.index.has_duplicates:
+                        new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
                     new_data[k] = new_obj
                     if len(new_obj.index) > 0:
                         new_last_index[k] = new_obj.index[-1]
@@ -3269,7 +3277,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     obj = obj[0]
             obj = obj.loc[from_index:to_index]
             new_obj = pd.concat((obj, new_obj), axis=0)
-            new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
+            if new_obj.index.has_duplicates:
+                new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
             new_data[k] = new_obj
 
         # Align the index and columns in the new data
