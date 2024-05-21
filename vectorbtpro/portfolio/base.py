@@ -9439,8 +9439,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
         allocations = wrapper.select_col_from_obj(allocations, column=column, obj_ungrouped=True, group_by=group_by)
-        group_names = wrapper.grouper.get_index(group_by=group_by).names
-        allocations = allocations.vbt.drop_levels(group_names, strict=False)
+        if wrapper.grouper.is_grouped(group_by=group_by):
+            group_names = wrapper.grouper.get_index(group_by=group_by).names
+            allocations = allocations.vbt.drop_levels(group_names, strict=False)
+        if isinstance(allocations, pd.Series) and allocations.name is None:
+            allocations.name = "Allocation"
         fig = allocations.vbt.areaplot(line_shape=line_shape, line_visible=line_visible, colorway=colorway, **kwargs)
         if xref is None:
             xref = fig.data[-1]["xaxis"] if fig.data[-1]["xaxis"] is not None else "x"

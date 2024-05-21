@@ -8,13 +8,14 @@ assert_can_import("plotly")
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidget
 from plotly.subplots import make_subplots as _make_subplots
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import datetime_ as dt
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.path_ import check_mkdir
 
@@ -65,16 +66,129 @@ FigureMixinT = tp.TypeVar("FigureMixinT", bound="FigureMixin")
 class FigureMixin:
     """Mixin class for figures."""
 
-    def auto_rangebreaks(self: FigureMixinT, index: tp.Optional[tp.IndexLike] = None, **kwargs) -> FigureMixinT:
-        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`.
+    def copy(self: FigureMixinT, *args, **kwargs) -> FigureMixinT:
+        """Create a copy of the figure."""
+        return type(self)(self, *args, empty_layout=True, **kwargs)
 
-        Changes the figure in place and returns it."""
+    def select_range(
+        self: FigureMixinT,
+        start: tp.Union[None, int, tp.DatetimeLike] = None,
+        end: tp.Union[None, int, tp.DatetimeLike] = None,
+        inplace: bool = False,
+    ) -> FigureMixinT:
+        """Select a range.
+
+        Start and end index can be integers but also datetime-like objects."""
+        if inplace:
+            fig = self
+        else:
+            fig = self.copy()
+        for i, d in enumerate(fig.data):
+            range_mask = None
+            if "x" in d:
+                d_index = pd.Index(d.x)
+                if start is not None:
+                    if checks.is_int(start):
+                        if not pd.api.types.is_integer_dtype(d_index):
+                            raise TypeError(f"fig.data[{i}].x is not integer-like")
+                        start_mask = np.full(len(d_index), False)
+                        start_mask[start:] = True
+                        if range_mask is None:
+                            range_mask = start_mask
+                        else:
+                            range_mask &= start_mask
+                    else:
+                        if not isinstance(d_index, pd.DatetimeIndex):
+                            raise TypeError(f"fig.data[{i}].x is not datetime-like")
+                        start_dt = dt.try_align_dt_to_index(start, d_index)
+                        start_mask = d_index >= start_dt
+                        if range_mask is None:
+                            range_mask = start_mask
+                        else:
+                            range_mask &= start_mask
+                if end is not None:
+                    if checks.is_int(end):
+                        if not pd.api.types.is_integer_dtype(d_index):
+                            raise TypeError(f"fig.data[{i}].x is not integer-like")
+                        end_mask = np.full(len(d_index), False)
+                        end_mask[:end] = True
+                        if range_mask is None:
+                            range_mask = end_mask
+                        else:
+                            range_mask &= end_mask
+                    else:
+                        if not isinstance(d_index, pd.DatetimeIndex):
+                            raise TypeError(f"fig.data[{i}].x is not datetime-like")
+                        end_dt = dt.try_align_dt_to_index(end, d_index)
+                        end_mask = d_index < end_dt
+                        if range_mask is None:
+                            range_mask = end_mask
+                        else:
+                            range_mask &= end_mask
+            if range_mask is not None:
+                for k in list(d):
+                    if k != "x":
+                        v = getattr(d, k)
+                        if isinstance(v, np.ndarray):
+                            if len(v) == len(d.x):
+                                setattr(d, k, v[range_mask])
+                d.x = d.x[range_mask]
+        if "layout" in fig and "shapes" in fig.layout:
+            new_shapes = []
+            for i, shape in enumerate(fig.layout.shapes):
+                if shape.xref.startswith("x") and not shape.xref.endswith("domain"):
+                    new_x0 = shape.x0
+                    new_x1 = shape.x1
+                    shape_index = pd.Index([shape.x0, shape.x1])
+                    if start is not None:
+                        if checks.is_int(start):
+                            if not pd.api.types.is_integer_dtype(shape_index):
+                                raise TypeError(f"fig.layout.shapes[{i}].x is not integer-like")
+                            new_x0 = max(shape_index[0], start)
+                            new_x1 = max(shape_index[1], start)
+                        else:
+                            if not isinstance(shape_index, pd.DatetimeIndex):
+                                raise TypeError(f"fig.layout.shapes[{i}].x is not datetime-like")
+                            start_dt = dt.try_align_dt_to_index(start, shape_index)
+                            new_x0 = max(shape_index[0], start_dt)
+                            new_x1 = max(shape_index[1], start_dt)
+                    if end is not None:
+                        if checks.is_int(end):
+                            if not pd.api.types.is_integer_dtype(shape_index):
+                                raise TypeError(f"fig.layout.shapes[{i}].x is not integer-like")
+                            new_x0 = min(shape_index[0], end)
+                            new_x1 = min(shape_index[1], end)
+                        else:
+                            if not isinstance(shape_index, pd.DatetimeIndex):
+                                raise TypeError(f"fig.layout.shapes[{i}].x is not datetime-like")
+                            end_dt = dt.try_align_dt_to_index(end, shape_index)
+                            new_x0 = min(shape_index[0], end_dt)
+                            new_x1 = min(shape_index[1], end_dt)
+                    if new_x0 >= new_x1:
+                        continue
+                    shape.x0 = new_x0
+                    shape.x1 = new_x1
+                new_shapes.append(shape)
+            fig.layout.shapes = new_shapes
+        return fig
+
+    def auto_rangebreaks(
+        self: FigureMixinT,
+        index: tp.Optional[tp.IndexLike] = None,
+        inplace: bool = True,
+        **kwargs,
+    ) -> FigureMixinT:
+        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`."""
+        if inplace:
+            fig = self
+        else:
+            fig = self.copy()
         if index is None:
-            for d in self.data:
+            for d in fig.data:
                 if "x" in d:
-                    d_index = pd.Index(self.data[0].x)
+                    d_index = pd.Index(d.x)
                     if not isinstance(d_index, pd.DatetimeIndex):
-                        return self
+                        return fig
                     if index is None:
                         index = d_index
                     elif not index.equals(d_index):
@@ -82,13 +196,15 @@ class FigureMixin:
             if index is None:
                 raise ValueError("Couldn't extract x-axis values, please provide index")
         rangebreaks = dt.get_rangebreaks(index, **kwargs)
-        return self.update_xaxes(rangebreaks=rangebreaks)
+        return fig.update_xaxes(rangebreaks=rangebreaks)
 
-    def skip_index(self: FigureMixinT, skip_index: tp.IndexLike) -> FigureMixinT:
-        """Skip index values.
-
-        Changes the figure in place and returns it."""
-        return self.update_xaxes(rangebreaks=[dict(values=skip_index)])
+    def skip_index(self: FigureMixinT, skip_index: tp.IndexLike, inplace: bool = True) -> FigureMixinT:
+        """Skip index values."""
+        if inplace:
+            fig = self
+        else:
+            fig = self.copy()
+        return fig.update_xaxes(rangebreaks=[dict(values=skip_index)])
 
     def resolve_show_args(
         self,
@@ -164,14 +280,17 @@ class Figure(_Figure, FigureMixin):
 
     Extends `plotly.graph_objects.Figure`."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        from vectorbtpro._settings import settings
+    def __init__(self, *args, empty_layout: bool = False, **kwargs) -> None:
+        if empty_layout:
+            super().__init__(*args, **kwargs)
+        else:
+            from vectorbtpro._settings import settings
 
-        plotting_cfg = settings["plotting"]
+            plotting_cfg = settings["plotting"]
 
-        layout = kwargs.pop("layout", {})
-        super().__init__(*args, **kwargs)
-        self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
+            layout = kwargs.pop("layout", {})
+            super().__init__(*args, **kwargs)
+            self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
     def show(self, *args, **kwargs) -> None:
         args, kwargs = self.resolve_show_args(*args, **kwargs)
@@ -183,14 +302,17 @@ class FigureWidget(_FigureWidget, FigureMixin):
 
     Extends `plotly.graph_objects.FigureWidget`."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        from vectorbtpro._settings import settings
+    def __init__(self, *args, empty_layout: bool = False, **kwargs) -> None:
+        if empty_layout:
+            super().__init__(*args, **kwargs)
+        else:
+            from vectorbtpro._settings import settings
 
-        plotting_cfg = settings["plotting"]
+            plotting_cfg = settings["plotting"]
 
-        layout = kwargs.pop("layout", {})
-        super().__init__(*args, **kwargs)
-        self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
+            layout = kwargs.pop("layout", {})
+            super().__init__(*args, **kwargs)
+            self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
     def show(self, *args, **kwargs) -> None:
         args, kwargs = self.resolve_show_args(*args, **kwargs)
@@ -205,14 +327,17 @@ try:
 
         Extends `plotly.graph_objects.Figure`."""
 
-        def __init__(self, *args, **kwargs) -> None:
-            from vectorbtpro._settings import settings
+        def __init__(self, *args, empty_layout: bool = False, **kwargs) -> None:
+            if empty_layout:
+                super().__init__(*args, **kwargs)
+            else:
+                from vectorbtpro._settings import settings
 
-            plotting_cfg = settings["plotting"]
+                plotting_cfg = settings["plotting"]
 
-            layout = kwargs.pop("layout", {})
-            super().__init__(*args, **kwargs)
-            self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
+                layout = kwargs.pop("layout", {})
+                super().__init__(*args, **kwargs)
+                self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
         def show(self, *args, **kwargs) -> None:
             args, kwargs = self.resolve_show_args(*args, **kwargs)
@@ -223,14 +348,17 @@ try:
 
         Extends `plotly.graph_objects.FigureWidget`."""
 
-        def __init__(self, *args, **kwargs) -> None:
-            from vectorbtpro._settings import settings
+        def __init__(self, *args, empty_layout: bool = False, **kwargs) -> None:
+            if empty_layout:
+                super().__init__(*args, **kwargs)
+            else:
+                from vectorbtpro._settings import settings
 
-            plotting_cfg = settings["plotting"]
+                plotting_cfg = settings["plotting"]
 
-            layout = kwargs.pop("layout", {})
-            super().__init__(*args, **kwargs)
-            self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
+                layout = kwargs.pop("layout", {})
+                super().__init__(*args, **kwargs)
+                self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
         def show(self, *args, **kwargs) -> None:
             args, kwargs = self.resolve_show_args(*args, **kwargs)
