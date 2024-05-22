@@ -1225,6 +1225,10 @@ def pivot_info_1d_nb(
     for i in range(high.shape[0]):
         if not np.isnan(high[i]) and not np.isnan(low[i]):
             if first_valid_idx == -1:
+                _up_th = 1 + abs(flex_select_1d_nb(up_th_, i))
+                _down_th = 1 - abs(flex_select_1d_nb(down_th_, i))
+                if np.isnan(_up_th) or np.isnan(_down_th):
+                    continue
                 first_valid_idx = i
             if _last_idx == -1:
                 _up_th = 1 + abs(flex_select_1d_nb(up_th_, first_valid_idx))
