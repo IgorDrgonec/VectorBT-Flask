@@ -384,7 +384,7 @@ class PolygonData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        return df, dict(tz_convert=tz, freq=timeframe)
+        return df, dict(tz=tz, freq=timeframe)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

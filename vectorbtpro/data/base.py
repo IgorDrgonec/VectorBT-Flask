@@ -2928,6 +2928,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         data = dict_type()
         returned_kwargs = dict_type()
+        common_tz_localize = None
+        common_tz_convert = None
+        common_freq = None
         for i, out in enumerate(outputs):
             k = keys[i]
             if out is not None:
@@ -2938,21 +2941,35 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     _data = out
                     _returned_kwargs = {}
                 _data = to_any_array(_data)
+                _tz = _returned_kwargs.pop("tz", None)
                 _tz_localize = _returned_kwargs.pop("tz_localize", None)
-                if _tz_localize is not None:
-                    if tz_localize is None:
-                        tz_localize = _tz_localize
-                    elif tz_localize != _tz_localize:
-                        raise ValueError("Cannot localize using different timezones")
                 _tz_convert = _returned_kwargs.pop("tz_convert", None)
-                if _tz_convert is not None:
-                    if tz_convert is None:
-                        tz_convert = _tz_convert
-                    elif tz_convert != _tz_convert:
-                        tz_convert = "utc"
                 _freq = _returned_kwargs.pop("freq", None)
-                if wrapper_kwargs.get("freq", None) is None:
-                    wrapper_kwargs["freq"] = _freq
+                if _tz is not None:
+                    if _tz_localize is None:
+                        _tz_localize = _tz
+                    if _tz_convert is None:
+                        _tz_convert = _tz
+                if _tz_localize is not None:
+                    if common_tz_localize is None:
+                        common_tz_localize = _tz_localize
+                    elif common_tz_localize != _tz_localize:
+                        raise ValueError("Returned objects have different timezones (tz_localize)")
+                if _tz_convert is not None:
+                    if common_tz_convert is None:
+                        common_tz_convert = _tz_convert
+                    elif common_tz_convert != _tz_convert:
+                        if not silence_warnings:
+                            warnings.warn(
+                                f"Returned objects have different timezones (tz_convert). Setting to UTC.",
+                                stacklevel=2,
+                            )
+                        common_tz_convert = "utc"
+                if _freq is not None:
+                    if common_freq is None:
+                        common_freq = _freq
+                    elif common_freq != _freq:
+                        raise ValueError("Returned objects have different frequencies (freq)")
                 if _data.size == 0:
                     if not silence_warnings:
                         if keys_are_features:
@@ -2968,6 +2985,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 else:
                     data[k] = _data
                     returned_kwargs[k] = _returned_kwargs
+        if tz_localize is None and common_tz_localize is not None:
+            tz_localize = common_tz_localize
+        if tz_convert is None and common_tz_convert is not None:
+            tz_convert = common_tz_convert
+        if wrapper_kwargs.get("freq", None) is None and common_freq is not None:
+            wrapper_kwargs["freq"] = common_freq
 
         if len(data) == 0:
             if keys_are_features:

@@ -175,7 +175,6 @@ class CSVData(FileData):
             nrows=nrows,
             **read_kwargs,
         )
-
         if isinstance(obj, TextFileReader):
             if chunk_func is None:
                 obj = pd.concat(list(obj), axis=0)
@@ -214,7 +213,7 @@ class CSVData(FileData):
                 return None
             obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
             start_row += mask_indices[0]
-        return obj, dict(last_row=start_row - header_rows + len(obj.index) - 1, tz_convert=tz)
+        return obj, dict(last_row=start_row - header_rows + len(obj.index) - 1, tz=tz)
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:

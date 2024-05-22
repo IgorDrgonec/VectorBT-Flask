@@ -1012,8 +1012,8 @@ class SQLData(DBData):
         if dispose_engine:
             engine.dispose()
         if keep_row_number:
-            return obj, dict(tz_convert=tz, row_number_column=row_number_column)
-        return obj, dict(tz_convert=tz)
+            return obj, dict(tz=tz, row_number_column=row_number_column)
+        return obj, dict(tz=tz)
 
     @classmethod
     def fetch_feature(cls, feature: str, **kwargs) -> tp.FeatureData:

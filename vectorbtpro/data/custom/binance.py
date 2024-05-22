@@ -339,7 +339,7 @@ class BinanceData(RemoteData):
         del df["Close time"]
         del df["Ignore"]
 
-        return df, dict(tz_convert=tz, freq=freq)
+        return df, dict(tz=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

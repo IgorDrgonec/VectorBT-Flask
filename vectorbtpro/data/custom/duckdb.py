@@ -809,7 +809,7 @@ class DuckDBData(DBData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
-        return obj, dict(tz_convert=tz)
+        return obj, dict(tz=tz)
 
     @classmethod
     def fetch_feature(cls, feature: str, **kwargs) -> tp.FeatureData:
