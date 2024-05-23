@@ -211,8 +211,14 @@ def split(
                     var_apply_kwargs = var_kwargs
                 splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
                 apply_kwargs = merge_dicts(var_apply_kwargs, apply_kwargs)
-            if splitter is None:
-                splitter = splitter_cls.guess_method(**splitter_kwargs)
+            if len(splitter_kwargs) > 0:
+                if splitter is None:
+                    splitter = splitter_cls.guess_method(**splitter_kwargs)
+                if splitter is None:
+                    raise ValueError("Splitter method couldn't be guessed")
+            else:
+                if splitter is None:
+                    raise ValueError("Must provide splitter or splitter method")
             if not isinstance(splitter, splitter_cls) and index is not None:
                 if isinstance(splitter, str):
                     splitter = getattr(splitter_cls, splitter)

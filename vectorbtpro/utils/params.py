@@ -14,8 +14,9 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.annotations import Annotatable, has_annotatables
-from vectorbtpro.utils.attr_ import DefineMixin, define
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.config import FrozenConfig, Configured, merge_dicts
+from vectorbtpro.utils.eval_ import Evaluable
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
@@ -221,7 +222,7 @@ ParamT = tp.TypeVar("ParamT", bound="Param")
 
 
 @define
-class Param(Annotatable, DefineMixin):
+class Param(Evaluable, Annotatable, DefineMixin):
     """Class that represents a parameter."""
 
     value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = define.required_field()
@@ -297,17 +298,6 @@ class Param(Annotatable, DefineMixin):
 
     eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.optional_field(default=None)
     """One or more identifiers at which to evaluate this instance."""
-
-    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
-        """Return whether the evaluation id of the instance meets the global evaluation id."""
-        if self.eval_id is not None and eval_id is not None:
-            if checks.is_complex_sequence(self.eval_id):
-                if eval_id not in self.eval_id:
-                    return False
-            else:
-                if eval_id != self.eval_id:
-                    return False
-        return True
 
     def map_value(self: ParamT, func: tp.Callable, old_as_keys: bool = False) -> ParamT:
         """Execute a function on each value in `Param.value` and create a new `Param` instance.
@@ -1590,6 +1580,8 @@ class Parameterizer(Configured):
         return_param_index = self.resolve_setting(self.return_param_index, "return_param_index")
         execute_kwargs = self.resolve_setting(self.execute_kwargs, "execute_kwargs", merge=True)
 
+        template_context["eval_id"] = eval_id
+
         if param_configs is None:
             param_configs = []
 
@@ -1802,10 +1794,19 @@ class Parameterizer(Configured):
             dict(show_progress=False if template_context["single_comb"] else None),
             execute_kwargs,
         )
+        keys = template_context["param_index"]
+        if keys is not None and eval_id is not None:
+            new_keys = []
+            for key in keys:
+                if isinstance(keys, pd.MultiIndex):
+                    new_keys.append((MISSING, *key))
+                else:
+                    new_keys.append((MISSING, key))
+            keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
         results = execute(
             template_context["funcs_args"],
             size=len(template_context["param_configs"]),
-            keys=template_context["param_index"],
+            keys=keys,
             **execute_kwargs,
         )
 
@@ -2091,7 +2092,7 @@ def parameterized(
                 return_param_index=_resolve_key("return_param_index"),
                 execute_kwargs=_resolve_key("execute_kwargs", merge=True),
                 **_resolve_key("parameterizer_kwargs", merge=True),
-            ).run(*args, eval_id=eval_id, **kwargs)
+            ).run(*args, eval_id=_resolve_key("eval_id"), **kwargs)
 
         wrapper.func = func
         wrapper.name = func.__name__

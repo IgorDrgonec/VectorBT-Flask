@@ -360,16 +360,24 @@ class ProgressBar:
             new_desc = []
             for k, v in desc.items():
                 if v is MISSING:
-                    continue
-                if isinstance(v, Number):
-                    v = self.bar.format_num(v)
-                if not isinstance(v, str):
-                    v = str(v)
-                v = v.strip()
-                if k is None or k is MISSING:
-                    new_desc.append(v)
+                    if k not in (None, MISSING):
+                        if not isinstance(k, str):
+                            k = str(k)
+                        k = k.strip()
+                        new_desc.append(k)
                 else:
-                    new_desc.append(k + "=" + v)
+                    if isinstance(v, Number):
+                        v = self.bar.format_num(v)
+                    if not isinstance(v, str):
+                        v = str(v)
+                    v = v.strip()
+                    if k not in (None, MISSING):
+                        if not isinstance(k, str):
+                            k = str(k)
+                        k = k.strip()
+                        new_desc.append(k + "=" + v)
+                    else:
+                        new_desc.append(v)
             return ", ".join(new_desc)
         return str(desc)
 

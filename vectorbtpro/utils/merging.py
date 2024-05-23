@@ -8,6 +8,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.annotations import get_annotations, Annotatable, Union
 from vectorbtpro.utils.attr_ import DefineMixin, define
+from vectorbtpro.utils.eval_ import Evaluable
 from vectorbtpro.utils.template import substitute_templates
 
 __all__ = [
@@ -20,7 +21,7 @@ MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 
 
 @define
-class MergeFunc(Annotatable, DefineMixin):
+class MergeFunc(Evaluable, Annotatable, DefineMixin):
     """Class representing a merging function and its keyword arguments.
 
     Can be directly called to call the underlying (already resolved and with keyword
@@ -37,6 +38,9 @@ class MergeFunc(Annotatable, DefineMixin):
 
     sub_id_prefix: str = define.field(default="")
     """Prefix for the substitution id."""
+
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
+    """One or more identifiers at which to evaluate this instance."""
 
     def __init__(self, *args, **kwargs) -> None:
         attr_names = [a.name for a in self.fields]
@@ -85,7 +89,7 @@ class MergeFunc(Annotatable, DefineMixin):
         return merge_func(objs, **kwargs)
 
 
-def parse_merge_func(func: tp.Callable) -> tp.Optional[MergeFunc]:
+def parse_merge_func(func: tp.Callable, eval_id: tp.Optional[tp.Hashable] = None) -> tp.Optional[MergeFunc]:
     """Parser the merging function from the function's annotations."""
     annotations = get_annotations(func)
     merge_func = None
@@ -101,13 +105,13 @@ def parse_merge_func(func: tp.Callable) -> tp.Optional[MergeFunc]:
                         annotation = MergeFunc(annotation)
                 if checks.is_complex_sequence(annotation):
                     for o in annotation:
-                        if o is None or isinstance(o, (str, MergeFunc)):
+                        if o is None or isinstance(o, str) or (isinstance(o, MergeFunc) and o.meets_eval_id(eval_id)):
                             if merge_func is None:
                                 merge_func = []
                             elif not isinstance(merge_func, list):
                                 raise ValueError(f"Two merging functions found in annotations: {merge_func} and {o}")
                             merge_func.append(o)
-                elif isinstance(annotation, MergeFunc):
+                elif isinstance(annotation, MergeFunc) and annotation.meets_eval_id(eval_id):
                     if merge_func is not None:
                         raise ValueError(f"Two merging functions found in annotations: {merge_func} and {annotation}")
                     merge_func = annotation

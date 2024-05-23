@@ -29,6 +29,7 @@ from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.eval_ import Evaluable
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
 from vectorbtpro.utils.parsing import (
@@ -298,7 +299,7 @@ class RelRange(DefineMixin):
 
 
 @define
-class Takeable(Annotatable, DefineMixin):
+class Takeable(Evaluable, Annotatable, DefineMixin):
     """Class that represents an object from which a range can be taken."""
 
     obj: tp.Any = define.required_field()
@@ -322,17 +323,6 @@ class Takeable(Annotatable, DefineMixin):
 
     eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
     """One or more identifiers at which to evaluate this instance."""
-
-    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
-        """Return whether the evaluation id of the instance meets the global evaluation id."""
-        if self.eval_id is not None and eval_id is not None:
-            if checks.is_complex_sequence(self.eval_id):
-                if eval_id not in self.eval_id:
-                    return False
-            else:
-                if eval_id != self.eval_id:
-                    return False
-        return True
 
 
 class ZeroLengthError(ValueError):
@@ -1804,10 +1794,14 @@ class Splitter(Analyzable):
                 var_take_kwargs = var_kwargs
             splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
             take_kwargs = merge_dicts(var_take_kwargs, take_kwargs)
-        if splitter is None:
-            splitter = cls.guess_method(**splitter_kwargs)
-        if splitter is None:
-            raise ValueError("Must provide splitter or split instruction")
+        if len(splitter_kwargs) > 0:
+            if splitter is None:
+                splitter = cls.guess_method(**splitter_kwargs)
+            if splitter is None:
+                raise ValueError("Splitter method couldn't be guessed")
+        else:
+            if splitter is None:
+                raise ValueError("Must provide splitter or splitter method")
         if not isinstance(splitter, cls):
             if isinstance(splitter, str):
                 splitter = getattr(cls, splitter)
@@ -1889,10 +1883,14 @@ class Splitter(Analyzable):
                 var_apply_kwargs = var_kwargs
             splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
             apply_kwargs = merge_dicts(var_apply_kwargs, apply_kwargs)
-        if splitter is None:
-            splitter = cls.guess_method(**splitter_kwargs)
-        if splitter is None:
-            raise ValueError("Must provide splitter or split instruction")
+        if len(splitter_kwargs) > 0:
+            if splitter is None:
+                splitter = cls.guess_method(**splitter_kwargs)
+            if splitter is None:
+                raise ValueError("Splitter method couldn't be guessed")
+        else:
+            if splitter is None:
+                raise ValueError("Must provide splitter or splitter method")
         if not isinstance(splitter, cls):
             if isinstance(splitter, str):
                 splitter = getattr(cls, splitter)
@@ -3609,6 +3607,7 @@ class Splitter(Analyzable):
             },
             template_context,
         )
+        template_context["eval_id"] = eval_id
 
         if has_annotatables(apply_func):
             ann_args = annotate_args(
@@ -3813,6 +3812,14 @@ class Splitter(Analyzable):
 
             funcs_args = _get_generator()
             keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
             results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
@@ -3824,6 +3831,14 @@ class Splitter(Analyzable):
 
             funcs_args = _get_generator()
             keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
             results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
@@ -3842,8 +3857,17 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
+            keys = split_labels
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits, keys=split_labels, **execute_kwargs)
+            results = execute(funcs_args, size=n_splits, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
             def _process_chunk(chunk):
@@ -3860,8 +3884,17 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
+            keys = set_labels
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_sets, keys=set_labels, **execute_kwargs)
+            results = execute(funcs_args, size=n_sets, keys=keys, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 
