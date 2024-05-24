@@ -2976,6 +2976,57 @@ class Splitter(Analyzable):
             return tuple(obj[i] for i in np.arange(len(obj))[ready_range])
         return obj[ready_range]
 
+    @class_or_instancemethod
+    def take_range_from_takeable(
+        cls_or_self,
+        takeable: Takeable,
+        range_: tp.FixRangeLike,
+        remap_to_obj: bool = True,
+        obj_index: tp.Optional[tp.IndexLike] = None,
+        obj_freq: tp.Optional[tp.FrequencyLike] = None,
+        point_wise: bool = False,
+        template_context: tp.KwargsLike = None,
+        return_obj_meta: bool = False,
+        return_meta: bool = False,
+        **ready_obj_range_kwargs,
+    ) -> tp.Any:
+        """Take a range from a takeable object."""
+        takeable.assert_field_not_missing("obj")
+        obj_meta, obj_range_meta = cls_or_self.get_ready_obj_range(
+            takeable.obj,
+            range_,
+            remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not MISSING else remap_to_obj,
+            obj_index=takeable.index if takeable.index is not MISSING else obj_index,
+            obj_freq=takeable.freq if takeable.freq is not MISSING else obj_freq,
+            template_context=template_context,
+            return_obj_meta=True,
+            return_meta=True,
+            **ready_obj_range_kwargs,
+        )
+        if isinstance(takeable.obj, CustomTemplate):
+            template_context = merge_dicts(
+                dict(
+                    range_=obj_range_meta["range_"],
+                    range_meta=obj_range_meta,
+                    point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
+                ),
+                template_context,
+            )
+            obj_slice = substitute_templates(takeable.obj, template_context, eval_id="take_range")
+        else:
+            obj_slice = cls_or_self.take_range(
+                takeable.obj,
+                obj_range_meta["range_"],
+                point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
+            )
+        if return_obj_meta and return_meta:
+            return obj_meta, obj_range_meta, obj_slice
+        if return_obj_meta:
+            return obj_meta, obj_slice
+        if return_meta:
+            return obj_range_meta, obj_slice
+        return obj_slice
+
     def take(
         self,
         obj: tp.Any,
@@ -3639,39 +3690,6 @@ class Splitter(Analyzable):
             )
             return range_meta
 
-        def _take_range(takeable, range_, _template_context):
-            takeable.assert_field_not_missing("obj")
-            obj_meta, obj_range_meta = self.get_ready_obj_range(
-                takeable.obj,
-                range_,
-                remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not MISSING else remap_to_obj,
-                obj_index=takeable.index if takeable.index is not MISSING else obj_index,
-                obj_freq=takeable.freq if takeable.freq is not MISSING else obj_freq,
-                range_format=range_format,
-                template_context=_template_context,
-                silence_warnings=silence_warnings,
-                freq=freq,
-                return_obj_meta=True,
-                return_meta=True,
-            )
-            if isinstance(takeable.obj, CustomTemplate):
-                _template_context = merge_dicts(
-                    dict(
-                        range_=obj_range_meta["range_"],
-                        range_meta=obj_range_meta,
-                        point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
-                    ),
-                    _template_context,
-                )
-                obj_slice = substitute_templates(takeable.obj, _template_context, eval_id="take_range")
-            else:
-                obj_slice = self.take_range(
-                    takeable.obj,
-                    obj_range_meta["range_"],
-                    point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
-                )
-            return obj_meta, obj_range_meta, obj_slice
-
         def _take_args(args, range_, _template_context):
             obj_meta = {}
             obj_range_meta = {}
@@ -3679,7 +3697,20 @@ class Splitter(Analyzable):
             if args is not None:
                 for i, v in enumerate(args):
                     if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
-                        _obj_meta, _obj_range_meta, obj_slice = _take_range(v, range_, _template_context)
+                        _obj_meta, _obj_range_meta, obj_slice = self.take_range_from_takeable(
+                            v,
+                            range_,
+                            remap_to_obj=remap_to_obj,
+                            obj_index=obj_index,
+                            obj_freq=obj_freq,
+                            range_format=range_format,
+                            point_wise=point_wise,
+                            template_context=_template_context,
+                            silence_warnings=silence_warnings,
+                            freq=freq,
+                            return_obj_meta=True,
+                            return_meta=True,
+                        )
                         new_args += (obj_slice,)
                         obj_meta[i] = _obj_meta
                         obj_range_meta[i] = _obj_range_meta
@@ -3694,7 +3725,20 @@ class Splitter(Analyzable):
             if kwargs is not None:
                 for k, v in kwargs.items():
                     if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
-                        _obj_meta, _obj_range_meta, obj_slice = _take_range(v, range_, _template_context)
+                        _obj_meta, _obj_range_meta, obj_slice = self.take_range_from_takeable(
+                            v,
+                            range_,
+                            remap_to_obj=remap_to_obj,
+                            obj_index=obj_index,
+                            obj_freq=obj_freq,
+                            range_format=range_format,
+                            point_wise=point_wise,
+                            template_context=_template_context,
+                            silence_warnings=silence_warnings,
+                            freq=freq,
+                            return_obj_meta=True,
+                            return_meta=True,
+                        )
                         new_kwargs[k] = obj_slice
                         obj_meta[k] = _obj_meta
                         obj_range_meta[k] = _obj_range_meta

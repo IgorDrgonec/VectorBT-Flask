@@ -1231,6 +1231,42 @@ class TestPortfolioOptimizer:
         )
         pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
+            lambda prices: prices.sum(),
+            vbt.Takeable(prices),
+            index_ranges=vbt.RepEval("[(0, 2), (2, 4)]"),
+            index_loc=vbt.RepEval("[2, 4]"),
+        )
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
+        assert_records_close(
+            pfo.alloc_records.values,
+            np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
+        )
+        np.testing.assert_array_equal(
+            pfo._allocations,
+            get_allocations(pfo),
+        )
+
+        def ann_optimize_func(prices: vbt.Takeable):
+            return prices.sum()
+
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
+            prices.vbt.wrapper,
+            ann_optimize_func,
+            prices,
+            index_ranges=vbt.RepEval("[(0, 2), (2, 4)]"),
+            index_loc=vbt.RepEval("[2, 4]"),
+        )
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
+        assert_records_close(
+            pfo.alloc_records.values,
+            np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
+        )
+        np.testing.assert_array_equal(
+            pfo._allocations,
+            get_allocations(pfo),
+        )
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
+            prices.vbt.wrapper,
             lambda i, index_ranges: prices.iloc[index_ranges[0][i] : index_ranges[1][i]].sum(),
             vbt.Rep("i"),
             vbt.Rep("index_ranges"),

@@ -17,6 +17,7 @@ from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.enums import RangeStatus
+from vectorbtpro.generic.splitting.base import Splitter, Takeable
 from vectorbtpro.portfolio.enums import Direction
 from vectorbtpro.portfolio.pfopt import nb
 from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
@@ -24,11 +25,20 @@ from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks, datetime_ as dt
+from vectorbtpro.utils.annotations import has_annotatables
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import Param, combine_params, Parameterizer
-from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsFiltered
+from vectorbtpro.utils.parsing import (
+    get_func_arg_names,
+    annotate_args,
+    flatten_ann_args,
+    unflatten_ann_args,
+    ann_args_to_args,
+    warn_stdout,
+    WarningsFiltered,
+)
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
@@ -1817,151 +1827,148 @@ class PortfolioOptimizer(Analyzable):
         group_index: tp.Index,
         group_idx: int,
         pre_group_func: tp.Optional[tp.Callable] = None,
-        jitted_loop: bool = False,
-        jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
     ) -> tp.Tuple[tp.RecordArray, tp.Array2d]:
         """Run an allocation group."""
         group_config = dict(group_configs[group_idx])
         if pre_group_func is not None:
             pre_group_func(group_config)
 
-        _allocate_func = group_config.pop("allocate_func")
-        _every = group_config.pop("every")
-        _normalize_every = group_config.pop("normalize_every")
-        _at_time = group_config.pop("at_time")
-        _start = group_config.pop("start")
-        _end = group_config.pop("end")
-        _exact_start = group_config.pop("exact_start")
-        _on = group_config.pop("on")
-        _add_delta = group_config.pop("add_delta")
-        _kind = group_config.pop("kind")
-        _indexer_method = group_config.pop("indexer_method")
-        _indexer_tolerance = group_config.pop("indexer_tolerance")
-        _skip_not_found = group_config.pop("skip_not_found")
-        _index_points = group_config.pop("index_points")
-        _rescale_to = group_config.pop("rescale_to")
-        _jitted_loop = group_config.pop("jitted_loop")
-        _jitted = group_config.pop("jitted")
-        _chunked = group_config.pop("chunked")
-        _template_context = group_config.pop("template_context")
-        _execute_kwargs = group_config.pop("execute_kwargs")
-        _args = group_config.pop("args")
-        _kwargs = group_config
+        allocate_func = group_config.pop("allocate_func")
+        every = group_config.pop("every")
+        normalize_every = group_config.pop("normalize_every")
+        at_time = group_config.pop("at_time")
+        start = group_config.pop("start")
+        end = group_config.pop("end")
+        exact_start = group_config.pop("exact_start")
+        on = group_config.pop("on")
+        add_delta = group_config.pop("add_delta")
+        kind = group_config.pop("kind")
+        indexer_method = group_config.pop("indexer_method")
+        indexer_tolerance = group_config.pop("indexer_tolerance")
+        skip_not_found = group_config.pop("skip_not_found")
+        index_points = group_config.pop("index_points")
+        rescale_to = group_config.pop("rescale_to")
+        jitted_loop = group_config.pop("jitted_loop")
+        jitted = group_config.pop("jitted")
+        chunked = group_config.pop("chunked")
+        template_context = group_config.pop("template_context")
+        execute_kwargs = group_config.pop("execute_kwargs")
+        args = group_config.pop("args")
+        kwargs = group_config
 
-        _template_context = merge_dicts(
+        template_context = merge_dicts(
             dict(
                 group_configs=group_configs,
                 group_index=group_index,
                 group_idx=group_idx,
                 wrapper=wrapper,
-                allocate_func=_allocate_func,
-                every=_every,
-                normalize_every=_normalize_every,
-                at_time=_at_time,
-                start=_start,
-                end=_end,
-                exact_start=_exact_start,
-                on=_on,
-                add_delta=_add_delta,
-                kind=_kind,
-                indexer_method=_indexer_method,
-                indexer_tolerance=_indexer_tolerance,
-                skip_not_found=_skip_not_found,
-                index_points=_index_points,
-                rescale_to=_rescale_to,
-                jitted_loop=_jitted_loop,
-                jitted=_jitted,
-                chunked=_chunked,
-                execute_kwargs=_execute_kwargs,
-                args=_args,
-                kwargs=_kwargs,
+                allocate_func=allocate_func,
+                every=every,
+                normalize_every=normalize_every,
+                at_time=at_time,
+                start=start,
+                end=end,
+                exact_start=exact_start,
+                on=on,
+                add_delta=add_delta,
+                kind=kind,
+                indexer_method=indexer_method,
+                indexer_tolerance=indexer_tolerance,
+                skip_not_found=skip_not_found,
+                index_points=index_points,
+                rescale_to=rescale_to,
+                jitted_loop=jitted_loop,
+                jitted=jitted,
+                chunked=chunked,
+                execute_kwargs=execute_kwargs,
+                args=args,
+                kwargs=kwargs,
             ),
-            _template_context,
+            template_context,
         )
 
-        if _index_points is None:
+        if index_points is None:
             get_index_points_kwargs = substitute_templates(
                 dict(
-                    every=_every,
-                    normalize_every=_normalize_every,
-                    at_time=_at_time,
-                    start=_start,
-                    end=_end,
-                    exact_start=_exact_start,
-                    on=_on,
-                    add_delta=_add_delta,
-                    kind=_kind,
-                    indexer_method=_indexer_method,
-                    indexer_tolerance=_indexer_tolerance,
-                    skip_not_found=_skip_not_found,
+                    every=every,
+                    normalize_every=normalize_every,
+                    at_time=at_time,
+                    start=start,
+                    end=end,
+                    exact_start=exact_start,
+                    on=on,
+                    add_delta=add_delta,
+                    kind=kind,
+                    indexer_method=indexer_method,
+                    indexer_tolerance=indexer_tolerance,
+                    skip_not_found=skip_not_found,
                 ),
-                _template_context,
+                template_context,
                 eval_id="get_index_points_defaults",
                 strict=True,
             )
-            _index_points = wrapper.get_index_points(**get_index_points_kwargs)
-            _template_context = merge_dicts(
-                _template_context,
+            index_points = wrapper.get_index_points(**get_index_points_kwargs)
+            template_context = merge_dicts(
+                template_context,
                 get_index_points_kwargs,
-                dict(index_points=_index_points),
+                dict(index_points=index_points),
             )
         else:
-            _index_points = substitute_templates(
-                _index_points,
-                _template_context,
+            index_points = substitute_templates(
+                index_points,
+                template_context,
                 eval_id="index_points",
                 strict=True,
             )
-            _index_points = to_1d_array(_index_points)
-            _template_context = merge_dicts(_template_context, dict(index_points=_index_points))
+            index_points = to_1d_array(index_points)
+            template_context = merge_dicts(template_context, dict(index_points=index_points))
 
         if jitted_loop:
-            _allocate_func = substitute_templates(
-                _allocate_func,
-                _template_context,
+            allocate_func = substitute_templates(
+                allocate_func,
+                template_context,
                 eval_id="allocate_func",
                 strict=True,
             )
-            _args = substitute_templates(_args, _template_context, eval_id="args")
-            _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
+            args = substitute_templates(args, template_context, eval_id="args")
+            kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
             func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
+            _allocations = func(len(wrapper.columns), index_points, allocate_func, *args, **kwargs)
         else:
             funcs_args = []
             keys = []
-            for i in range(len(_index_points)):
-                __template_context = merge_dicts(
+            for i in range(len(index_points)):
+                _template_context = merge_dicts(
                     dict(
                         i=i,
-                        index_point=_index_points[i],
+                        index_point=index_points[i],
                     ),
-                    _template_context,
+                    template_context,
                 )
-                __allocate_func = substitute_templates(
-                    _allocate_func,
-                    __template_context,
+                _allocate_func = substitute_templates(
+                    allocate_func,
+                    _template_context,
                     eval_id="allocate_func",
                     strict=True,
                 )
-                __args = substitute_templates(_args, __template_context, eval_id="args")
-                __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
-                funcs_args.append((__allocate_func, __args, __kwargs))
+                _args = substitute_templates(args, _template_context, eval_id="args")
+                _kwargs = substitute_templates(kwargs, _template_context, eval_id="kwargs")
+                funcs_args.append((_allocate_func, _args, _kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
-                    keys.append(dt.readable_datetime(wrapper.index[_index_points[i]], freq=wrapper.freq))
+                    keys.append(dt.readable_datetime(wrapper.index[index_points[i]], freq=wrapper.freq))
                 else:
-                    keys.append(str(wrapper.index[_index_points[i]]))
-            results = execute(funcs_args, keys=keys, **_execute_kwargs)
+                    keys.append(str(wrapper.index[index_points[i]]))
+            results = execute(funcs_args, keys=keys, **execute_kwargs)
             _allocations = pd.DataFrame(results, columns=wrapper.columns)
             if isinstance(_allocations.columns, pd.RangeIndex):
                 _allocations = _allocations.values
             else:
                 _allocations = _allocations[list(wrapper.columns)].values
-            if _rescale_to is not None:
-                _allocations = nb.rescale_allocations_nb(_allocations, _rescale_to)
+            if rescale_to is not None:
+                _allocations = nb.rescale_allocations_nb(_allocations, rescale_to)
 
-        return nb.prepare_alloc_points_nb(_index_points, _allocations, group_idx)
+        return nb.prepare_alloc_points_nb(index_points, _allocations, group_idx)
 
     @classmethod
     def from_allocate_func(
@@ -2299,9 +2306,6 @@ class PortfolioOptimizer(Analyzable):
                         group_index=group_index,
                         group_idx=group_idx,
                         pre_group_func=pre_group_func,
-                        jitted_loop=jitted_loop,
-                        jitted=jitted,
-                        chunked=chunked,
                     ),
                 )
             )
@@ -2576,218 +2580,261 @@ class PortfolioOptimizer(Analyzable):
         group_index: tp.Index,
         group_idx: int,
         pre_group_func: tp.Optional[tp.Callable] = None,
-        jitted_loop: bool = False,
-        jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
+        silence_warnings: bool = False,
     ) -> tp.Tuple[tp.RecordArray, tp.Array2d]:
         """Run an optimization group."""
         group_config = dict(group_configs[group_idx])
         if pre_group_func is not None:
             pre_group_func(group_config)
 
-        _optimize_func = group_config.pop("optimize_func")
-        _every = group_config.pop("every")
-        _normalize_every = group_config.pop("normalize_every")
-        _split_every = group_config.pop("split_every")
-        _start_time = group_config.pop("start_time")
-        _end_time = group_config.pop("end_time")
-        _lookback_period = group_config.pop("lookback_period")
-        _start = group_config.pop("start")
-        _end = group_config.pop("end")
-        _exact_start = group_config.pop("exact_start")
-        _fixed_start = group_config.pop("fixed_start")
-        _closed_start = group_config.pop("closed_start")
-        _closed_end = group_config.pop("closed_end")
-        _add_start_delta = group_config.pop("add_start_delta")
-        _add_end_delta = group_config.pop("add_end_delta")
-        _kind = group_config.pop("kind")
-        _skip_not_found = group_config.pop("skip_not_found")
-        _index_ranges = group_config.pop("index_ranges")
-        _index_loc = group_config.pop("index_loc")
-        _rescale_to = group_config.pop("rescale_to")
-        _alloc_wait = group_config.pop("alloc_wait")
-        _jitted_loop = group_config.pop("jitted_loop")
-        _jitted = group_config.pop("jitted")
-        _chunked = group_config.pop("chunked")
-        _template_context = group_config.pop("template_context")
-        _execute_kwargs = group_config.pop("execute_kwargs")
-        _args = group_config.pop("args")
-        _kwargs = group_config
+        optimize_func = group_config.pop("optimize_func")
+        every = group_config.pop("every")
+        normalize_every = group_config.pop("normalize_every")
+        split_every = group_config.pop("split_every")
+        start_time = group_config.pop("start_time")
+        end_time = group_config.pop("end_time")
+        lookback_period = group_config.pop("lookback_period")
+        start = group_config.pop("start")
+        end = group_config.pop("end")
+        exact_start = group_config.pop("exact_start")
+        fixed_start = group_config.pop("fixed_start")
+        closed_start = group_config.pop("closed_start")
+        closed_end = group_config.pop("closed_end")
+        add_start_delta = group_config.pop("add_start_delta")
+        add_end_delta = group_config.pop("add_end_delta")
+        kind = group_config.pop("kind")
+        skip_not_found = group_config.pop("skip_not_found")
+        index_ranges = group_config.pop("index_ranges")
+        index_loc = group_config.pop("index_loc")
+        rescale_to = group_config.pop("rescale_to")
+        alloc_wait = group_config.pop("alloc_wait")
+        splitter_cls = group_config.pop("splitter_cls")
+        eval_id = group_config.pop("eval_id")
+        jitted_loop = group_config.pop("jitted_loop")
+        jitted = group_config.pop("jitted")
+        chunked = group_config.pop("chunked")
+        template_context = group_config.pop("template_context")
+        execute_kwargs = group_config.pop("execute_kwargs")
+        args = group_config.pop("args")
+        kwargs = group_config
 
-        _template_context = merge_dicts(
+        if splitter_cls is None:
+            splitter_cls = Splitter
+
+        template_context = merge_dicts(
             dict(
                 group_configs=group_configs,
                 group_index=group_index,
                 group_idx=group_idx,
                 wrapper=wrapper,
-                optimize_func=_optimize_func,
-                every=_every,
-                normalize_every=_normalize_every,
-                split_every=_split_every,
-                start_time=_start_time,
-                end_time=_end_time,
-                lookback_period=_lookback_period,
-                start=_start,
-                end=_end,
-                exact_start=_exact_start,
-                fixed_start=_fixed_start,
-                closed_start=_closed_start,
-                closed_end=_closed_end,
-                add_start_delta=_add_start_delta,
-                add_end_delta=_add_end_delta,
-                kind=_kind,
-                skip_not_found=_skip_not_found,
-                index_ranges=_index_ranges,
-                index_loc=_index_loc,
-                rescale_to=_rescale_to,
-                alloc_wait=_alloc_wait,
-                jitted_loop=_jitted_loop,
-                jitted=_jitted,
-                chunked=_chunked,
-                args=_args,
-                kwargs=_kwargs,
-                execute_kwargs=_execute_kwargs,
+                optimize_func=optimize_func,
+                every=every,
+                normalize_every=normalize_every,
+                split_every=split_every,
+                start_time=start_time,
+                end_time=end_time,
+                lookback_period=lookback_period,
+                start=start,
+                end=end,
+                exact_start=exact_start,
+                fixed_start=fixed_start,
+                closed_start=closed_start,
+                closed_end=closed_end,
+                add_start_delta=add_start_delta,
+                add_end_delta=add_end_delta,
+                kind=kind,
+                skip_not_found=skip_not_found,
+                index_ranges=index_ranges,
+                index_loc=index_loc,
+                rescale_to=rescale_to,
+                alloc_wait=alloc_wait,
+                splitter_cls=splitter_cls,
+                eval_id=eval_id,
+                jitted_loop=jitted_loop,
+                jitted=jitted,
+                chunked=chunked,
+                args=args,
+                kwargs=kwargs,
+                execute_kwargs=execute_kwargs,
             ),
-            _template_context,
+            template_context,
         )
 
-        if _index_ranges is None:
+        if index_ranges is None:
             get_index_ranges_defaults = substitute_templates(
                 dict(
-                    every=_every,
-                    normalize_every=_normalize_every,
-                    split_every=_split_every,
-                    start_time=_start_time,
-                    end_time=_end_time,
-                    lookback_period=_lookback_period,
-                    start=_start,
-                    end=_end,
-                    exact_start=_exact_start,
-                    fixed_start=_fixed_start,
-                    closed_start=_closed_start,
-                    closed_end=_closed_end,
-                    add_start_delta=_add_start_delta,
-                    add_end_delta=_add_end_delta,
-                    kind=_kind,
-                    skip_not_found=_skip_not_found,
-                    jitted=_jitted,
+                    every=every,
+                    normalize_every=normalize_every,
+                    split_every=split_every,
+                    start_time=start_time,
+                    end_time=end_time,
+                    lookback_period=lookback_period,
+                    start=start,
+                    end=end,
+                    exact_start=exact_start,
+                    fixed_start=fixed_start,
+                    closed_start=closed_start,
+                    closed_end=closed_end,
+                    add_start_delta=add_start_delta,
+                    add_end_delta=add_end_delta,
+                    kind=kind,
+                    skip_not_found=skip_not_found,
+                    jitted=jitted,
                 ),
-                _template_context,
+                template_context,
                 eval_id="get_index_ranges_defaults",
                 strict=True,
             )
-            _index_ranges = wrapper.get_index_ranges(**get_index_ranges_defaults)
-            _template_context = merge_dicts(
-                _template_context,
+            index_ranges = wrapper.get_index_ranges(**get_index_ranges_defaults)
+            template_context = merge_dicts(
+                template_context,
                 get_index_ranges_defaults,
-                dict(index_ranges=_index_ranges),
+                dict(index_ranges=index_ranges),
             )
         else:
-            _index_ranges = substitute_templates(
-                _index_ranges,
-                _template_context,
+            index_ranges = substitute_templates(
+                index_ranges,
+                template_context,
                 eval_id="index_ranges",
                 strict=True,
             )
-            if isinstance(_index_ranges, np.ndarray):
-                _index_ranges = (_index_ranges[:, 0], _index_ranges[:, 1])
-            elif not isinstance(_index_ranges[0], np.ndarray) and not isinstance(_index_ranges[1], np.ndarray):
-                _index_ranges = to_2d_array(_index_ranges, expand_axis=0)
-                _index_ranges = (_index_ranges[:, 0], _index_ranges[:, 1])
-            _template_context = merge_dicts(_template_context, dict(index_ranges=_index_ranges))
-        if _index_loc is not None:
-            _index_loc = substitute_templates(
-                _index_loc,
-                _template_context,
+            if isinstance(index_ranges, np.ndarray):
+                index_ranges = (index_ranges[:, 0], index_ranges[:, 1])
+            elif not isinstance(index_ranges[0], np.ndarray) and not isinstance(index_ranges[1], np.ndarray):
+                index_ranges = to_2d_array(index_ranges, expand_axis=0)
+                index_ranges = (index_ranges[:, 0], index_ranges[:, 1])
+            template_context = merge_dicts(template_context, dict(index_ranges=index_ranges))
+        if index_loc is not None:
+            index_loc = substitute_templates(
+                index_loc,
+                template_context,
                 eval_id="index_loc",
                 strict=True,
             )
-            _index_loc = to_1d_array(_index_loc)
-            _template_context = merge_dicts(_template_context, dict(index_loc=_index_loc))
+            index_loc = to_1d_array(index_loc)
+            template_context = merge_dicts(template_context, dict(index_loc=index_loc))
 
         if jitted_loop:
-            _optimize_func = substitute_templates(
-                _optimize_func,
-                _template_context,
+            optimize_func = substitute_templates(
+                optimize_func,
+                template_context,
                 eval_id="optimize_func",
                 strict=True,
             )
-            _args = substitute_templates(_args, _template_context, eval_id="args")
-            _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
+            args = substitute_templates(args, template_context, eval_id="args")
+            kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
             func = jit_reg.resolve_option(nb.optimize_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             _allocations = func(
                 len(wrapper.columns),
-                _index_ranges[0],
-                _index_ranges[1],
-                _optimize_func,
-                *_args,
-                **_kwargs,
+                index_ranges[0],
+                index_ranges[1],
+                optimize_func,
+                *args,
+                **kwargs,
             )
         else:
             funcs_args = []
             keys = []
-            for i in range(len(_index_ranges[0])):
-                index_slice = slice(max(0, _index_ranges[0][i]), _index_ranges[1][i])
-                __template_context = merge_dicts(
+            for i in range(len(index_ranges[0])):
+                index_slice = slice(max(0, index_ranges[0][i]), index_ranges[1][i])
+                _template_context = merge_dicts(
                     dict(
                         i=i,
                         index_slice=index_slice,
-                        index_start=_index_ranges[0][i],
-                        index_end=_index_ranges[1][i],
+                        index_start=index_ranges[0][i],
+                        index_end=index_ranges[1][i],
                     ),
-                    _template_context,
+                    template_context,
                 )
-                __optimize_func = substitute_templates(
-                    _optimize_func,
-                    __template_context,
+                _optimize_func = substitute_templates(
+                    optimize_func,
+                    _template_context,
                     eval_id="optimize_func",
                     strict=True,
                 )
-                __args = substitute_templates(_args, __template_context, eval_id="args")
-                __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
-                funcs_args.append((__optimize_func, __args, __kwargs))
+                _args = substitute_templates(args, _template_context, eval_id="args")
+                _kwargs = substitute_templates(kwargs, _template_context, eval_id="kwargs")
+
+                if has_annotatables(_optimize_func):
+                    ann_args = annotate_args(
+                        _optimize_func,
+                        _args,
+                        _kwargs,
+                        attach_annotations=True,
+                    )
+                    flat_ann_args = flatten_ann_args(ann_args)
+                    flat_ann_args = splitter_cls.parse_and_inject_takeables(flat_ann_args, eval_id=eval_id)
+                    ann_args = unflatten_ann_args(flat_ann_args)
+                    _args, _kwargs = ann_args_to_args(ann_args)
+
+                __args = ()
+                for v in _args:
+                    if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
+                        v = splitter_cls.take_range_from_takeable(
+                            v,
+                            index_slice,
+                            template_context=_template_context,
+                            silence_warnings=silence_warnings,
+                            index=wrapper.index,
+                            freq=wrapper.freq,
+                        )
+                    __args += (v,)
+                __kwargs = {}
+                for k, v in _kwargs.items():
+                    if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
+                        v = splitter_cls.take_range_from_takeable(
+                            v,
+                            index_slice,
+                            template_context=_template_context,
+                            silence_warnings=silence_warnings,
+                            index=wrapper.index,
+                            freq=wrapper.freq,
+                        )
+                    __kwargs[k] = v
+                
+                funcs_args.append((_optimize_func, __args, __kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
                     keys.append(
                         "{} → {}".format(
-                            dt.readable_datetime(wrapper.index[_index_ranges[0][i]], freq=wrapper.freq),
-                            dt.readable_datetime(wrapper.index[_index_ranges[1][i] - 1], freq=wrapper.freq),
+                            dt.readable_datetime(wrapper.index[index_ranges[0][i]], freq=wrapper.freq),
+                            dt.readable_datetime(wrapper.index[index_ranges[1][i] - 1], freq=wrapper.freq),
                         )
                     )
                 else:
                     keys.append(
                         "{} → {}".format(
-                            str(wrapper.index[_index_ranges[0][i]]),
-                            str(wrapper.index[_index_ranges[1][i] - 1]),
+                            str(wrapper.index[index_ranges[0][i]]),
+                            str(wrapper.index[index_ranges[1][i] - 1]),
                         )
                     )
-            results = execute(funcs_args, keys=keys, **_execute_kwargs)
+            results = execute(funcs_args, keys=keys, **execute_kwargs)
             _allocations = pd.DataFrame(results, columns=wrapper.columns)
             if isinstance(_allocations.columns, pd.RangeIndex):
                 _allocations = _allocations.values
             else:
                 _allocations = _allocations[list(wrapper.columns)].values
-            if _rescale_to is not None:
-                _allocations = nb.rescale_allocations_nb(_allocations, _rescale_to)
+            if rescale_to is not None:
+                _allocations = nb.rescale_allocations_nb(_allocations, rescale_to)
 
-        if _index_loc is None:
-            _alloc_wait = substitute_templates(
-                _alloc_wait,
-                _template_context,
+        if index_loc is None:
+            alloc_wait = substitute_templates(
+                alloc_wait,
+                template_context,
                 eval_id="alloc_wait",
                 strict=True,
             )
-            alloc_idx = _index_ranges[1] - 1 + _alloc_wait
+            alloc_idx = index_ranges[1] - 1 + alloc_wait
         else:
-            alloc_idx = _index_loc
+            alloc_idx = index_loc
         status = np.where(
             alloc_idx >= len(wrapper.index),
             RangeStatus.Open,
             RangeStatus.Closed,
         )
         return nb.prepare_alloc_ranges_nb(
-            _index_ranges[0],
-            _index_ranges[1],
+            index_ranges[0],
+            index_ranges[1],
             alloc_idx,
             status,
             _allocations,
@@ -2825,6 +2872,8 @@ class PortfolioOptimizer(Analyzable):
         name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
         group_configs: tp.Union[None, tp.Dict[tp.Hashable, tp.Kwargs], tp.Sequence[tp.Kwargs]] = None,
         pre_group_func: tp.Optional[tp.Callable] = None,
+        splitter_cls: tp.Optional[tp.Type[Splitter]] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
         jitted_loop: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -3164,6 +3213,8 @@ class PortfolioOptimizer(Analyzable):
         groupable_kwargs = {
             "optimize_func": optimize_func,
             **paramable_kwargs,
+            "splitter_cls": splitter_cls,
+            "eval_id": eval_id,
             "jitted_loop": jitted_loop,
             "jitted": jitted,
             "chunked": chunked,
@@ -3196,9 +3247,6 @@ class PortfolioOptimizer(Analyzable):
                         group_index=group_index,
                         group_idx=group_idx,
                         pre_group_func=pre_group_func,
-                        jitted_loop=jitted_loop,
-                        jitted=jitted,
-                        chunked=chunked,
                     ),
                 )
             )
