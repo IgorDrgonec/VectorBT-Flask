@@ -139,14 +139,14 @@ class SerialEngine(ExecutionEngine):
     def clear_cache(self) -> tp.Union[bool, int]:
         """Whether to clear vectorbt's cache after each iteration.
 
-        If integer, do it once a number of calls."""
+        If integer, do it once a number of tasks."""
         return self._clear_cache
 
     @property
     def collect_garbage(self) -> tp.Union[bool, int]:
         """Whether to clear garbage after each iteration.
 
-        If integer, do it once a number of calls."""
+        If integer, do it once a number of tasks."""
         return self._collect_garbage
 
     @property
@@ -773,15 +773,15 @@ class Executor(Configured):
     Arguments `n_chunks` and `chunk_len` can be set globally in the engine-specific settings.
     Set `n_chunks` and `chunk_len` to 'auto' to set them to the number of cores.
 
-    If `distribute` is "calls", distributes calls within each chunk.
+    If `distribute` is "tasks", distributes tasks within each chunk.
     If indices in `chunk_meta` are perfectly sorted and `tasks` is an iterable, iterates
     over `tasks` to avoid converting it into a list. Otherwise, iterates over `chunk_meta`.
     If `in_chunk_order` is True, returns the outputs in the order they appear in `chunk_meta`.
     Otherwise, always returns them in the same order as in `tasks`.
 
-    If `distribute` is "chunks", distributes chunks. For this, executes calls
-    within each chunk serially using `Executor.execute_serially`. Also, compresses each chunk such that
-    each unique function, positional argument, and keyword argument is serialized only once.
+    If `distribute` is "chunks", distributes chunks. For this, executes tasks within each chunk serially
+    using `Executor.execute_serially`. Also, compresses each chunk such that each unique function,
+    positional argument, and keyword argument is serialized only once.
 
     If `tasks` is a custom template, substitutes it once `chunk_meta` is established.
     Use `template_context` as an additional context. All the resolved functions and arguments
@@ -799,13 +799,13 @@ class Executor(Configured):
     was executed `chunk_executed` or otherwise returned by `pre_chunk_func` (only for `post_chunk_func`).
 
     !!! note
-        The both callbacks above are effective only when `distribute` is "calls" and chunking is enabled.
+        The both callbacks above are effective only when `distribute` is "tasks" and chunking is enabled.
 
-    If `pre_execute_func` is not None, calls the function before processing all calls. Should return
+    If `pre_execute_func` is not None, calls the function before processing all tasks. Should return
     nothing (None). Will also substitute any templates in `post_execute_kwargs` and pass them as keyword
     arguments. The following additional arguments are available in the context: the number of chunks `n_chunks`.
 
-    If `post_execute_func` is not None, calls the function after processing all calls. Will also substitute
+    If `post_execute_func` is not None, calls the function after processing all tasks. Will also substitute
     any templates in `post_execute_kwargs` and pass them as keyword arguments. Should return either None
     to keep the default outputs or return the new ones. The following additional arguments are available
     in the context: the number of chunks `n_chunks` and the generated flattened list of outputs `outputs`.
@@ -1298,7 +1298,7 @@ class Executor(Configured):
 
     @property
     def pre_execute_func(self) -> tp.Optional[tp.Callable]:
-        """Function to call before processing all calls."""
+        """Function to call before processing all tasks."""
         return self._pre_execute_func
 
     @property
@@ -1333,7 +1333,7 @@ class Executor(Configured):
 
     @property
     def post_execute_func(self) -> tp.Optional[tp.Callable]:
-        """Function to call after processing all calls.
+        """Function to call after processing all tasks.
 
         Should return either None to keep the default outputs, or return the new ones."""
         return self._post_execute_func
@@ -1652,9 +1652,9 @@ class Executor(Configured):
         if "bar_id" not in pbar_kwargs:
             if keys is not None:
                 if isinstance(keys, pd.MultiIndex):
-                    pbar_kwargs["bar_id"] = ("chunk_calls", tuple(keys.names))
+                    pbar_kwargs["bar_id"] = ("chunk_tasks", tuple(keys.names))
                 else:
-                    pbar_kwargs["bar_id"] = ("chunk_calls", keys.name)
+                    pbar_kwargs["bar_id"] = ("chunk_tasks", keys.name)
         if cache_chunks and chunk_cache_dir is None:
             if "bar_id" in pbar_kwargs:
                 import hashlib
@@ -1777,7 +1777,7 @@ class Executor(Configured):
         if "n_chunks" not in template_context:
             template_context["n_chunks"] = len(all_call_indices)
 
-        if distribute.lower() == "calls":
+        if distribute.lower() == "tasks":
             if indices_sorted and not hasattr(tasks, "__len__"):
                 outputs = []
                 chunk_idx = 0
@@ -1794,7 +1794,7 @@ class Executor(Configured):
                 with ProgressBar(total=len(all_call_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
                     pbar.set_description(
                         dict(
-                            chunk_calls="{}..{}".format(
+                            chunk_tasks="{}..{}".format(
                                 all_call_indices[chunk_idx][0],
                                 all_call_indices[chunk_idx][-1],
                             )
@@ -1843,7 +1843,7 @@ class Executor(Configured):
                             if chunk_idx < len(all_call_indices):
                                 pbar.set_description(
                                     dict(
-                                        chunk_calls="{}..{}".format(
+                                        chunk_tasks="{}..{}".format(
                                             all_call_indices[chunk_idx][0],
                                             all_call_indices[chunk_idx][-1],
                                         )
@@ -1916,7 +1916,7 @@ class Executor(Configured):
                 with ProgressBar(total=len(all_call_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
                     pbar.set_description(
                         dict(
-                            chunk_calls="{}..{}".format(
+                            chunk_tasks="{}..{}".format(
                                 all_call_indices[0][0],
                                 all_call_indices[0][-1],
                             )
@@ -1965,7 +1965,7 @@ class Executor(Configured):
                         if chunk_idx + 1 < len(all_call_indices):
                             pbar.set_description(
                                 dict(
-                                    chunk_calls="{}..{}".format(
+                                    chunk_tasks="{}..{}".format(
                                         all_call_indices[chunk_idx + 1][0],
                                         all_call_indices[chunk_idx + 1][-1],
                                     )
@@ -2183,3 +2183,177 @@ def execute(
         template_context=template_context,
         **kwargs,
     ).run(tasks, size=size, keys=keys)
+
+
+def executed(
+    *args,
+    executor_cls: tp.Optional[tp.Type[Executor]] = None,
+    engine: tp.Optional[tp.ExecutionEngineLike] = None,
+    engine_config: tp.KwargsLike = None,
+    min_size: tp.Optional[int] = None,
+    n_chunks: tp.Union[None, int, str] = None,
+    chunk_len: tp.Union[None, int, str] = None,
+    chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
+    distribute: tp.Optional[str] = None,
+    in_chunk_order: tp.Optional[bool] = None,
+    warmup: tp.Optional[bool] = None,
+    cache_chunks: tp.Optional[bool] = None,
+    chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+    chunk_cache_save_kwargs: tp.KwargsLike = None,
+    chunk_cache_load_kwargs: tp.KwargsLike = None,
+    pre_clear_chunk_cache: tp.Optional[bool] = None,
+    post_clear_chunk_cache: tp.Optional[bool] = None,
+    release_chunk_cache: tp.Optional[bool] = None,
+    pre_execute_func: tp.Optional[tp.Callable] = None,
+    pre_execute_kwargs: tp.KwargsLike = None,
+    pre_chunk_func: tp.Optional[tp.Callable] = None,
+    pre_chunk_kwargs: tp.KwargsLike = None,
+    post_chunk_func: tp.Optional[tp.Callable] = None,
+    post_chunk_kwargs: tp.KwargsLike = None,
+    post_execute_func: tp.Optional[tp.Callable] = None,
+    post_execute_kwargs: tp.KwargsLike = None,
+    post_execute_on_sorted: tp.Optional[bool] = None,
+    show_progress: tp.Optional[bool] = None,
+    pbar_kwargs: tp.KwargsLike = None,
+    template_context: tp.KwargsLike = None,
+    merge_to_engine_config: tp.Optional[bool] = None,
+    **kwargs,
+) -> tp.Callable:
+    """Decorator that executes a function using `Executor`.
+
+    Returns a new function that takes a sequence of argument configurations and other arguments accepted
+    by `Executor.run`. These configurations will be converted to a list and can have various formats:
+
+    * Tuple: Positional arguments
+    * Dict: Keyword arguments
+    * Tuple of one tuple and one dict: Positional and/or keyword arguments
+    * Anything else: First argument
+
+    Each option can be modified in the `options` attribute of the wrapper function or
+    directly passed as a keyword argument with a leading underscore.
+
+    Keyword arguments `**kwargs` and `engine_config` are merged into `engine_config`
+    if `merge_to_engine_config` is True, otherwise, `**kwargs` are passed directly to `Executor`."""
+
+    def decorator(func: tp.Callable) -> tp.Callable:
+        from vectorbtpro._settings import settings
+
+        execution_cfg = settings["execution"]
+
+        if merge_to_engine_config is None:
+            _merge_to_engine_config = execution_cfg["merge_to_engine_config"]
+        else:
+            _merge_to_engine_config = merge_to_engine_config
+        if _merge_to_engine_config:
+            _engine_config = merge_dicts(kwargs, engine_config)
+            _executor_kwargs = {}
+        else:
+            _engine_config = engine_config
+            _executor_kwargs = kwargs
+
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> tp.Any:
+            def _resolve_key(key, merge=False):
+                if "_" + key in kwargs:
+                    if merge:
+                        return merge_dicts(wrapper.options[key], kwargs.pop("_" + key))
+                    return kwargs.pop("_" + key)
+                return wrapper.options.get(key)
+
+            executor_cls = wrapper.options["executor_cls"]
+            if executor_cls is None:
+                executor_cls = execution_cfg["executor_cls"]
+            if executor_cls is None:
+                executor_cls = Executor
+
+            first_values = list(args[0])
+            tasks = []
+            for v in first_values:
+                tasks.append((func, (v, *args[1:]), kwargs))
+
+            return executor_cls(
+                func,
+                engine=_resolve_key("engine"),
+                engine_config=_resolve_key("engine_config", merge=True),
+                min_size=_resolve_key("min_size"),
+                n_chunks=_resolve_key("n_chunks"),
+                chunk_len=_resolve_key("chunk_len"),
+                chunk_meta=_resolve_key("chunk_meta"),
+                distribute=_resolve_key("distribute"),
+                in_chunk_order=_resolve_key("in_chunk_order"),
+                warmup=_resolve_key("warmup"),
+                cache_chunks=_resolve_key("cache_chunks"),
+                chunk_cache_dir=_resolve_key("chunk_cache_dir"),
+                chunk_cache_save_kwargs=_resolve_key("chunk_cache_save_kwargs", merge=True),
+                chunk_cache_load_kwargs=_resolve_key("chunk_cache_load_kwargs", merge=True),
+                pre_clear_chunk_cache=_resolve_key("pre_clear_chunk_cache"),
+                post_clear_chunk_cache=_resolve_key("post_clear_chunk_cache"),
+                release_chunk_cache=_resolve_key("release_chunk_cache"),
+                pre_execute_func=_resolve_key("pre_execute_func"),
+                pre_execute_kwargs=_resolve_key("pre_execute_kwargs", merge=True),
+                pre_chunk_func=_resolve_key("pre_chunk_func"),
+                pre_chunk_kwargs=_resolve_key("pre_chunk_kwargs", merge=True),
+                post_chunk_func=_resolve_key("post_chunk_func"),
+                post_chunk_kwargs=_resolve_key("post_chunk_kwargs", merge=True),
+                post_execute_func=_resolve_key("post_execute_func"),
+                post_execute_kwargs=_resolve_key("post_execute_kwargs", merge=True),
+                post_execute_on_sorted=_resolve_key("post_execute_on_sorted"),
+                show_progress=_resolve_key("show_progress"),
+                pbar_kwargs=_resolve_key("pbar_kwargs", merge=True),
+                template_context=_resolve_key("template_context", merge=True),
+                **_resolve_key("executor_kwargs", merge=True),
+            ).run(tasks, *args[1:], **kwargs)
+
+        wrapper.func = func
+        wrapper.name = func.__name__
+        wrapper.is_executor = True
+        wrapper.options = FrozenConfig(
+            executor_cls=executor_cls,
+            executor_kwargs=_executor_kwargs,
+            engine=engine,
+            engine_config=_engine_config,
+            min_size=min_size,
+            n_chunks=n_chunks,
+            chunk_len=chunk_len,
+            chunk_meta=chunk_meta,
+            distribute=distribute,
+            in_chunk_order=in_chunk_order,
+            warmup=warmup,
+            cache_chunks=cache_chunks,
+            chunk_cache_dir=chunk_cache_dir,
+            chunk_cache_save_kwargs=chunk_cache_save_kwargs,
+            chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+            pre_clear_chunk_cache=pre_clear_chunk_cache,
+            post_clear_chunk_cache=post_clear_chunk_cache,
+            release_chunk_cache=release_chunk_cache,
+            pre_execute_func=pre_execute_func,
+            pre_execute_kwargs=pre_execute_kwargs,
+            pre_chunk_func=pre_chunk_func,
+            pre_chunk_kwargs=pre_chunk_kwargs,
+            post_chunk_func=post_chunk_func,
+            post_chunk_kwargs=post_chunk_kwargs,
+            post_execute_func=post_execute_func,
+            post_execute_kwargs=post_execute_kwargs,
+            post_execute_on_sorted=post_execute_on_sorted,
+            show_progress=show_progress,
+            pbar_kwargs=pbar_kwargs,
+            template_context=template_context,
+        )
+        signature = inspect.signature(wrapper)
+        lists_var_kwargs = False
+        for k, v in signature.parameters.items():
+            if v.kind == v.VAR_KEYWORD:
+                lists_var_kwargs = True
+                break
+        if not lists_var_kwargs:
+            var_kwargs_param = inspect.Parameter("kwargs", inspect.Parameter.VAR_KEYWORD)
+            new_parameters = tuple(signature.parameters.values()) + (var_kwargs_param,)
+            wrapper.__signature__ = signature.replace(parameters=new_parameters)
+
+        return wrapper
+
+    if len(args) == 0:
+        return decorator
+    elif len(args) == 1:
+        return decorator(args[0])
+    raise ValueError("Either function or keyword arguments must be passed")
