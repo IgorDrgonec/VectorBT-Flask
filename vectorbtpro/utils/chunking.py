@@ -1148,7 +1148,7 @@ class Chunker(Configured):
         """Template context.
 
         Any template in both `execute_kwargs` and `merge_kwargs` will be substituted. You can use
-        the keys `ann_args`, `chunk_meta`, `arg_take_spec`, and `funcs_args` to be replaced by
+        the keys `ann_args`, `chunk_meta`, `arg_take_spec`, and `tasks` to be replaced by
         the actual objects."""
         return self._template_context
 
@@ -1783,7 +1783,7 @@ class Chunker(Configured):
         template_context["chunk_meta"] = chunk_meta
         if len(chunk_meta) < 2 and skip_single_chunk:
             return func(*args, **kwargs)
-        funcs_args = self.yield_arg_chunks(
+        tasks = self.yield_arg_chunks(
             func,
             ann_args,
             chunk_meta,
@@ -1794,7 +1794,7 @@ class Chunker(Configured):
             eval_id=eval_id,
         )
         if return_raw_chunks:
-            return chunk_meta, funcs_args
+            return chunk_meta, tasks
         execute_kwargs = substitute_templates(execute_kwargs, template_context, eval_id="execute_kwargs")
         execute_kwargs = merge_dicts(dict(show_progress=False if len(chunk_meta) == 1 else None), execute_kwargs)
         keys = []
@@ -1816,9 +1816,9 @@ class Chunker(Configured):
             keys = pd.MultiIndex.from_tuples(keys, names=(f"eval_id={eval_id}", "chunk_indices"))
         else:
             keys = pd.Index(keys, name="chunk_indices")
-        results = execute(funcs_args, size=len(chunk_meta), keys=keys, **execute_kwargs)
+        results = execute(tasks, size=len(chunk_meta), keys=keys, **execute_kwargs)
         if merge_func is not None:
-            template_context["funcs_args"] = funcs_args
+            template_context["tasks"] = tasks
             if isinstance(merge_func, MergeFunc):
                 merge_func = merge_func.replace(
                     merge_kwargs=merge_kwargs,

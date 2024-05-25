@@ -2891,7 +2891,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         execute_kwargs = cls.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
         execute_kwargs = merge_dicts(dict(show_progress=not single_key), execute_kwargs)
 
-        funcs_args = []
+        tasks = []
         if keys_are_features:
             func_arg_names = get_func_arg_names(cls.fetch_feature)
         else:
@@ -2908,7 +2908,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if k in fetch_kwargs:
                 key_fetch_kwargs = merge_dicts(key_fetch_kwargs, fetch_kwargs[k])
 
-            funcs_args.append(
+            tasks.append(
                 (
                     key_fetch_func,
                     (k,),
@@ -2922,7 +2922,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             fetch_kwargs[k] = key_fetch_kwargs
 
         key_index = cls.get_key_index(keys=keys, level_name=level_name, feature_oriented=keys_are_features)
-        outputs = execute(funcs_args, size=len(keys), keys=key_index, **execute_kwargs)
+        outputs = execute(tasks, size=len(keys), keys=key_index, **execute_kwargs)
         if return_raw:
             return outputs
 
@@ -3163,7 +3163,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         checks.assert_instance_of(self.last_index, self.dict_type, "last_index")
         checks.assert_instance_of(self.delisted, self.dict_type, "delisted")
 
-        funcs_args = []
+        tasks = []
         key_indices = []
         for i, k in enumerate(self.keys):
             if not self.delisted.get(k, False):
@@ -3175,7 +3175,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     key_update_kwargs = self.select_symbol_kwargs(k, kwargs)
                 if "silence_warnings" in func_arg_names:
                     key_update_kwargs["silence_warnings"] = silence_warnings
-                funcs_args.append(
+                tasks.append(
                     (
                         key_update_func,
                         (k,),
@@ -3188,7 +3188,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 )
                 key_indices.append(i)
 
-        outputs = execute(funcs_args, size=len(self.keys), keys=self.key_index, **execute_kwargs)
+        outputs = execute(tasks, size=len(self.keys), keys=self.key_index, **execute_kwargs)
         if return_raw:
             return outputs
 
@@ -3794,7 +3794,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             _self = _self.select_symbols(on_symbols)
 
         if checks.is_complex_iterable(func):
-            funcs_args = []
+            tasks = []
             keys = []
             for i, f in enumerate(func):
                 _location = location
@@ -3848,11 +3848,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     **new_kwargs,
                 }
 
-                funcs_args.append((self.try_run, new_args, new_kwargs))
+                tasks.append((self.try_run, new_args, new_kwargs))
                 keys.append(str(func_name))
 
             keys = pd.Index(keys, name="run_func")
-            results = execute(funcs_args, size=len(keys), keys=keys, **execute_kwargs)
+            results = execute(tasks, size=len(keys), keys=keys, **execute_kwargs)
 
             skip_indices = set()
             for i, result in enumerate(results):

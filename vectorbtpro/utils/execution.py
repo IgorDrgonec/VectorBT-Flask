@@ -6,14 +6,16 @@ import concurrent.futures
 import enum
 import time
 import warnings
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
+import inspect
 
 import pandas as pd
 from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.config import merge_dicts, Configured
+from vectorbtpro.utils.attr_ import define, DefineMixin
+from vectorbtpro.utils.config import merge_dicts, Configured, FrozenConfig
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.path_ import remove_dir, file_exists
 from vectorbtpro.utils.pbar import ProgressBar
@@ -30,6 +32,7 @@ except ImportError:
     ObjectRefT = tp.Any
 
 __all__ = [
+    "Task",
     "SerialEngine",
     "ThreadPoolEngine",
     "ProcessPoolEngine",
@@ -40,18 +43,45 @@ __all__ = [
 ]
 
 
+@define
+class Task(DefineMixin):
+    """Class that represents an executable task."""
+
+    func: tp.Callable = define.field()
+    """Function."""
+
+    args: tp.Args = define.field(factory=tuple)
+    """Positional arguments."""
+
+    kwargs: tp.Kwargs = define.field(factory=dict)
+    """Keyword arguments."""
+
+    def __init__(self, func: tp.Callable, *args, **kwargs) -> None:
+        DefineMixin.__init__(self, func=func, args=args, kwargs=kwargs)
+
+    def __iter__(self) -> tp.Iterator:
+        return iter((self.func, self.args, self.kwargs))
+
+    def __getitem__(self, item: int) -> tp.Any:
+        return tuple(self)[item]
+
+    def execute(self) -> tp.Any:
+        """Execute the task."""
+        return self.func(*self.args, **self.kwargs)
+
+
 class ExecutionEngine(Configured):
     """Abstract class for executing functions."""
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
         """Run an iterable of tuples out of a function, arguments, and keyword arguments.
 
-        Provide `size` in case `funcs_args` is a generator and the underlying engine needs it."""
+        Provide `size` in case `tasks` is a generator and the underlying engine needs it."""
         raise NotImplementedError
 
 
@@ -126,7 +156,7 @@ class SerialEngine(ExecutionEngine):
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
@@ -134,8 +164,8 @@ class SerialEngine(ExecutionEngine):
         from vectorbtpro.base.indexes import to_any_index
 
         results = []
-        if size is None and hasattr(funcs_args, "__len__"):
-            size = len(funcs_args)
+        if size is None and hasattr(tasks, "__len__"):
+            size = len(tasks)
         if keys is not None:
             keys = to_any_index(keys)
         pbar_kwargs = dict(self.pbar_kwargs)
@@ -153,7 +183,7 @@ class SerialEngine(ExecutionEngine):
                 else:
                     pbar.set_description(dict(zip(keys.names, [keys[0]])))
 
-            for i, (func, args, kwargs) in enumerate(funcs_args):
+            for i, (func, args, kwargs) in enumerate(tasks):
                 results.append(func(*args, **kwargs))
                 if isinstance(self.clear_cache, bool):
                     if self.clear_cache:
@@ -213,13 +243,13 @@ class ThreadPoolEngine(ExecutionEngine):
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
         with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
             futures = {}
-            for i, (func, args, kwargs) in enumerate(funcs_args):
+            for i, (func, args, kwargs) in enumerate(tasks):
                 future = executor.submit(func, *args, **kwargs)
                 futures[future] = i
             results = [None] * len(futures)
@@ -263,13 +293,13 @@ class ProcessPoolEngine(ExecutionEngine):
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
         with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
             futures = {}
-            for i, (func, args, kwargs) in enumerate(funcs_args):
+            for i, (func, args, kwargs) in enumerate(tasks):
                 future = executor.submit(func, *args, **kwargs)
                 futures[future] = i
             results = [None] * len(futures)
@@ -368,7 +398,7 @@ class PathosEngine(ExecutionEngine):
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
@@ -383,7 +413,7 @@ class PathosEngine(ExecutionEngine):
         elif self.pool_type.lower() in ("parallel", "parallelpool"):
             from pathos.pools import ParallelPool as Pool
 
-            funcs_args = [(pass_kwargs_as_args, x, {}) for x in funcs_args]
+            tasks = [(pass_kwargs_as_args, x, {}) for x in tasks]
         else:
             raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
         pbar_kwargs = dict(self.pbar_kwargs)
@@ -396,7 +426,7 @@ class PathosEngine(ExecutionEngine):
 
         with Pool(**self.init_kwargs) as pool:
             async_results = []
-            for func, args, kwargs in funcs_args:
+            for func, args, kwargs in tasks:
                 async_result = pool.apipe(func, *args, **kwargs)
                 async_results.append(async_result)
             if self.timeout is not None or self.show_progress:
@@ -463,7 +493,7 @@ class MpireEngine(ExecutionEngine):
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
@@ -474,7 +504,7 @@ class MpireEngine(ExecutionEngine):
 
         with WorkerPool(**self.init_kwargs) as pool:
             async_results = []
-            for i, (func, args, kwargs) in enumerate(funcs_args):
+            for i, (func, args, kwargs) in enumerate(tasks):
                 async_result = pool.apply_async(func, args=args, kwargs=kwargs, **self.apply_kwargs)
                 async_results.append(async_result)
             pool.stop_and_join()
@@ -512,7 +542,7 @@ class DaskEngine(ExecutionEngine):
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
@@ -522,7 +552,7 @@ class DaskEngine(ExecutionEngine):
         import dask
 
         results_delayed = []
-        for func, args, kwargs in funcs_args:
+        for func, args, kwargs in tasks:
             results_delayed.append(dask.delayed(func)(*args, **kwargs))
         return list(dask.compute(*results_delayed, **self.compute_kwargs))
 
@@ -611,7 +641,7 @@ class RayEngine(ExecutionEngine):
     @classmethod
     def get_ray_refs(
         cls,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         reuse_refs: bool = True,
         remote_kwargs: tp.KwargsLike = None,
     ) -> tp.List[tp.Tuple[RemoteFunctionT, tp.Tuple[ObjectRefT, ...], tp.Dict[str, ObjectRefT]]]:
@@ -631,8 +661,8 @@ class RayEngine(ExecutionEngine):
 
         func_id_remotes = {}
         obj_id_refs = {}
-        funcs_args_refs = []
-        for func, args, kwargs in funcs_args:
+        task_refs = []
+        for func, args, kwargs in tasks:
             # Get remote function
             if isinstance(func, RemoteFunction):
                 func_remote = func
@@ -678,12 +708,12 @@ class RayEngine(ExecutionEngine):
                         kwarg_ref = obj_id_refs[id(kwarg)]
                 kwarg_refs[kwarg_name] = kwarg_ref
 
-            funcs_args_refs.append((func_remote, arg_refs, kwarg_refs))
-        return funcs_args_refs
+            task_refs.append((func_remote, arg_refs, kwarg_refs))
+        return task_refs
 
     def execute(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
@@ -697,9 +727,9 @@ class RayEngine(ExecutionEngine):
                 ray.shutdown()
         if not ray.is_initialized():
             ray.init(**self.init_kwargs)
-        funcs_args_refs = self.get_ray_refs(funcs_args, reuse_refs=self.reuse_refs, remote_kwargs=self.remote_kwargs)
+        task_refs = self.get_ray_refs(tasks, reuse_refs=self.reuse_refs, remote_kwargs=self.remote_kwargs)
         result_refs = []
-        for func_remote, arg_refs, kwarg_refs in funcs_args_refs:
+        for func_remote, arg_refs, kwarg_refs in task_refs:
             result_refs.append(func_remote.remote(*arg_refs, **kwarg_refs))
         try:
             results = ray.get(result_refs)
@@ -736,7 +766,7 @@ class Executor(Configured):
     * Name of the engine (see supported engines)
     * Subclass of `ExecutionEngine` - initializes with `engine_config`
     * Instance of `ExecutionEngine` - calls `ExecutionEngine.execute` with `size`
-    * Callable - passes `funcs_args`, `size` (if not None), and `engine_config`
+    * Callable - passes `tasks`, `size` (if not None), and `engine_config`
 
     Can execute per chunk if `chunk_meta` is provided. Otherwise, if any of `n_chunks` and `chunk_len`
     are set, passes them to `vectorbtpro.utils.chunking.yield_chunk_meta` to generate `chunk_meta`.
@@ -744,16 +774,16 @@ class Executor(Configured):
     Set `n_chunks` and `chunk_len` to 'auto' to set them to the number of cores.
 
     If `distribute` is "calls", distributes calls within each chunk.
-    If indices in `chunk_meta` are perfectly sorted and `funcs_args` is an iterable, iterates
-    over `funcs_args` to avoid converting it into a list. Otherwise, iterates over `chunk_meta`.
+    If indices in `chunk_meta` are perfectly sorted and `tasks` is an iterable, iterates
+    over `tasks` to avoid converting it into a list. Otherwise, iterates over `chunk_meta`.
     If `in_chunk_order` is True, returns the outputs in the order they appear in `chunk_meta`.
-    Otherwise, always returns them in the same order as in `funcs_args`.
+    Otherwise, always returns them in the same order as in `tasks`.
 
     If `distribute` is "chunks", distributes chunks. For this, executes calls
     within each chunk serially using `Executor.execute_serially`. Also, compresses each chunk such that
     each unique function, positional argument, and keyword argument is serialized only once.
 
-    If `funcs_args` is a custom template, substitutes it once `chunk_meta` is established.
+    If `tasks` is a custom template, substitutes it once `chunk_meta` is established.
     Use `template_context` as an additional context. All the resolved functions and arguments
     will be immediately passed to the executor.
 
@@ -1222,12 +1252,12 @@ class Executor(Configured):
     def in_chunk_order(self) -> bool:
         """Whether to return the outputs in the order they appear in `chunk_meta`.
 
-        Otherwise, always returns them in the same order as in `funcs_args`."""
+        Otherwise, always returns them in the same order as in `tasks`."""
         return self._in_chunk_order
 
     @property
     def warmup(self) -> bool:
-        """Whether to call the first item of `funcs_args` once before distribution."""
+        """Whether to call the first item of `tasks` once before distribution."""
         return self._warmup
 
     @property
@@ -1337,10 +1367,10 @@ class Executor(Configured):
         return self._template_context
 
     @staticmethod
-    def execute_serially(funcs_args: tp.FuncsArgs, id_objs: tp.Dict[int, tp.Any]) -> tp.ExecOutputs:
+    def execute_serially(tasks: tp.TasksLike, id_objs: tp.Dict[int, tp.Any]) -> tp.ExecOutputs:
         """Execute serially."""
         results = []
-        for func, args, kwargs in funcs_args:
+        for func, args, kwargs in tasks:
             new_func = id_objs[func]
             new_args = tuple(id_objs[arg] for arg in args)
             new_kwargs = {k: id_objs[v] for k, v in kwargs.items()}
@@ -1348,7 +1378,7 @@ class Executor(Configured):
         return results
 
     @classmethod
-    def build_serial_chunk(cls, funcs_args: tp.FuncsArgs) -> tp.FuncArgs:
+    def build_serial_chunk(cls, tasks: tp.TasksLike) -> tp.FuncArgs:
         """Build a serial chunk."""
         ref_ids = dict()
         id_objs = dict()
@@ -1361,13 +1391,13 @@ class Executor(Configured):
             id_objs[new_id] = x
             return new_id
 
-        new_funcs_args = []
-        for func, args, kwargs in funcs_args:
+        new_tasks = []
+        for func, args, kwargs in tasks:
             new_func = _prepare(func)
             new_args = tuple(_prepare(arg) for arg in args)
             new_kwargs = {k: _prepare(v) for k, v in kwargs.items()}
-            new_funcs_args.append((new_func, new_args, new_kwargs))
-        return cls.execute_serially, (new_funcs_args, id_objs), {}
+            new_tasks.append((new_func, new_args, new_kwargs))
+        return cls.execute_serially, (new_tasks, id_objs), {}
 
     @classmethod
     def call_pre_execute_func(
@@ -1457,20 +1487,20 @@ class Executor(Configured):
     def call_execute(
         cls,
         engine: tp.Union[ExecutionEngine, tp.Callable],
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
         """Call `ExecutionEngine.execute`."""
         if isinstance(engine, ExecutionEngine):
-            return engine.execute(funcs_args, size=size, keys=keys)
+            return engine.execute(tasks, size=size, keys=keys)
         func_arg_names = get_func_arg_names(engine)
         execute_kwargs = {}
         if "size" in func_arg_names:
             execute_kwargs["size"] = size
         if "keys" in func_arg_names:
             execute_kwargs["keys"] = keys
-        return engine(funcs_args, **execute_kwargs)
+        return engine(tasks, **execute_kwargs)
 
     @classmethod
     def call_post_chunk_func(
@@ -1581,7 +1611,7 @@ class Executor(Configured):
 
     def run(
         self,
-        funcs_args: tp.FuncsArgs,
+        tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecOutputs:
@@ -1633,12 +1663,12 @@ class Executor(Configured):
                 chunk_cache_dir = "chunk_cache_%s" % chunk_cache_dir_hash
 
         if warmup:
-            if not hasattr(funcs_args, "__getitem__"):
-                funcs_args = list(funcs_args)
-            funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
+            if not hasattr(tasks, "__getitem__"):
+                tasks = list(tasks)
+            tasks[0][0](*tasks[0][1], **tasks[0][2])
 
         if n_chunks is None and chunk_len is None and chunk_meta is None:
-            if isinstance(funcs_args, CustomTemplate):
+            if isinstance(tasks, CustomTemplate):
                 n_chunks = 1
             else:
                 if cache_chunks:
@@ -1654,7 +1684,7 @@ class Executor(Configured):
                 )
                 if "n_chunks" not in template_context:
                     template_context["n_chunks"] = 1
-                outputs = self.call_execute(engine, funcs_args, size=size, keys=keys)
+                outputs = self.call_execute(engine, tasks, size=size, keys=keys)
                 return self.call_post_execute_func(
                     outputs,
                     cache_chunks=cache_chunks,
@@ -1670,17 +1700,17 @@ class Executor(Configured):
         if chunk_meta is None:
             from vectorbtpro.utils.chunking import yield_chunk_meta
 
-            if not isinstance(funcs_args, CustomTemplate) and hasattr(funcs_args, "__len__"):
-                _size = len(funcs_args)
+            if not isinstance(tasks, CustomTemplate) and hasattr(tasks, "__len__"):
+                _size = len(tasks)
             elif size is not None:
                 _size = size
             elif keys is not None:
                 _size = len(keys)
             else:
-                if isinstance(funcs_args, CustomTemplate):
-                    raise ValueError("When funcs_args is a template, must provide size")
-                funcs_args = list(funcs_args)
-                _size = len(funcs_args)
+                if isinstance(tasks, CustomTemplate):
+                    raise ValueError("When tasks is a template, must provide size")
+                tasks = list(tasks)
+                _size = len(tasks)
             chunk_meta = yield_chunk_meta(
                 size=_size,
                 min_size=min_size,
@@ -1690,13 +1720,13 @@ class Executor(Configured):
             if "chunk_meta" not in template_context:
                 template_context["chunk_meta"] = chunk_meta
 
-        if isinstance(funcs_args, CustomTemplate):
+        if isinstance(tasks, CustomTemplate):
             if cache_chunks:
                 warnings.warn("Cannot cache chunks with custom chunking", stacklevel=2)
                 cache_chunks = False
-            funcs_args = substitute_templates(funcs_args, template_context, eval_id="funcs_args")
-            if hasattr(funcs_args, "__len__"):
-                size = len(funcs_args)
+            tasks = substitute_templates(tasks, template_context, eval_id="tasks")
+            if hasattr(tasks, "__len__"):
+                size = len(tasks)
             else:
                 size = None
             self.call_pre_execute_func(
@@ -1711,7 +1741,7 @@ class Executor(Configured):
                 template_context["n_chunks"] = 1
             outputs = self.call_execute(
                 engine,
-                funcs_args,
+                tasks,
                 size=size,
                 keys=keys,
             )
@@ -1748,10 +1778,10 @@ class Executor(Configured):
             template_context["n_chunks"] = len(all_call_indices)
 
         if distribute.lower() == "calls":
-            if indices_sorted and not hasattr(funcs_args, "__len__"):
+            if indices_sorted and not hasattr(tasks, "__len__"):
                 outputs = []
                 chunk_idx = 0
-                _funcs_args = []
+                _tasks = []
 
                 self.call_pre_execute_func(
                     cache_chunks=cache_chunks,
@@ -1770,7 +1800,7 @@ class Executor(Configured):
                             )
                         )
                     )
-                    for i, func_args in enumerate(funcs_args):
+                    for i, func_args in enumerate(tasks):
                         if i > all_call_indices[chunk_idx][-1]:
                             call_indices = all_call_indices[chunk_idx]
                             call_outputs = self.call_pre_chunk_func(
@@ -1787,7 +1817,7 @@ class Executor(Configured):
                             if call_outputs is None:
                                 call_outputs = self.call_execute(
                                     engine,
-                                    _funcs_args,
+                                    _tasks,
                                     size=len(call_indices),
                                     keys=keys[call_indices] if keys is not None else None,
                                 )
@@ -1809,7 +1839,7 @@ class Executor(Configured):
                             )
                             outputs.extend(call_outputs)
                             chunk_idx += 1
-                            _funcs_args = []
+                            _tasks = []
                             if chunk_idx < len(all_call_indices):
                                 pbar.set_description(
                                     dict(
@@ -1820,8 +1850,8 @@ class Executor(Configured):
                                     )
                                 )
                             pbar.update()
-                        _funcs_args.append(func_args)
-                    if len(_funcs_args) > 0:
+                        _tasks.append(func_args)
+                    if len(_tasks) > 0:
                         call_indices = all_call_indices[chunk_idx]
                         call_outputs = self.call_pre_chunk_func(
                             chunk_idx,
@@ -1837,7 +1867,7 @@ class Executor(Configured):
                         if call_outputs is None:
                             call_outputs = self.call_execute(
                                 engine,
-                                _funcs_args,
+                                _tasks,
                                 size=len(call_indices),
                                 keys=keys[call_indices] if keys is not None else None,
                             )
@@ -1871,7 +1901,7 @@ class Executor(Configured):
                     template_context=template_context,
                 )
             else:
-                funcs_args = list(funcs_args)
+                tasks = list(tasks)
                 outputs = []
                 output_indices = []
 
@@ -1905,12 +1935,12 @@ class Executor(Configured):
                             template_context=template_context,
                         )
                         if call_outputs is None:
-                            _funcs_args = []
+                            _tasks = []
                             for idx in call_indices:
-                                _funcs_args.append(funcs_args[idx])
+                                _tasks.append(tasks[idx])
                             call_outputs = self.call_execute(
                                 engine,
-                                _funcs_args,
+                                _tasks,
                                 size=len(call_indices),
                                 keys=keys[call_indices] if keys is not None else None,
                             )
@@ -1974,10 +2004,10 @@ class Executor(Configured):
             if cache_chunks:
                 warnings.warn("Cannot cache chunks with chunk distribution", stacklevel=2)
                 cache_chunks = False
-            if indices_sorted and not hasattr(funcs_args, "__len__"):
+            if indices_sorted and not hasattr(tasks, "__len__"):
                 chunk_idx = 0
-                _funcs_args = []
-                funcs_args_chunks = []
+                _tasks = []
+                task_chunks = []
 
                 self.call_pre_execute_func(
                     cache_chunks=cache_chunks,
@@ -1987,18 +2017,18 @@ class Executor(Configured):
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
                 )
-                for i, func_args in enumerate(funcs_args):
+                for i, func_args in enumerate(tasks):
                     if i > all_call_indices[chunk_idx][-1]:
-                        funcs_args_chunks.append(self.build_serial_chunk(_funcs_args))
+                        task_chunks.append(self.build_serial_chunk(_tasks))
                         chunk_idx += 1
-                        _funcs_args = []
-                    _funcs_args.append(func_args)
-                if len(_funcs_args) > 0:
-                    funcs_args_chunks.append(self.build_serial_chunk(_funcs_args))
+                        _tasks = []
+                    _tasks.append(func_args)
+                if len(_tasks) > 0:
+                    task_chunks.append(self.build_serial_chunk(_tasks))
                 outputs = self.call_execute(
                     engine,
-                    funcs_args_chunks,
-                    size=len(funcs_args_chunks),
+                    task_chunks,
+                    size=len(task_chunks),
                 )
                 outputs = [x for o in outputs for x in o]
                 return self.call_post_execute_func(
@@ -2013,8 +2043,8 @@ class Executor(Configured):
                     template_context=template_context,
                 )
             else:
-                funcs_args = list(funcs_args)
-                funcs_args_chunks = []
+                tasks = list(tasks)
+                task_chunks = []
                 output_indices = []
 
                 self.call_pre_execute_func(
@@ -2026,15 +2056,15 @@ class Executor(Configured):
                     template_context=template_context,
                 )
                 for call_indices in all_call_indices:
-                    _funcs_args = []
+                    _tasks = []
                     for idx in call_indices:
-                        _funcs_args.append(funcs_args[idx])
-                    funcs_args_chunks.append(self.build_serial_chunk(_funcs_args))
+                        _tasks.append(tasks[idx])
+                    task_chunks.append(self.build_serial_chunk(_tasks))
                     output_indices.extend(call_indices)
                 outputs = self.call_execute(
                     engine,
-                    funcs_args_chunks,
-                    size=len(funcs_args_chunks),
+                    task_chunks,
+                    size=len(task_chunks),
                 )
                 outputs = [x for o in outputs for x in o]
                 if not post_execute_on_sorted:
@@ -2069,7 +2099,7 @@ class Executor(Configured):
 
 
 def execute(
-    funcs_args: tp.FuncsArgs,
+    tasks: tp.TasksLike,
     size: tp.Optional[int] = None,
     keys: tp.Optional[tp.IndexLike] = None,
     executor_cls: tp.Optional[tp.Type[Executor]] = None,
@@ -2152,4 +2182,4 @@ def execute(
         pbar_kwargs=pbar_kwargs,
         template_context=template_context,
         **kwargs,
-    ).run(funcs_args, size=size, keys=keys)
+    ).run(tasks, size=size, keys=keys)

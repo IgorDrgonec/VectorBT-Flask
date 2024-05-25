@@ -3080,7 +3080,7 @@ Other keyword arguments are passed to `{0}.run`.
                     execute_kwargs=execute_kwargs,
                 )
 
-            funcs_args = []
+            tasks = []
             for i in range(_n_params):
                 if select_params:
                     _inputs = tuple(_inputs[i] for _inputs in _input_tuple)
@@ -3090,7 +3090,7 @@ Other keyword arguments are passed to `{0}.run`.
                     _inputs = _input_tuple
                     _in_outputs = _in_output_tuple
                     _params = _param_tuple
-                funcs_args.append(
+                tasks.append(
                     (
                         apply_func,
                         (
@@ -3107,7 +3107,7 @@ Other keyword arguments are passed to `{0}.run`.
                     )
                 )
             return combining.apply_and_concat_each(
-                funcs_args,
+                tasks,
                 n_outputs=num_ret_outputs,
                 execute_kwargs=execute_kwargs,
             )

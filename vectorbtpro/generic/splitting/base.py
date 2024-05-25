@@ -3854,7 +3854,7 @@ class Splitter(Analyzable):
                     for j in range(n_sets):
                         yield _get_func_args(i, j)
 
-            funcs_args = _get_generator()
+            tasks = _get_generator()
             keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
             if eval_id is not None:
                 new_keys = []
@@ -3865,7 +3865,7 @@ class Splitter(Analyzable):
                         new_keys.append((MISSING, key))
                 keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
+            results = execute(tasks, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
             def _get_generator():
@@ -3873,7 +3873,7 @@ class Splitter(Analyzable):
                     for i in range(n_splits):
                         yield _get_func_args(i, j)
 
-            funcs_args = _get_generator()
+            tasks = _get_generator()
             keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
             if eval_id is not None:
                 new_keys = []
@@ -3884,7 +3884,7 @@ class Splitter(Analyzable):
                         new_keys.append((MISSING, key))
                 keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
+            results = execute(tasks, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
             def _process_chunk(chunk):
@@ -3900,7 +3900,7 @@ class Splitter(Analyzable):
                         chunk.append(_get_func_args(i, j))
                     yield _process_chunk, (chunk,), {}
 
-            funcs_args = _get_generator()
+            tasks = _get_generator()
             keys = split_labels
             if eval_id is not None:
                 new_keys = []
@@ -3911,7 +3911,7 @@ class Splitter(Analyzable):
                         new_keys.append((MISSING, key))
                 keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits, keys=keys, **execute_kwargs)
+            results = execute(tasks, size=n_splits, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
             def _process_chunk(chunk):
@@ -3927,7 +3927,7 @@ class Splitter(Analyzable):
                         chunk.append(_get_func_args(i, j))
                     yield _process_chunk, (chunk,), {}
 
-            funcs_args = _get_generator()
+            tasks = _get_generator()
             keys = set_labels
             if eval_id is not None:
                 new_keys = []
@@ -3938,7 +3938,7 @@ class Splitter(Analyzable):
                         new_keys.append((MISSING, key))
                 keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_sets, keys=keys, **execute_kwargs)
+            results = execute(tasks, size=n_sets, keys=keys, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 
@@ -4011,7 +4011,7 @@ class Splitter(Analyzable):
                     return pd.Series(_results, index=keys, dtype=object)
 
             if merge_func is not None:
-                template_context["funcs_args"] = funcs_args
+                template_context["tasks"] = tasks
                 template_context["keys"] = keys
                 if is_merge_func_from_config(merge_func):
                     merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
@@ -4085,7 +4085,7 @@ class Splitter(Analyzable):
                         keep_major_indices.append(i)
                 else:
                     _template_context = dict(template_context)
-                    _template_context["funcs_args"] = funcs_args
+                    _template_context["tasks"] = tasks
                     if attach_bounds is not None:
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:

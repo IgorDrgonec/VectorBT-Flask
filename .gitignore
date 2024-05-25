@@ -132,6 +132,7 @@ dmypy.json
 .idea/
 
 # Custom
+.DS_Store
 *.pkl
 *.pickle
 *.csv

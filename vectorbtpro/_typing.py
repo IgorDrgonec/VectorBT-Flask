@@ -34,7 +34,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from vectorbtpro.utils.parsing import Regex
-    from vectorbtpro.utils.execution import ExecutionEngine
+    from vectorbtpro.utils.execution import Task, ExecutionEngine
     from vectorbtpro.utils.chunking import Sizer, NotChunked, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
     from vectorbtpro.utils.template import CustomTemplate
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from vectorbtpro.generic.splitting.base import FixRange, RelRange
 else:
     Regex = "Regex"
+    Task = "Task"
     ExecutionEngine = "ExecutionEngine"
     Sizer = "Sizer"
     NotChunked = "NotChunked"
@@ -247,6 +248,8 @@ AnnArgQuery = Union[int, str, Regex]
 # Execution
 FuncArgs = Tuple[Callable, Args, Kwargs]
 FuncsArgs = Iterable[FuncArgs]
+TaskLike = Union[FuncArgs, Task]
+TasksLike = Iterable[TaskLike]
 ExecutionEngineLike = Union[str, type, ExecutionEngine, Callable]
 ExecOutput = Any
 ExecOutputs = List[Any]

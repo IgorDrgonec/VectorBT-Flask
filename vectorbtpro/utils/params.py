@@ -1391,13 +1391,13 @@ class Parameterizer(Configured):
         return new_param_configs, param_index, single_comb
 
     @classmethod
-    def yield_funcs_args(
+    def yield_tasks(
         cls,
         func: tp.Callable,
         ann_args: tp.AnnArgs,
         param_configs: tp.List[tp.Kwargs],
         template_context: tp.KwargsLike = None,
-    ) -> tp.FuncsArgs:
+    ) -> tp.TasksLike:
         """Yield functions and their arguments for execution."""
         for p, param_config in enumerate(param_configs):
             _template_context = dict(template_context)
@@ -1727,15 +1727,15 @@ class Parameterizer(Configured):
             template_context["single_comb"] = new_single_comb
 
         if skip_single_comb and template_context["single_comb"]:
-            funcs_args = list(
-                self.yield_funcs_args(
+            tasks = list(
+                self.yield_tasks(
                     self.func,
                     template_context["ann_args"],
                     template_context["param_configs"],
                     template_context=template_context,
                 )
             )
-            result = funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
+            result = tasks[0][0](*tasks[0][1], **tasks[0][2])
             if isinstance(result, _NoResult):
                 raise NoResultsException
             return result
@@ -1772,7 +1772,7 @@ class Parameterizer(Configured):
         else:
             template_context["mono_chunk_indices"] = None
 
-        template_context["funcs_args"] = self.yield_funcs_args(
+        template_context["tasks"] = self.yield_tasks(
             self.func,
             template_context["ann_args"],
             template_context["param_configs"],
@@ -1787,7 +1787,7 @@ class Parameterizer(Configured):
                 param_configs=template_context["param_configs"],
                 param_index=template_context["param_index"],
                 mono_chunk_indices=template_context["mono_chunk_indices"],
-                funcs_args=template_context["funcs_args"],
+                tasks=template_context["tasks"],
             )
 
         execute_kwargs = merge_dicts(
@@ -1804,7 +1804,7 @@ class Parameterizer(Configured):
                     new_keys.append((MISSING, key))
             keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
         results = execute(
-            template_context["funcs_args"],
+            template_context["tasks"],
             size=len(template_context["param_configs"]),
             keys=keys,
             **execute_kwargs,
@@ -1878,7 +1878,7 @@ def parameterized(
     eval_id: tp.Optional[tp.Hashable] = None,
     **kwargs,
 ) -> tp.Callable:
-    """Decorator that parameterizes the inputs of a function using `Parameterizer`.
+    """Decorator that parameterizes inputs of a function using `Parameterizer`.
 
     Returns a new function with the same signature as the passed one.
 

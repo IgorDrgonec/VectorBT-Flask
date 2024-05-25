@@ -1936,7 +1936,7 @@ class PortfolioOptimizer(Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             _allocations = func(len(wrapper.columns), index_points, allocate_func, *args, **kwargs)
         else:
-            funcs_args = []
+            tasks = []
             keys = []
             for i in range(len(index_points)):
                 _template_context = merge_dicts(
@@ -1954,12 +1954,12 @@ class PortfolioOptimizer(Analyzable):
                 )
                 _args = substitute_templates(args, _template_context, eval_id="args")
                 _kwargs = substitute_templates(kwargs, _template_context, eval_id="kwargs")
-                funcs_args.append((_allocate_func, _args, _kwargs))
+                tasks.append((_allocate_func, _args, _kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
                     keys.append(dt.readable_datetime(wrapper.index[index_points[i]], freq=wrapper.freq))
                 else:
                     keys.append(str(wrapper.index[index_points[i]]))
-            results = execute(funcs_args, keys=keys, **execute_kwargs)
+            results = execute(tasks, keys=keys, **execute_kwargs)
             _allocations = pd.DataFrame(results, columns=wrapper.columns)
             if isinstance(_allocations.columns, pd.RangeIndex):
                 _allocations = _allocations.values
@@ -2294,9 +2294,9 @@ class PortfolioOptimizer(Analyzable):
         group_configs = new_group_configs
 
         # Generate allocations
-        funcs_args = []
+        tasks = []
         for group_idx, group_config in enumerate(group_configs):
-            funcs_args.append(
+            tasks.append(
                 (
                     cls.run_allocation_group,
                     (),
@@ -2310,7 +2310,7 @@ class PortfolioOptimizer(Analyzable):
                 )
             )
         group_execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), group_execute_kwargs)
-        results = execute(funcs_args, keys=group_index, **group_execute_kwargs)
+        results = execute(tasks, keys=group_index, **group_execute_kwargs)
         alloc_points, allocations = zip(*results)
 
         # Build column hierarchy
@@ -2734,7 +2734,7 @@ class PortfolioOptimizer(Analyzable):
                 **kwargs,
             )
         else:
-            funcs_args = []
+            tasks = []
             keys = []
             for i in range(len(index_ranges[0])):
                 index_slice = slice(max(0, index_ranges[0][i]), index_ranges[1][i])
@@ -2793,7 +2793,7 @@ class PortfolioOptimizer(Analyzable):
                         )
                     __kwargs[k] = v
                 
-                funcs_args.append((_optimize_func, __args, __kwargs))
+                tasks.append((_optimize_func, __args, __kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
                     keys.append(
                         "{} → {}".format(
@@ -2808,7 +2808,7 @@ class PortfolioOptimizer(Analyzable):
                             str(wrapper.index[index_ranges[1][i] - 1]),
                         )
                     )
-            results = execute(funcs_args, keys=keys, **execute_kwargs)
+            results = execute(tasks, keys=keys, **execute_kwargs)
             _allocations = pd.DataFrame(results, columns=wrapper.columns)
             if isinstance(_allocations.columns, pd.RangeIndex):
                 _allocations = _allocations.values
@@ -3235,9 +3235,9 @@ class PortfolioOptimizer(Analyzable):
         group_configs = new_group_configs
 
         # Generate allocations
-        funcs_args = []
+        tasks = []
         for group_idx, group_config in enumerate(group_configs):
-            funcs_args.append(
+            tasks.append(
                 (
                     cls.run_optimization_group,
                     (),
@@ -3251,7 +3251,7 @@ class PortfolioOptimizer(Analyzable):
                 )
             )
         group_execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), group_execute_kwargs)
-        results = execute(funcs_args, keys=group_index, **group_execute_kwargs)
+        results = execute(tasks, keys=group_index, **group_execute_kwargs)
         alloc_ranges, allocations = zip(*results)
 
         # Build column hierarchy
