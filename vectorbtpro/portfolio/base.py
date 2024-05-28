@@ -5398,7 +5398,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> tp.Frame:
-        """Get (entry and exit) trade history as a DataFrame."""
+        """Get order history merged with entry and exit trades as a readable DataFrame.
+
+        !!! note
+            The P&L and return aggregated across the DataFrame may not match the actual total P&L and
+            return, as this DataFrame annotates entry and exit orders with the performance relative to
+            their respective trade types. To obtain accurate total statistics, aggregate only the statistics
+            of either trade type. Additionally, entry orders include open statistics, whereas exit orders do not.
+        """
         if not isinstance(cls_or_self, type):
             if orders is None:
                 orders = cls_or_self.resolve_shortcut_attr(
@@ -5440,24 +5447,26 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         del order_history["Size"]
         del order_history["Price"]
         del order_history["Fees"]
+
         entry_trade_history = entry_trades.records_readable
-        exit_trade_history = exit_trades.records_readable
-        entry_trade_history.rename(columns={"Entry Order Id": "Order Id"}, inplace=True)
-        exit_trade_history.rename(columns={"Exit Order Id": "Order Id"}, inplace=True)
         del entry_trade_history["Entry Index"]
-        del exit_trade_history["Exit Index"]
-        entry_trade_history.rename(columns={"Avg Entry Price": "Price"}, inplace=True)
-        exit_trade_history.rename(columns={"Avg Exit Price": "Price"}, inplace=True)
-        entry_trade_history.rename(columns={"Entry Fees": "Fees"}, inplace=True)
-        exit_trade_history.rename(columns={"Exit Fees": "Fees"}, inplace=True)
         del entry_trade_history["Exit Order Id"]
-        del exit_trade_history["Entry Order Id"]
         del entry_trade_history["Exit Index"]
-        del exit_trade_history["Entry Index"]
         del entry_trade_history["Avg Exit Price"]
-        del exit_trade_history["Avg Entry Price"]
         del entry_trade_history["Exit Fees"]
+        entry_trade_history.rename(columns={"Entry Order Id": "Order Id"}, inplace=True)
+        entry_trade_history.rename(columns={"Avg Entry Price": "Price"}, inplace=True)
+        entry_trade_history.rename(columns={"Entry Fees": "Fees"}, inplace=True)
+
+        exit_trade_history = exit_trades.records_readable
+        del exit_trade_history["Exit Index"]
+        del exit_trade_history["Entry Order Id"]
+        del exit_trade_history["Entry Index"]
+        del exit_trade_history["Avg Entry Price"]
         del exit_trade_history["Entry Fees"]
+        exit_trade_history.rename(columns={"Exit Order Id": "Order Id"}, inplace=True)
+        exit_trade_history.rename(columns={"Avg Exit Price": "Price"}, inplace=True)
+        exit_trade_history.rename(columns={"Exit Fees": "Fees"}, inplace=True)
 
         trade_history = pd.concat((entry_trade_history, exit_trade_history), axis=0)
         trade_history = pd.merge(order_history, trade_history, on=["Column", "Order Id"])

@@ -17,7 +17,7 @@ from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, 
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.config import merge_dicts, FrozenConfig, Configured
 from vectorbtpro.utils.eval_ import Evaluable
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
@@ -1006,7 +1006,7 @@ class Chunker(Configured):
     1. Generates chunk metadata by passing `n_chunks`, `size`, `min_size`, `chunk_len`,
         and `chunk_meta` to `Chunker.get_chunk_meta_from_args`.
     2. Splits arguments and keyword arguments by passing chunk metadata, `arg_take_spec`,
-        and `template_context` to `Chunker.yield_arg_chunks`, which yields one chunk at a time.
+        and `template_context` to `Chunker.yield_tasks`, which yields one chunk at a time.
     3. Executes all chunks by passing `**execute_kwargs` to `vectorbtpro.utils.execution.execute`.
     4. Optionally, post-processes and merges the results by passing them and
         `**merge_kwargs` to `merge_func`.
@@ -1140,7 +1140,7 @@ class Chunker(Configured):
 
     @property
     def arg_take_spec(self) -> tp.Optional[tp.ArgTakeSpecLike]:
-        """See `yield_arg_chunks`."""
+        """See `yield_tasks`."""
         return self._arg_take_spec
 
     @property
@@ -1393,7 +1393,7 @@ class Chunker(Configured):
         return new_args, new_kwargs
 
     @classmethod
-    def yield_arg_chunks(
+    def yield_tasks(
         cls,
         func: tp.Callable,
         ann_args: tp.AnnArgs,
@@ -1401,8 +1401,8 @@ class Chunker(Configured):
         arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
         template_context: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Generator[tp.FuncArgs, None, None]:
-        """Split annotated arguments into chunks using `Chunker.take_from_args` and yield each chunk.
+    ) -> tp.Generator[Task, None, None]:
+        """Split annotated arguments into chunks using `Chunker.take_from_args` and yield each chunk as a task.
 
         Args:
             func (callable): Callable.
@@ -1448,7 +1448,7 @@ class Chunker(Configured):
                     template_context=_template_context,
                     **kwargs,
                 )
-            yield func, chunk_args, chunk_kwargs
+            yield Task(func, *chunk_args, **chunk_kwargs)
 
     @classmethod
     def parse_sizer_from_func(
@@ -1783,7 +1783,7 @@ class Chunker(Configured):
         template_context["chunk_meta"] = chunk_meta
         if len(chunk_meta) < 2 and skip_single_chunk:
             return func(*args, **kwargs)
-        tasks = self.yield_arg_chunks(
+        tasks = self.yield_tasks(
             func,
             ann_args,
             chunk_meta,

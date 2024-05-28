@@ -51,6 +51,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configur
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
+from vectorbtpro.utils.execution import Task
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.module_ import search_package_for_funcs
@@ -3090,22 +3091,18 @@ Other keyword arguments are passed to `{0}.run`.
                     _inputs = _input_tuple
                     _in_outputs = _in_output_tuple
                     _params = _param_tuple
-                tasks.append(
-                    (
-                        apply_func,
-                        (
-                            *((i,) if not select_params else ()),
-                            *args_before,
-                            *((_inputs,) if pass_packed else _inputs),
-                            *((_in_outputs,) if pass_packed else _in_outputs),
-                            *((_params,) if pass_packed else _params),
-                            *_args,
-                            *more_args,
-                            *cache,
-                        ),
-                        _kwargs,
-                    )
-                )
+                tasks.append(Task(
+                    apply_func,
+                    *((i,) if not select_params else ()),
+                    *args_before,
+                    *((_inputs,) if pass_packed else _inputs),
+                    *((_in_outputs,) if pass_packed else _in_outputs),
+                    *((_params,) if pass_packed else _params),
+                    *_args,
+                    *more_args,
+                    *cache,
+                    **_kwargs,
+                ))
             return combining.apply_and_concat_each(
                 tasks,
                 n_outputs=num_ret_outputs,

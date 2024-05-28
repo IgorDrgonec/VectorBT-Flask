@@ -1585,7 +1585,7 @@ class Parameterizer(Configured):
         if param_configs is None:
             param_configs = []
 
-        parsed_merge_func = parse_merge_func(self.func)
+        parsed_merge_func = parse_merge_func(self.func, eval_id=eval_id)
         if parsed_merge_func is not None:
             if merge_func is not None:
                 raise ValueError(

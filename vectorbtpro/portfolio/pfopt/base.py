@@ -28,7 +28,7 @@ from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.annotations import has_annotatables
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.params import Param, combine_params, Parameterizer
 from vectorbtpro.utils.parsing import (
     get_func_arg_names,
@@ -1954,7 +1954,7 @@ class PortfolioOptimizer(Analyzable):
                 )
                 _args = substitute_templates(args, _template_context, eval_id="args")
                 _kwargs = substitute_templates(kwargs, _template_context, eval_id="kwargs")
-                tasks.append((_allocate_func, _args, _kwargs))
+                tasks.append(Task(_allocate_func, *_args, **_kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
                     keys.append(dt.readable_datetime(wrapper.index[index_points[i]], freq=wrapper.freq))
                 else:
@@ -2296,19 +2296,14 @@ class PortfolioOptimizer(Analyzable):
         # Generate allocations
         tasks = []
         for group_idx, group_config in enumerate(group_configs):
-            tasks.append(
-                (
-                    cls.run_allocation_group,
-                    (),
-                    dict(
-                        wrapper=wrapper,
-                        group_configs=group_configs,
-                        group_index=group_index,
-                        group_idx=group_idx,
-                        pre_group_func=pre_group_func,
-                    ),
-                )
-            )
+            tasks.append(Task(
+                cls.run_allocation_group,
+                wrapper=wrapper,
+                group_configs=group_configs,
+                group_index=group_index,
+                group_idx=group_idx,
+                pre_group_func=pre_group_func,
+            ))
         group_execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), group_execute_kwargs)
         results = execute(tasks, keys=group_index, **group_execute_kwargs)
         alloc_points, allocations = zip(*results)
@@ -2793,7 +2788,7 @@ class PortfolioOptimizer(Analyzable):
                         )
                     __kwargs[k] = v
                 
-                tasks.append((_optimize_func, __args, __kwargs))
+                tasks.append(Task(_optimize_func, *__args, **__kwargs))
                 if isinstance(wrapper.index, pd.DatetimeIndex):
                     keys.append(
                         "{} → {}".format(
@@ -3237,19 +3232,14 @@ class PortfolioOptimizer(Analyzable):
         # Generate allocations
         tasks = []
         for group_idx, group_config in enumerate(group_configs):
-            tasks.append(
-                (
-                    cls.run_optimization_group,
-                    (),
-                    dict(
-                        wrapper=wrapper,
-                        group_configs=group_configs,
-                        group_index=group_index,
-                        group_idx=group_idx,
-                        pre_group_func=pre_group_func,
-                    ),
-                )
-            )
+            tasks.append(Task(
+                cls.run_optimization_group,
+                wrapper=wrapper,
+                group_configs=group_configs,
+                group_index=group_index,
+                group_idx=group_idx,
+                pre_group_func=pre_group_func,
+            ))
         group_execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), group_execute_kwargs)
         results = execute(tasks, keys=group_index, **group_execute_kwargs)
         alloc_ranges, allocations = zip(*results)

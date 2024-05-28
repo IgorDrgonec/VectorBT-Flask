@@ -3134,6 +3134,42 @@ class TestExecution:
         assert post_execute_arg_lst == [103]
         assert outputs == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+    def test_iterated(self):
+        def f(a, *args, b=None, **kwargs):
+            return a + sum(args) + b + sum(kwargs.values())
+
+        f_iterated = vbt.iterated(f)
+        assert f_iterated([0, 1, 2], 3, b=4, c=5) == [12, 13, 14]
+        f_iterated = vbt.iterated(f, merge_func="concat")
+        assert_series_equal(
+            f_iterated([0, 1, 2], 3, b=4, c=5),
+            pd.Series([12, 13, 14], index=pd.Index([0, 1, 2], name="a")),
+        )
+        assert_series_equal(
+            f_iterated(3, 3, b=4, c=5),
+            pd.Series([12, 13, 14], index=pd.Index([0, 1, 2], name="a")),
+        )
+        assert_series_equal(
+            f_iterated(dict(a0=0, a1=1, a2=2), 3, b=4, c=5),
+            pd.Series([12, 13, 14], index=pd.Index(["a0", "a1", "a2"], name="a")),
+        )
+        assert_series_equal(
+            f_iterated(pd.Index([0, 1, 2]), 3, b=4, c=5),
+            pd.Series([12, 13, 14], index=pd.Index([0, 1, 2], name="a")),
+        )
+        assert_series_equal(
+            f_iterated(pd.Index([0, 1, 2], name="custom_a"), 3, b=4, c=5),
+            pd.Series([12, 13, 14], index=pd.Index([0, 1, 2], name="custom_a")),
+        )
+        assert_series_equal(
+            f_iterated(pd.Series([0, 1, 2], index=pd.Index(["a0", "a1", "a2"], name="a")), 3, b=4, c=5),
+            pd.Series([12, 13, 14], index=pd.Index(["a0", "a1", "a2"], name="a")),
+        )
+        np.testing.assert_array_equal(
+            f_iterated(iter([0, 1, 2]), 3, b=4, c=5),
+            np.array([12, 13, 14]),
+        )
+
 
 # ############# pickling ############# #
 
@@ -3552,7 +3588,7 @@ class TestChunking:
             df.iloc[:, [0]],
         )
 
-    def test_yield_arg_chunks(self):
+    def test_yield_tasks(self):
         def f(a, *args, b=None, **kwargs):
             pass
 
@@ -3563,8 +3599,8 @@ class TestChunking:
             chunking.ChunkMeta(uuid="", idx=2, start=2, end=3, indices=None),
         ]
         arg_take_spec = dict(b=chunking.ChunkSelector())
-        result = [(f, (2, 3, 1), {"b": 1}), (f, (2, 3, 1), {"b": 2}), (f, (2, 3, 1), {"b": 3})]
-        assert list(vbt.Chunker.yield_arg_chunks(f, ann_args, chunk_meta, arg_take_spec=arg_take_spec)) == result
+        result = [vbt.Task(f, 2, 3, 1, b=1), vbt.Task(f, 2, 3, 1, b=2), vbt.Task(f, 2, 3, 1, b=3)]
+        assert list(vbt.Chunker.yield_tasks(f, ann_args, chunk_meta, arg_take_spec=arg_take_spec)) == result
         ann_args = parsing.annotate_args(
             f,
             (template.RepEval('ann_args["args"]["value"][1] + 1'), 3, 1),
@@ -3572,7 +3608,7 @@ class TestChunking:
         )
         assert (
             list(
-                vbt.Chunker.yield_arg_chunks(
+                vbt.Chunker.yield_tasks(
                     f,
                     ann_args,
                     chunk_meta,

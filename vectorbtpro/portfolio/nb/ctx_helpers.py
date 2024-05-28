@@ -1,6 +1,6 @@
 # Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled helper functions for portfolio simulation."""
+"""Numba-compiled context helper functions for portfolio simulation."""
 
 from vectorbtpro.base.flex_indexing import flex_select_col_nb
 from vectorbtpro.portfolio.nb import records as pf_records_nb

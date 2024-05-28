@@ -261,6 +261,7 @@ TaskId = Union[Hashable, Callable]
 
 # Merging
 MergeFuncLike = MaybeSequence[Union[None, str, Callable, MergeFunc]]
+MergeOutput = Any
 
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]

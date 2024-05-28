@@ -30,7 +30,7 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.eval_ import Evaluable
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
 from vectorbtpro.utils.parsing import (
     get_func_arg_names,
@@ -3611,7 +3611,7 @@ class Splitter(Analyzable):
             index_combine_kwargs = {}
         if execute_kwargs is None:
             execute_kwargs = {}
-        parsed_merge_func = parse_merge_func(apply_func)
+        parsed_merge_func = parse_merge_func(apply_func, eval_id=eval_id)
         if parsed_merge_func is not None:
             if merge_func is not None:
                 raise ValueError(
@@ -3800,7 +3800,7 @@ class Splitter(Analyzable):
 
         bounds = {}
 
-        def _get_func_args(i, j, _bounds=bounds):
+        def _get_task(i, j, _bounds=bounds):
             split_idx = split_group_indices[i]
             set_idx = set_group_indices[j]
             _template_context = merge_dicts(
@@ -3837,7 +3837,7 @@ class Splitter(Analyzable):
             _apply_func = substitute_templates(apply_func, _template_context, eval_id="apply_func")
             _apply_args = substitute_templates(_apply_args, _template_context, eval_id="apply_args")
             _apply_kwargs = substitute_templates(_apply_kwargs, _template_context, eval_id="apply_kwargs")
-            return _apply_func, _apply_args, _apply_kwargs
+            return Task(_apply_func, *_apply_args, **_apply_kwargs)
 
         def _attach_bounds(keys, range_bounds):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
@@ -3849,12 +3849,12 @@ class Splitter(Analyzable):
 
         if iteration.lower() == "split_major":
 
-            def _get_generator():
+            def _get_task_generator():
                 for i in range(n_splits):
                     for j in range(n_sets):
-                        yield _get_func_args(i, j)
+                        yield _get_task(i, j)
 
-            tasks = _get_generator()
+            tasks = _get_task_generator()
             keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
             if eval_id is not None:
                 new_keys = []
@@ -3868,12 +3868,12 @@ class Splitter(Analyzable):
             results = execute(tasks, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
-            def _get_generator():
+            def _get_task_generator():
                 for j in range(n_sets):
                     for i in range(n_splits):
-                        yield _get_func_args(i, j)
+                        yield _get_task(i, j)
 
-            tasks = _get_generator()
+            tasks = _get_task_generator()
             keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
             if eval_id is not None:
                 new_keys = []
@@ -3887,20 +3887,20 @@ class Splitter(Analyzable):
             results = execute(tasks, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
-            def _process_chunk(chunk):
+            def _process_chunk_tasks(chunk_tasks):
                 results = []
-                for func, args, kwargs in chunk:
+                for func, args, kwargs in chunk_tasks:
                     results.append(func(*args, **kwargs))
                 return results
 
-            def _get_generator():
+            def _get_task_generator():
                 for i in range(n_splits):
-                    chunk = []
+                    chunk_tasks = []
                     for j in range(n_sets):
-                        chunk.append(_get_func_args(i, j))
-                    yield _process_chunk, (chunk,), {}
+                        chunk_tasks.append(_get_task(i, j))
+                    yield Task(_process_chunk_tasks, chunk_tasks)
 
-            tasks = _get_generator()
+            tasks = _get_task_generator()
             keys = split_labels
             if eval_id is not None:
                 new_keys = []
@@ -3914,20 +3914,20 @@ class Splitter(Analyzable):
             results = execute(tasks, size=n_splits, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
-            def _process_chunk(chunk):
+            def _process_chunk_tasks(chunk_tasks):
                 results = []
-                for func, args, kwargs in chunk:
+                for func, args, kwargs in chunk_tasks:
                     results.append(func(*args, **kwargs))
                 return results
 
-            def _get_generator():
+            def _get_task_generator():
                 for j in range(n_sets):
-                    chunk = []
+                    chunk_tasks = []
                     for i in range(n_splits):
-                        chunk.append(_get_func_args(i, j))
-                    yield _process_chunk, (chunk,), {}
+                        chunk_tasks.append(_get_task(i, j))
+                    yield Task(_process_chunk_tasks, chunk_tasks)
 
-            tasks = _get_generator()
+            tasks = _get_task_generator()
             keys = set_labels
             if eval_id is not None:
                 new_keys = []

@@ -12,7 +12,7 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.template import RepFunc
 
 __all__ = []
@@ -199,7 +199,7 @@ def apply_and_concat(
                     if _chunk_meta.start is None or _chunk_meta.end is None:
                         raise ValueError("Each chunk must have a start and an end index")
                     chunk_indices = np.arange(_chunk_meta.start, _chunk_meta.end)
-                tasks.append((func, (chunk_indices, apply_func, *args), kwargs))
+                tasks.append(Task(func, chunk_indices, apply_func, *args, **kwargs))
             return tasks
 
         tasks = RepFunc(_tasks_template)

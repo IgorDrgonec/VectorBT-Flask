@@ -25,7 +25,7 @@ from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
@@ -2908,17 +2908,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if k in fetch_kwargs:
                 key_fetch_kwargs = merge_dicts(key_fetch_kwargs, fetch_kwargs[k])
 
-            tasks.append(
-                (
-                    key_fetch_func,
-                    (k,),
-                    dict(
-                        skip_on_error=skip_on_error,
-                        silence_warnings=silence_warnings,
-                        fetch_kwargs=key_fetch_kwargs,
-                    ),
-                )
-            )
+            tasks.append(Task(
+                key_fetch_func,
+                k,
+                skip_on_error=skip_on_error,
+                silence_warnings=silence_warnings,
+                fetch_kwargs=key_fetch_kwargs,
+            ))
             fetch_kwargs[k] = key_fetch_kwargs
 
         key_index = cls.get_key_index(keys=keys, level_name=level_name, feature_oriented=keys_are_features)
@@ -3175,17 +3171,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     key_update_kwargs = self.select_symbol_kwargs(k, kwargs)
                 if "silence_warnings" in func_arg_names:
                     key_update_kwargs["silence_warnings"] = silence_warnings
-                tasks.append(
-                    (
-                        key_update_func,
-                        (k,),
-                        dict(
-                            skip_on_error=skip_on_error,
-                            silence_warnings=silence_warnings,
-                            update_kwargs=key_update_kwargs,
-                        ),
-                    )
-                )
+                tasks.append(Task(
+                    key_update_func,
+                    k,
+                    skip_on_error=skip_on_error,
+                    silence_warnings=silence_warnings,
+                    update_kwargs=key_update_kwargs,
+                ))
                 key_indices.append(i)
 
         outputs = execute(tasks, size=len(self.keys), keys=self.key_index, **execute_kwargs)
@@ -3848,7 +3840,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     **new_kwargs,
                 }
 
-                tasks.append((self.try_run, new_args, new_kwargs))
+                tasks.append(Task(self.try_run, *new_args, **new_kwargs))
                 keys.append(str(func_name))
 
             keys = pd.Index(keys, name="run_func")

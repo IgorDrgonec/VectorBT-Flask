@@ -14,8 +14,16 @@ import pandas as pd
 from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import checks
+from vectorbtpro.utils.parsing import (
+    annotate_args,
+    flat_ann_args_to_args,
+    match_ann_arg,
+    match_and_set_flat_ann_arg,
+)
 from vectorbtpro.utils.attr_ import define, DefineMixin
 from vectorbtpro.utils.config import merge_dicts, Configured, FrozenConfig
+from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.path_ import remove_dir, file_exists
 from vectorbtpro.utils.pbar import ProgressBar
@@ -40,6 +48,7 @@ __all__ = [
     "DaskEngine",
     "RayEngine",
     "execute",
+    "iterated",
 ]
 
 
@@ -97,7 +106,7 @@ class SerialEngine(ExecutionEngine):
         "pbar_kwargs",
         "clear_cache",
         "collect_garbage",
-        "cooldown",
+        "delay",
     }
 
     def __init__(
@@ -106,7 +115,7 @@ class SerialEngine(ExecutionEngine):
         pbar_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
-        cooldown: tp.Optional[int] = None,
+        delay: tp.Optional[int] = None,
         **kwargs,
     ) -> None:
         ExecutionEngine.__init__(
@@ -115,7 +124,7 @@ class SerialEngine(ExecutionEngine):
             pbar_kwargs=pbar_kwargs,
             clear_cache=clear_cache,
             collect_garbage=collect_garbage,
-            cooldown=cooldown,
+            delay=delay,
             **kwargs,
         )
 
@@ -123,7 +132,7 @@ class SerialEngine(ExecutionEngine):
         self._pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
         self._clear_cache = self.resolve_setting(clear_cache, "clear_cache")
         self._collect_garbage = self.resolve_setting(collect_garbage, "collect_garbage")
-        self._cooldown = self.resolve_setting(cooldown, "cooldown")
+        self._delay = self.resolve_setting(delay, "delay")
 
     @property
     def show_progress(self) -> bool:
@@ -150,9 +159,9 @@ class SerialEngine(ExecutionEngine):
         return self._collect_garbage
 
     @property
-    def cooldown(self) -> tp.Optional[int]:
+    def delay(self) -> tp.Optional[int]:
         """Number of seconds to sleep after each call."""
-        return self._cooldown
+        return self._delay
 
     def execute(
         self,
@@ -166,6 +175,8 @@ class SerialEngine(ExecutionEngine):
         results = []
         if size is None and hasattr(tasks, "__len__"):
             size = len(tasks)
+        elif keys is not None and hasattr(keys, "__len__"):
+            size = len(keys)
         if keys is not None:
             keys = to_any_index(keys)
         pbar_kwargs = dict(self.pbar_kwargs)
@@ -195,8 +206,8 @@ class SerialEngine(ExecutionEngine):
                         collect_garbage()
                 elif i > 0 and (i + 1) % self.collect_garbage == 0:
                     collect_garbage()
-                if self.cooldown is not None:
-                    time.sleep(self.cooldown)
+                if self.delay is not None:
+                    time.sleep(self.delay)
 
                 if keys is not None and i + 1 < len(keys):
                     if isinstance(keys, pd.MultiIndex):
@@ -844,9 +855,11 @@ class Executor(Configured):
         "post_execute_func",
         "post_execute_kwargs",
         "post_execute_on_sorted",
+        "merge_func",
+        "merge_kwargs",
+        "template_context",
         "show_progress",
         "pbar_kwargs",
-        "template_context",
     }
 
     @classmethod
@@ -1012,9 +1025,11 @@ class Executor(Configured):
         post_execute_func: tp.Optional[tp.Callable] = None,
         post_execute_kwargs: tp.KwargsLike = None,
         post_execute_on_sorted: tp.Optional[bool] = None,
+        merge_func: tp.Optional[tp.MergeFuncLike] = None,
+        merge_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
-        template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
         Configured.__init__(
@@ -1044,9 +1059,11 @@ class Executor(Configured):
             post_execute_func=post_execute_func,
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
+            merge_func=merge_func,
+            merge_kwargs=merge_kwargs,
+            template_context=template_context,
             show_progress=show_progress,
             pbar_kwargs=pbar_kwargs,
-            template_context=template_context,
             **kwargs,
         )
 
@@ -1181,14 +1198,16 @@ class Executor(Configured):
         )
         if release_chunk_cache and post_execute_on_sorted:
             raise ValueError("Cannot use release_chunk_cache and post_execute_on_sorted together")
-        show_progress = self.resolve_setting(show_progress, "show_progress")
-        pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        merge_func = self.resolve_engine_setting(merge_func, "merge_func")
+        merge_kwargs = self.resolve_engine_setting(merge_kwargs, "merge_kwargs", merge=True)
         template_context = self.resolve_engine_setting(
             template_context,
             "template_context",
             merge=True,
             engine_name=engine_name,
         )
+        show_progress = self.resolve_setting(show_progress, "show_progress")
+        pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
 
         self._engine = engine
         self._min_size = min_size
@@ -1214,9 +1233,11 @@ class Executor(Configured):
         self._post_execute_func = post_execute_func
         self._post_execute_kwargs = post_execute_kwargs
         self._post_execute_on_sorted = post_execute_on_sorted
+        self._merge_func = merge_func
+        self._merge_kwargs = merge_kwargs
+        self._template_context = template_context
         self._show_progress = show_progress
         self._pbar_kwargs = pbar_kwargs
-        self._template_context = template_context
 
     @property
     def engine(self) -> tp.Union[ExecutionEngine, tp.Callable]:
@@ -1349,6 +1370,23 @@ class Executor(Configured):
         return self._post_execute_kwargs
 
     @property
+    def merge_func(self) -> tp.Optional[tp.MergeFuncLike]:
+        """Merging function.
+
+        Resolved using `vectorbtpro.base.merging.resolve_merge_func`."""
+        return self._merge_func
+
+    @property
+    def merge_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to the merging function."""
+        return self._merge_kwargs
+
+    @property
+    def template_context(self) -> tp.Kwargs:
+        """Context used to substitute templates."""
+        return self._template_context
+
+    @property
     def show_progress(self) -> bool:
         """Whether to show progress bar when iterating over chunks.
 
@@ -1360,11 +1398,6 @@ class Executor(Configured):
     def pbar_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`."""
         return self._pbar_kwargs
-
-    @property
-    def template_context(self) -> tp.Kwargs:
-        """Context used to substitute templates."""
-        return self._template_context
 
     @staticmethod
     def execute_serially(tasks: tp.TasksLike, id_objs: tp.Dict[int, tp.Any]) -> tp.ExecOutputs:
@@ -1378,7 +1411,7 @@ class Executor(Configured):
         return results
 
     @classmethod
-    def build_serial_chunk(cls, tasks: tp.TasksLike) -> tp.FuncArgs:
+    def build_serial_chunk(cls, tasks: tp.TasksLike) -> Task:
         """Build a serial chunk."""
         ref_ids = dict()
         id_objs = dict()
@@ -1396,8 +1429,8 @@ class Executor(Configured):
             new_func = _prepare(func)
             new_args = tuple(_prepare(arg) for arg in args)
             new_kwargs = {k: _prepare(v) for k, v in kwargs.items()}
-            new_tasks.append((new_func, new_args, new_kwargs))
-        return cls.execute_serially, (new_tasks, id_objs), {}
+            new_tasks.append(Task(new_func, *new_args, **new_kwargs))
+        return Task(cls.execute_serially, new_tasks, id_objs)
 
     @classmethod
     def call_pre_execute_func(
@@ -1609,12 +1642,38 @@ class Executor(Configured):
                 return new_outputs
         return outputs
 
+    @classmethod
+    def merge_outputs(
+        cls,
+        outputs: tp.ExecOutputs,
+        keys: tp.Optional[tp.IndexLike] = None,
+        merge_func: tp.Optional[tp.MergeFuncLike] = None,
+        merge_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+    ) -> tp.Union[tp.ExecOutputs, tp.MergeOutput]:
+        """Merge outputs using `Executor.merge_func` and `Executor.merge_kwargs`."""
+        if merge_func is not None:
+            template_context = merge_dicts(
+                dict(outputs=outputs),
+                template_context,
+            )
+            from vectorbtpro.base.merging import is_merge_func_from_config
+
+            if is_merge_func_from_config(merge_func):
+                merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+            if isinstance(merge_func, MergeFunc):
+                merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
+            else:
+                merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
+            return merge_func(outputs)
+        return outputs
+
     def run(
         self,
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.Union[tp.ExecOutputs, tp.MergeOutput]:
         """Execute functions and their arguments."""
         from vectorbtpro.base.indexes import to_any_index
 
@@ -1642,9 +1701,11 @@ class Executor(Configured):
         post_execute_func = self.post_execute_func
         post_execute_kwargs = self.post_execute_kwargs
         post_execute_on_sorted = self.post_execute_on_sorted
+        merge_func = self.merge_func
+        merge_kwargs = self.merge_kwargs
+        template_context = self.template_context
         show_progress = self.show_progress
         pbar_kwargs = self.pbar_kwargs
-        template_context = self.template_context
 
         if keys is not None:
             keys = to_any_index(keys)
@@ -1685,7 +1746,7 @@ class Executor(Configured):
                 if "n_chunks" not in template_context:
                     template_context["n_chunks"] = 1
                 outputs = self.call_execute(engine, tasks, size=size, keys=keys)
-                return self.call_post_execute_func(
+                outputs = self.call_post_execute_func(
                     outputs,
                     cache_chunks=cache_chunks,
                     chunk_cache_dir=chunk_cache_dir,
@@ -1696,6 +1757,13 @@ class Executor(Configured):
                     post_execute_kwargs=post_execute_kwargs,
                     template_context=template_context,
                 )
+                return self.merge_outputs(
+                    outputs,
+                    keys=keys,
+                    merge_func=merge_func,
+                    merge_kwargs=merge_kwargs,
+                    template_context=template_context,
+                )
 
         if chunk_meta is None:
             from vectorbtpro.utils.chunking import yield_chunk_meta
@@ -1704,7 +1772,7 @@ class Executor(Configured):
                 _size = len(tasks)
             elif size is not None:
                 _size = size
-            elif keys is not None:
+            elif keys is not None and hasattr(keys, "__len__"):
                 _size = len(keys)
             else:
                 if isinstance(tasks, CustomTemplate):
@@ -1727,6 +1795,8 @@ class Executor(Configured):
             tasks = substitute_templates(tasks, template_context, eval_id="tasks")
             if hasattr(tasks, "__len__"):
                 size = len(tasks)
+            elif keys is not None and hasattr(keys, "__len__"):
+                size = len(keys)
             else:
                 size = None
             self.call_pre_execute_func(
@@ -1745,7 +1815,7 @@ class Executor(Configured):
                 size=size,
                 keys=keys,
             )
-            return self.call_post_execute_func(
+            outputs = self.call_post_execute_func(
                 outputs,
                 cache_chunks=cache_chunks,
                 chunk_cache_dir=chunk_cache_dir,
@@ -1754,6 +1824,13 @@ class Executor(Configured):
                 release_chunk_cache=release_chunk_cache,
                 post_execute_func=post_execute_func,
                 post_execute_kwargs=post_execute_kwargs,
+                template_context=template_context,
+            )
+            return self.merge_outputs(
+                outputs,
+                keys=keys,
+                merge_func=merge_func,
+                merge_kwargs=merge_kwargs,
                 template_context=template_context,
             )
 
@@ -1889,7 +1966,7 @@ class Executor(Configured):
                         )
                         outputs.extend(call_outputs)
                         pbar.update()
-                return self.call_post_execute_func(
+                outputs = self.call_post_execute_func(
                     outputs,
                     cache_chunks=cache_chunks,
                     chunk_cache_dir=chunk_cache_dir,
@@ -1898,6 +1975,13 @@ class Executor(Configured):
                     release_chunk_cache=release_chunk_cache,
                     post_execute_func=post_execute_func,
                     post_execute_kwargs=post_execute_kwargs,
+                    template_context=template_context,
+                )
+                return self.merge_outputs(
+                    outputs,
+                    keys=keys,
+                    merge_func=merge_func,
+                    merge_kwargs=merge_kwargs,
                     template_context=template_context,
                 )
             else:
@@ -1998,7 +2082,13 @@ class Executor(Configured):
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
                     )
-                return outputs
+                return self.merge_outputs(
+                    outputs,
+                    keys=keys,
+                    merge_func=merge_func,
+                    merge_kwargs=merge_kwargs,
+                    template_context=template_context,
+                )
 
         elif distribute.lower() == "chunks":
             if cache_chunks:
@@ -2031,7 +2121,7 @@ class Executor(Configured):
                     size=len(task_chunks),
                 )
                 outputs = [x for o in outputs for x in o]
-                return self.call_post_execute_func(
+                outputs = self.call_post_execute_func(
                     outputs,
                     cache_chunks=cache_chunks,
                     chunk_cache_dir=chunk_cache_dir,
@@ -2040,6 +2130,13 @@ class Executor(Configured):
                     release_chunk_cache=release_chunk_cache,
                     post_execute_func=post_execute_func,
                     post_execute_kwargs=post_execute_kwargs,
+                    template_context=template_context,
+                )
+                return self.merge_outputs(
+                    outputs,
+                    keys=keys,
+                    merge_func=merge_func,
+                    merge_kwargs=merge_kwargs,
                     template_context=template_context,
                 )
             else:
@@ -2093,7 +2190,13 @@ class Executor(Configured):
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
                     )
-                return outputs
+                return self.merge_outputs(
+                    outputs,
+                    keys=keys,
+                    merge_func=merge_func,
+                    merge_kwargs=merge_kwargs,
+                    template_context=template_context,
+                )
         else:
             raise ValueError(f"Invalid option distribute='{self.distribute}'")
 
@@ -2128,12 +2231,14 @@ def execute(
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
+    merge_func: tp.Optional[tp.MergeFuncLike] = None,
+    merge_kwargs: tp.KwargsLike = None,
+    template_context: tp.KwargsLike = None,
     show_progress: tp.Optional[bool] = None,
     pbar_kwargs: tp.KwargsLike = None,
-    template_context: tp.KwargsLike = None,
     merge_to_engine_config: tp.Optional[bool] = None,
     **kwargs,
-) -> tp.ExecOutputs:
+) -> tp.Union[tp.ExecOutputs, tp.MergeOutput]:
     """Execute functions and their arguments using `Executor`.
 
     Keyword arguments `**kwargs` and `engine_config` are merged into `engine_config`
@@ -2178,15 +2283,60 @@ def execute(
         post_execute_func=post_execute_func,
         post_execute_kwargs=post_execute_kwargs,
         post_execute_on_sorted=post_execute_on_sorted,
+        merge_func=merge_func,
+        merge_kwargs=merge_kwargs,
+        template_context=template_context,
         show_progress=show_progress,
         pbar_kwargs=pbar_kwargs,
-        template_context=template_context,
         **kwargs,
     ).run(tasks, size=size, keys=keys)
 
 
-def executed(
+def parse_iterable_and_keys(
+    iterable_like: tp.Union[int, tp.Iterable],
+    keys: tp.Optional[tp.IndexLike] = None,
+) -> tp.Tuple[tp.Iterable, tp.Optional[tp.Index]]:
+    """Parse the iterable and the keys from an iterable-like and a keys-like object respectively.
+
+    Object can be an integer that will be interpreted as a total or any iterable.
+
+    If object is a dictionary, a Pandas Index, or a Pandas Series, keys will be set to the index.
+    Otherwise, keys will be extracted using `vectorbtpro.base.indexes.index_from_values`.
+    Keys won't be extracted if the object is not a sequence to avoid materializing it."""
+    if keys is not None:
+        from vectorbtpro.base.indexes import to_any_index
+
+        keys = to_any_index(keys)
+    if checks.is_int(iterable_like):
+        iterable = range(iterable_like)
+        if keys is None:
+            keys = pd.Index(iterable)
+    elif isinstance(iterable_like, dict):
+        iterable = iterable_like.values()
+        if keys is None:
+            keys = pd.Index(list(iterable_like.keys()))
+    elif isinstance(iterable_like, pd.Index):
+        iterable = iterable_like
+        if keys is None:
+            keys = iterable_like
+    elif isinstance(iterable_like, pd.Series):
+        iterable = iterable_like.values
+        if keys is None:
+            keys = iterable_like.index
+    elif checks.is_sequence(iterable_like):
+        from vectorbtpro.base.indexes import index_from_values
+
+        iterable = list(iterable_like)
+        if keys is None:
+            keys = index_from_values(iterable_like)
+    else:
+        iterable = iterable_like
+    return iterable, keys
+
+
+def iterated(
     *args,
+    iter_arg: tp.Optional[tp.AnnArgQuery] = None,
     executor_cls: tp.Optional[tp.Type[Executor]] = None,
     engine: tp.Optional[tp.ExecutionEngineLike] = None,
     engine_config: tp.KwargsLike = None,
@@ -2213,24 +2363,24 @@ def executed(
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
+    merge_func: tp.Optional[tp.MergeFuncLike] = None,
+    merge_kwargs: tp.KwargsLike = None,
+    template_context: tp.KwargsLike = None,
     show_progress: tp.Optional[bool] = None,
     pbar_kwargs: tp.KwargsLike = None,
-    template_context: tp.KwargsLike = None,
     merge_to_engine_config: tp.Optional[bool] = None,
     **kwargs,
 ) -> tp.Callable:
-    """Decorator that executes a function using `Executor`.
+    """Decorator that executes a function in iteration using `Executor`.
 
-    Returns a new function that takes a sequence of argument configurations and other arguments accepted
-    by `Executor.run`. These configurations will be converted to a list and can have various formats:
-
-    * Tuple: Positional arguments
-    * Dict: Keyword arguments
-    * Tuple of one tuple and one dict: Positional and/or keyword arguments
-    * Anything else: First argument
+    Returns a new function with the same signature as the passed one.
+    
+    Use `iter_arg` to specify which argument (position or name) should be iterated over.
+    If it's None (default), uses the first argument.
 
     Each option can be modified in the `options` attribute of the wrapper function or
-    directly passed as a keyword argument with a leading underscore.
+    directly passed as a keyword argument with a leading underscore. You can also explicitly specify
+    keys and size by passing them as `_keys` and `_size` respectively if the range-like object is an iterator.
 
     Keyword arguments `**kwargs` and `engine_config` are merged into `engine_config`
     if `merge_to_engine_config` is True, otherwise, `**kwargs` are passed directly to `Executor`."""
@@ -2266,13 +2416,35 @@ def executed(
             if executor_cls is None:
                 executor_cls = Executor
 
-            first_values = list(args[0])
-            tasks = []
-            for v in first_values:
-                tasks.append((func, (v, *args[1:]), kwargs))
+            iter_arg = _resolve_key("iter_arg")
+            if iter_arg is None:
+                iterable_like = args[0]
+            else:
+                ann_args = annotate_args(func, args, kwargs)
+                iterable_like = match_ann_arg(ann_args, iter_arg)
+            size = kwargs.pop("_size", None)
+            keys = kwargs.pop("_keys", None)
+            iterable, keys = parse_iterable_and_keys(iterable_like, keys=keys)
+            if keys is not None and size is None:
+                size = len(keys)
+            if keys is not None and keys.name is None:
+                keys = keys.rename(get_func_arg_names(func)[0])
+
+            if iter_arg is None:
+                def _get_task_generator():
+                    for x in iterable:
+                        yield Task(func, x, *args[1:], **kwargs)
+            else:
+                def _get_task_generator():
+                    for x in iterable:
+                        flat_ann_args = annotate_args(func, args, kwargs, flatten=True)
+                        match_and_set_flat_ann_arg(flat_ann_args, iter_arg, x)
+                        new_args, new_kwargs = flat_ann_args_to_args(flat_ann_args)
+                        yield Task(func, *new_args, **new_kwargs)
+
+            tasks = _get_task_generator()
 
             return executor_cls(
-                func,
                 engine=_resolve_key("engine"),
                 engine_config=_resolve_key("engine_config", merge=True),
                 min_size=_resolve_key("min_size"),
@@ -2298,16 +2470,19 @@ def executed(
                 post_execute_func=_resolve_key("post_execute_func"),
                 post_execute_kwargs=_resolve_key("post_execute_kwargs", merge=True),
                 post_execute_on_sorted=_resolve_key("post_execute_on_sorted"),
+                merge_func=_resolve_key("merge_func"),
+                merge_kwargs=_resolve_key("merge_kwargs", merge=True),
+                template_context=_resolve_key("template_context", merge=True),
                 show_progress=_resolve_key("show_progress"),
                 pbar_kwargs=_resolve_key("pbar_kwargs", merge=True),
-                template_context=_resolve_key("template_context", merge=True),
                 **_resolve_key("executor_kwargs", merge=True),
-            ).run(tasks, *args[1:], **kwargs)
+            ).run(tasks, size=size, keys=keys)
 
         wrapper.func = func
         wrapper.name = func.__name__
         wrapper.is_executor = True
         wrapper.options = FrozenConfig(
+            iter_arg=iter_arg,
             executor_cls=executor_cls,
             executor_kwargs=_executor_kwargs,
             engine=engine,
@@ -2335,9 +2510,11 @@ def executed(
             post_execute_func=post_execute_func,
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
+            merge_func=merge_func,
+            merge_kwargs=merge_kwargs,
+            template_context=template_context,
             show_progress=show_progress,
             pbar_kwargs=pbar_kwargs,
-            template_context=template_context,
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False
