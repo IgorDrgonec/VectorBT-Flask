@@ -244,6 +244,7 @@ class SQLData(DBData):
                 continue
             if schema not in schemas:
                 schemas.append(schema)
+
         if dispose_engine:
             engine.dispose()
         if sort:
@@ -341,6 +342,7 @@ class SQLData(DBData):
                     table = str(schema) + ":" + table
                 if table not in tables:
                     tables.append(table)
+
         if dispose_engine:
             engine.dispose()
         if sort:
@@ -1009,6 +1011,7 @@ class SQLData(DBData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
+
         if dispose_engine:
             engine.dispose()
         if keep_row_number:

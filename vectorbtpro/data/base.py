@@ -3729,7 +3729,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         silence_warnings: bool = False,
         raise_errors: bool = False,
         execute_kwargs: tp.KwargsLike = None,
-        filter_no_results: bool = True,
+        filter_results: bool = True,
         raise_no_results: bool = True,
         merge_func: tp.MergeFuncLike = None,
         merge_kwargs: tp.KwargsLike = None,
@@ -3847,11 +3847,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
             keys = pd.Index(keys, name="run_func")
             results = execute(tasks, size=len(keys), keys=keys, **execute_kwargs)
-            if filter_no_results:
-                from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+            if filter_results:
+                from vectorbtpro.utils.selection import filter_results as _filter_results
 
                 try:
-                    results, keys = _filter_no_results(results, keys=keys)
+                    results, keys = _filter_results(results, keys=keys)
                 except NoResultsException as e:
                     if raise_no_results:
                         raise e
@@ -3866,7 +3866,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if is_merge_func_from_config(merge_func):
                     merge_kwargs = merge_dicts(dict(
                         keys=keys,
-                        filter_no_results=not no_results_filtered,
+                        filter_results=not no_results_filtered,
                         raise_no_results=raise_no_results,
                     ), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
@@ -4734,9 +4734,21 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if connection_config is None:
             connection_config = {}
         if (connection is None or isinstance(connection, (str, Path))) and not self.has_key_dict(connection_config):
-            connection = DuckDBData.resolve_connection(connection=connection, **connection_config)
+            connection_meta = DuckDBData.resolve_connection(
+                connection=connection,
+                read_only=False,
+                return_meta=True,
+                **connection_config,
+            )
+            connection = connection_meta["connection"]
+            if return_meta or return_connection:
+                should_close = False
+            else:
+                should_close = connection_meta["should_close"]
         elif return_connection:
             raise ValueError("Connection can be returned only if URL was provided")
+        else:
+            should_close = False
 
         meta = self.dict_type()
         for k, v in self.data.items():
@@ -4760,7 +4772,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 is_kwargs=True,
             )
             if _connection is None or isinstance(_connection, (str, Path)):
-                _connection = DuckDBData.resolve_connection(connection=_connection, **_connection_config)
+                _connection_meta = DuckDBData.resolve_connection(
+                    connection=_connection,
+                    read_only=False,
+                    return_meta=True,
+                    **_connection_config,
+                )
+                _connection = _connection_meta["connection"]
+                _should_close = _connection_meta["should_close"]
+            else:
+                _should_close = False
             if table is None:
                 _table = k
             else:
@@ -4894,7 +4915,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 else:
                     _connection.sql(f'CREATE TABLE "{_table}" AS SELECT * FROM "_{k}"')
                 meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
+                if _should_close:
+                    _connection.close()
 
+        if should_close:
+            connection.close()
         if return_meta:
             return meta
         if return_connection:
