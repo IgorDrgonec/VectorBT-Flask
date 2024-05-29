@@ -28,6 +28,7 @@ from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.path_ import remove_dir, file_exists
 from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.pickling import load, save
+from vectorbtpro.utils.selection import NoResult, NoResultsException
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 try:
@@ -87,7 +88,7 @@ class ExecutionEngine(Configured):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         """Run an iterable of tuples out of a function, arguments, and keyword arguments.
 
         Provide `size` in case `tasks` is a generator and the underlying engine needs it."""
@@ -168,7 +169,7 @@ class SerialEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         from vectorbtpro.registries.ca_registry import clear_cache, collect_garbage
         from vectorbtpro.base.indexes import to_any_index
 
@@ -257,7 +258,7 @@ class ThreadPoolEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
             futures = {}
             for i, (func, args, kwargs) in enumerate(tasks):
@@ -307,7 +308,7 @@ class ProcessPoolEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
             futures = {}
             for i, (func, args, kwargs) in enumerate(tasks):
@@ -412,7 +413,7 @@ class PathosEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("pathos")
@@ -507,7 +508,7 @@ class MpireEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("mpire")
@@ -556,7 +557,7 @@ class DaskEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("dask")
@@ -727,7 +728,7 @@ class RayEngine(ExecutionEngine):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ray")
@@ -787,7 +788,7 @@ class Executor(Configured):
     If `distribute` is "tasks", distributes tasks within each chunk.
     If indices in `chunk_meta` are perfectly sorted and `tasks` is an iterable, iterates
     over `tasks` to avoid converting it into a list. Otherwise, iterates over `chunk_meta`.
-    If `in_chunk_order` is True, returns the outputs in the order they appear in `chunk_meta`.
+    If `in_chunk_order` is True, returns the results in the order they appear in `chunk_meta`.
     Otherwise, always returns them in the same order as in `tasks`.
 
     If `distribute` is "chunks", distributes chunks. For this, executes tasks within each chunk serially
@@ -799,14 +800,14 @@ class Executor(Configured):
     will be immediately passed to the executor.
 
     If `pre_chunk_func` is not None, calls the function before processing a chunk. If it returns anything
-    other than None, the returned object will be appended to the outputs and the chunk won't be executed.
+    other than None, the returned object will be appended to the results and the chunk won't be executed.
     This enables use cases such as caching. If `post_chunk_func` is not None, calls the function after
-    processing the chunk. It should return either None to keep the old call outputs, or return new ones.
+    processing the chunk. It should return either None to keep the old call results, or return new ones.
     Will also substitute any templates in `pre_chunk_kwargs` and `post_chunk_kwargs` and pass them as
     keyword arguments. The following additional arguments are available in the contexts: the index of
     the current chunk `chunk_idx`, the list of call indices `call_indices` in the chunk, the list of call
-    outputs `chunk_cache` returned from caching (only for `pre_chunk_func`), the list of call outputs
-    `call_outputs` returned by executing the chunk (only for `post_chunk_func`), and whether the chunk
+    results `chunk_cache` returned from caching (only for `pre_chunk_func`), the list of call results
+    `call_results` returned by executing the chunk (only for `post_chunk_func`), and whether the chunk
     was executed `chunk_executed` or otherwise returned by `pre_chunk_func` (only for `post_chunk_func`).
 
     !!! note
@@ -818,8 +819,8 @@ class Executor(Configured):
 
     If `post_execute_func` is not None, calls the function after processing all tasks. Will also substitute
     any templates in `post_execute_kwargs` and pass them as keyword arguments. Should return either None
-    to keep the default outputs or return the new ones. The following additional arguments are available
-    in the context: the number of chunks `n_chunks` and the generated flattened list of outputs `outputs`.
+    to keep the default results or return the new ones. The following additional arguments are available
+    in the context: the number of chunks `n_chunks` and the generated flattened list of results `results`.
     If `post_execute_on_sorted` is True, will run the callback after sorting the call indices.
 
     !!! info
@@ -855,6 +856,8 @@ class Executor(Configured):
         "post_execute_func",
         "post_execute_kwargs",
         "post_execute_on_sorted",
+        "filter_no_results",
+        "raise_no_results",
         "merge_func",
         "merge_kwargs",
         "template_context",
@@ -1025,6 +1028,8 @@ class Executor(Configured):
         post_execute_func: tp.Optional[tp.Callable] = None,
         post_execute_kwargs: tp.KwargsLike = None,
         post_execute_on_sorted: tp.Optional[bool] = None,
+        filter_no_results: tp.Optional[bool] = None,
+        raise_no_results: tp.Optional[bool] = None,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
@@ -1059,6 +1064,8 @@ class Executor(Configured):
             post_execute_func=post_execute_func,
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
+            filter_no_results=filter_no_results,
+            raise_no_results=raise_no_results,
             merge_func=merge_func,
             merge_kwargs=merge_kwargs,
             template_context=template_context,
@@ -1198,6 +1205,8 @@ class Executor(Configured):
         )
         if release_chunk_cache and post_execute_on_sorted:
             raise ValueError("Cannot use release_chunk_cache and post_execute_on_sorted together")
+        filter_no_results = self.resolve_engine_setting(filter_no_results, "filter_no_results")
+        raise_no_results = self.resolve_engine_setting(raise_no_results, "raise_no_results")
         merge_func = self.resolve_engine_setting(merge_func, "merge_func")
         merge_kwargs = self.resolve_engine_setting(merge_kwargs, "merge_kwargs", merge=True)
         template_context = self.resolve_engine_setting(
@@ -1233,6 +1242,8 @@ class Executor(Configured):
         self._post_execute_func = post_execute_func
         self._post_execute_kwargs = post_execute_kwargs
         self._post_execute_on_sorted = post_execute_on_sorted
+        self._filter_no_results = filter_no_results
+        self._raise_no_results = raise_no_results
         self._merge_func = merge_func
         self._merge_kwargs = merge_kwargs
         self._template_context = template_context
@@ -1271,7 +1282,7 @@ class Executor(Configured):
 
     @property
     def in_chunk_order(self) -> bool:
-        """Whether to return the outputs in the order they appear in `chunk_meta`.
+        """Whether to return the results in the order they appear in `chunk_meta`.
 
         Otherwise, always returns them in the same order as in `tasks`."""
         return self._in_chunk_order
@@ -1332,7 +1343,7 @@ class Executor(Configured):
         """Function to call before processing a chunk.
 
         If it returns anything other than None, the returned object will be appended to the
-        outputs and the chunk won't be executed. This enables use cases such as caching."""
+        results and the chunk won't be executed. This enables use cases such as caching."""
         return self._pre_chunk_func
 
     @property
@@ -1344,7 +1355,7 @@ class Executor(Configured):
     def post_chunk_func(self) -> tp.Optional[tp.Callable]:
         """Function to call after processing the chunk.
 
-        It should return either None to keep the old call outputs, or return new ones."""
+        It should return either None to keep the old call results, or return new ones."""
         return self._post_chunk_func
 
     @property
@@ -1356,8 +1367,13 @@ class Executor(Configured):
     def post_execute_func(self) -> tp.Optional[tp.Callable]:
         """Function to call after processing all tasks.
 
-        Should return either None to keep the default outputs, or return the new ones."""
+        Should return either None to keep the default results, or return the new ones."""
         return self._post_execute_func
+
+    @property
+    def post_execute_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `Executor.post_execute_func`."""
+        return self._post_execute_kwargs
 
     @property
     def post_execute_on_sorted(self) -> bool:
@@ -1365,9 +1381,19 @@ class Executor(Configured):
         return self._post_execute_func
 
     @property
-    def post_execute_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to `Executor.post_execute_func`."""
-        return self._post_execute_kwargs
+    def filter_no_results(self) -> bool:
+        """Whether to filter `vectorbtpro.utils.selection.NoResult` results."""
+        return self._filter_no_results
+
+    @property
+    def raise_no_results(self) -> bool:
+        """Whether to raise `vectorbtpro.utils.selection.NoResultsException` if there are no results.
+
+        Otherwise, returns `vectorbtpro.utils.selection.NoResult`.
+
+        Has effect only if `Executor.filter_no_results` is True. But regardless of this setting,
+        gets passed to the merging function if the merging function is pre-configured."""
+        return self._raise_no_results
 
     @property
     def merge_func(self) -> tp.Optional[tp.MergeFuncLike]:
@@ -1400,7 +1426,7 @@ class Executor(Configured):
         return self._pbar_kwargs
 
     @staticmethod
-    def execute_serially(tasks: tp.TasksLike, id_objs: tp.Dict[int, tp.Any]) -> tp.ExecOutputs:
+    def execute_serially(tasks: tp.TasksLike, id_objs: tp.Dict[int, tp.Any]) -> tp.ExecResults:
         """Execute serially."""
         results = []
         for func, args, kwargs in tasks:
@@ -1475,7 +1501,7 @@ class Executor(Configured):
         pre_chunk_func: tp.Optional[tp.Callable] = None,
         pre_chunk_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
-    ) -> tp.Optional[tp.ExecOutputs]:
+    ) -> tp.Optional[tp.ExecResults]:
         """Call `Executor.pre_chunk_func`."""
         chunk_cache = None
         if cache_chunks:
@@ -1511,9 +1537,9 @@ class Executor(Configured):
                 template_context,
                 eval_id="pre_chunk_kwargs",
             )
-            call_outputs = pre_chunk_func(**pre_chunk_kwargs)
-            if call_outputs is not None:
-                return call_outputs
+            call_results = pre_chunk_func(**pre_chunk_kwargs)
+            if call_results is not None:
+                return call_results
         return chunk_cache
 
     @classmethod
@@ -1523,7 +1549,7 @@ class Executor(Configured):
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         """Call `ExecutionEngine.execute`."""
         if isinstance(engine, ExecutionEngine):
             return engine.execute(tasks, size=size, keys=keys)
@@ -1540,7 +1566,7 @@ class Executor(Configured):
         cls,
         chunk_idx: int,
         call_indices: tp.List[int],
-        call_outputs: tp.ExecOutputs,
+        call_results: tp.ExecResults,
         cache_chunks: bool = False,
         chunk_cache_dir: tp.Optional[tp.PathLike] = None,
         chunk_cache_save_kwargs: tp.KwargsLike = None,
@@ -1549,7 +1575,7 @@ class Executor(Configured):
         post_chunk_kwargs: tp.KwargsLike = None,
         chunk_executed: bool = True,
         template_context: tp.KwargsLike = None,
-    ) -> tp.ExecOutputs:
+    ) -> tp.ExecResults:
         """Call `Executor.post_chunk_func`."""
         if chunk_executed:
             if cache_chunks:
@@ -1560,16 +1586,16 @@ class Executor(Configured):
                 chunk_path = chunk_cache_dir / ("chunk_%d.pickle" % chunk_idx)
                 if chunk_cache_save_kwargs is None:
                     chunk_cache_save_kwargs = {}
-                save(call_outputs, chunk_path, **chunk_cache_save_kwargs)
+                save(call_results, chunk_path, **chunk_cache_save_kwargs)
                 if release_chunk_cache:
-                    call_outputs = [DUMMY] * len(call_indices)
+                    call_results = [DUMMY] * len(call_indices)
 
         if post_chunk_func is not None:
             template_context = merge_dicts(
                 dict(
                     chunk_idx=chunk_idx,
                     call_indices=call_indices,
-                    call_outputs=call_outputs,
+                    call_results=call_results,
                     chunk_executed=chunk_executed,
                 ),
                 template_context,
@@ -1584,15 +1610,15 @@ class Executor(Configured):
                 template_context,
                 eval_id="post_chunk_kwargs",
             )
-            new_call_outputs = post_chunk_func(**post_chunk_kwargs)
-            if new_call_outputs is not None:
-                return new_call_outputs
-        return call_outputs
+            new_call_results = post_chunk_func(**post_chunk_kwargs)
+            if new_call_results is not None:
+                return new_call_results
+        return call_results
 
     @classmethod
     def call_post_execute_func(
         cls,
-        outputs: tp.ExecOutputs,
+        results: tp.ExecResults,
         cache_chunks: bool = False,
         chunk_cache_dir: tp.Optional[tp.PathLike] = None,
         chunk_cache_load_kwargs: tp.KwargsLike = None,
@@ -1601,7 +1627,7 @@ class Executor(Configured):
         post_execute_func: tp.Optional[tp.Callable] = None,
         post_execute_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
-    ) -> tp.Optional[tp.ExecOutputs]:
+    ) -> tp.Optional[tp.ExecResults]:
         """Call `Executor.post_execute_func`."""
         if cache_chunks and release_chunk_cache:
             if chunk_cache_dir is None:
@@ -1612,11 +1638,11 @@ class Executor(Configured):
                 chunk_cache_load_kwargs = {}
             chunk_paths = Path(chunk_cache_dir).rglob("chunk_*.pickle")
             chunk_paths = sorted(chunk_paths, key=lambda x: int(x.name.split("_")[1].split(".")[0]))
-            new_outputs = []
+            new_results = []
             for chunk_path in chunk_paths:
                 chunk_cache = load(chunk_path, **chunk_cache_load_kwargs)
-                new_outputs.extend(chunk_cache)
-            outputs = new_outputs
+                new_results.extend(chunk_cache)
+            results = new_results
         if cache_chunks and post_clear_chunk_cache:
             if chunk_cache_dir is None:
                 raise ValueError("Must provide chunk_cache_dir")
@@ -1624,7 +1650,7 @@ class Executor(Configured):
 
         if post_execute_func is not None:
             template_context = merge_dicts(
-                dict(outputs=outputs),
+                dict(results=results),
                 template_context,
             )
             post_execute_func = substitute_templates(
@@ -1637,43 +1663,61 @@ class Executor(Configured):
                 template_context,
                 eval_id="post_execute_kwargs",
             )
-            new_outputs = post_execute_func(**post_execute_kwargs)
-            if new_outputs is not None:
-                return new_outputs
-        return outputs
+            new_results = post_execute_func(**post_execute_kwargs)
+            if new_results is not None:
+                return new_results
+        return results
 
     @classmethod
-    def merge_outputs(
+    def merge_results(
         cls,
-        outputs: tp.ExecOutputs,
+        results: tp.ExecResults,
         keys: tp.Optional[tp.IndexLike] = None,
+        filter_no_results: bool = False,
+        raise_no_results: bool = True,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
-    ) -> tp.Union[tp.ExecOutputs, tp.MergeOutput]:
-        """Merge outputs using `Executor.merge_func` and `Executor.merge_kwargs`."""
+    ) -> tp.Union[tp.ExecResults, tp.MergeResult]:
+        """Merge results using `Executor.merge_func` and `Executor.merge_kwargs`."""
+        if filter_no_results:
+            from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+            try:
+                results, keys = _filter_no_results(results, keys=keys)
+            except NoResultsException as e:
+                if raise_no_results:
+                    raise e
+                return NoResult
+            no_results_filtered = True
+        else:
+            no_results_filtered = False
         if merge_func is not None:
             template_context = merge_dicts(
-                dict(outputs=outputs),
+                dict(results=results),
                 template_context,
             )
             from vectorbtpro.base.merging import is_merge_func_from_config
 
             if is_merge_func_from_config(merge_func):
-                merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                merge_kwargs = merge_dicts(dict(
+                    keys=keys,
+                    filter_no_results=not no_results_filtered,
+                    raise_no_results=raise_no_results,
+                ), merge_kwargs)
             if isinstance(merge_func, MergeFunc):
                 merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
             else:
                 merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
-            return merge_func(outputs)
-        return outputs
+            return merge_func(results)
+        return results
 
     def run(
         self,
         tasks: tp.TasksLike,
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
-    ) -> tp.Union[tp.ExecOutputs, tp.MergeOutput]:
+    ) -> tp.Union[tp.ExecResults, tp.MergeResult]:
         """Execute functions and their arguments."""
         from vectorbtpro.base.indexes import to_any_index
 
@@ -1701,6 +1745,8 @@ class Executor(Configured):
         post_execute_func = self.post_execute_func
         post_execute_kwargs = self.post_execute_kwargs
         post_execute_on_sorted = self.post_execute_on_sorted
+        filter_no_results = self.filter_no_results
+        raise_no_results = self.raise_no_results
         merge_func = self.merge_func
         merge_kwargs = self.merge_kwargs
         template_context = self.template_context
@@ -1745,9 +1791,9 @@ class Executor(Configured):
                 )
                 if "n_chunks" not in template_context:
                     template_context["n_chunks"] = 1
-                outputs = self.call_execute(engine, tasks, size=size, keys=keys)
-                outputs = self.call_post_execute_func(
-                    outputs,
+                results = self.call_execute(engine, tasks, size=size, keys=keys)
+                results = self.call_post_execute_func(
+                    results,
                     cache_chunks=cache_chunks,
                     chunk_cache_dir=chunk_cache_dir,
                     chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -1757,9 +1803,11 @@ class Executor(Configured):
                     post_execute_kwargs=post_execute_kwargs,
                     template_context=template_context,
                 )
-                return self.merge_outputs(
-                    outputs,
+                return self.merge_results(
+                    results,
                     keys=keys,
+                    filter_no_results=filter_no_results,
+                    raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
                     template_context=template_context,
@@ -1809,14 +1857,14 @@ class Executor(Configured):
             )
             if "n_chunks" not in template_context:
                 template_context["n_chunks"] = 1
-            outputs = self.call_execute(
+            results = self.call_execute(
                 engine,
                 tasks,
                 size=size,
                 keys=keys,
             )
-            outputs = self.call_post_execute_func(
-                outputs,
+            results = self.call_post_execute_func(
+                results,
                 cache_chunks=cache_chunks,
                 chunk_cache_dir=chunk_cache_dir,
                 chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -1826,9 +1874,11 @@ class Executor(Configured):
                 post_execute_kwargs=post_execute_kwargs,
                 template_context=template_context,
             )
-            return self.merge_outputs(
-                outputs,
+            return self.merge_results(
+                results,
                 keys=keys,
+                filter_no_results=filter_no_results,
+                raise_no_results=raise_no_results,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,
                 template_context=template_context,
@@ -1856,7 +1906,7 @@ class Executor(Configured):
 
         if distribute.lower() == "tasks":
             if indices_sorted and not hasattr(tasks, "__len__"):
-                outputs = []
+                results = []
                 chunk_idx = 0
                 _tasks = []
 
@@ -1880,7 +1930,7 @@ class Executor(Configured):
                     for i, func_args in enumerate(tasks):
                         if i > all_call_indices[chunk_idx][-1]:
                             call_indices = all_call_indices[chunk_idx]
-                            call_outputs = self.call_pre_chunk_func(
+                            call_results = self.call_pre_chunk_func(
                                 chunk_idx,
                                 call_indices,
                                 cache_chunks=cache_chunks,
@@ -1891,8 +1941,8 @@ class Executor(Configured):
                                 pre_chunk_kwargs=pre_chunk_kwargs,
                                 template_context=template_context,
                             )
-                            if call_outputs is None:
-                                call_outputs = self.call_execute(
+                            if call_results is None:
+                                call_results = self.call_execute(
                                     engine,
                                     _tasks,
                                     size=len(call_indices),
@@ -1901,10 +1951,10 @@ class Executor(Configured):
                                 chunk_executed = True
                             else:
                                 chunk_executed = False
-                            call_outputs = self.call_post_chunk_func(
+                            call_results = self.call_post_chunk_func(
                                 chunk_idx,
                                 call_indices,
-                                call_outputs,
+                                call_results,
                                 cache_chunks=cache_chunks,
                                 chunk_cache_dir=chunk_cache_dir,
                                 chunk_cache_save_kwargs=chunk_cache_save_kwargs,
@@ -1914,7 +1964,7 @@ class Executor(Configured):
                                 chunk_executed=chunk_executed,
                                 template_context=template_context,
                             )
-                            outputs.extend(call_outputs)
+                            results.extend(call_results)
                             chunk_idx += 1
                             _tasks = []
                             if chunk_idx < len(all_call_indices):
@@ -1930,7 +1980,7 @@ class Executor(Configured):
                         _tasks.append(func_args)
                     if len(_tasks) > 0:
                         call_indices = all_call_indices[chunk_idx]
-                        call_outputs = self.call_pre_chunk_func(
+                        call_results = self.call_pre_chunk_func(
                             chunk_idx,
                             call_indices,
                             cache_chunks=cache_chunks,
@@ -1941,8 +1991,8 @@ class Executor(Configured):
                             pre_chunk_kwargs=pre_chunk_kwargs,
                             template_context=template_context,
                         )
-                        if call_outputs is None:
-                            call_outputs = self.call_execute(
+                        if call_results is None:
+                            call_results = self.call_execute(
                                 engine,
                                 _tasks,
                                 size=len(call_indices),
@@ -1951,10 +2001,10 @@ class Executor(Configured):
                             chunk_executed = True
                         else:
                             chunk_executed = False
-                        call_outputs = self.call_post_chunk_func(
+                        call_results = self.call_post_chunk_func(
                             chunk_idx,
                             call_indices,
-                            call_outputs,
+                            call_results,
                             cache_chunks=cache_chunks,
                             chunk_cache_dir=chunk_cache_dir,
                             chunk_cache_save_kwargs=chunk_cache_save_kwargs,
@@ -1964,10 +2014,10 @@ class Executor(Configured):
                             chunk_executed=chunk_executed,
                             template_context=template_context,
                         )
-                        outputs.extend(call_outputs)
+                        results.extend(call_results)
                         pbar.update()
-                outputs = self.call_post_execute_func(
-                    outputs,
+                results = self.call_post_execute_func(
+                    results,
                     cache_chunks=cache_chunks,
                     chunk_cache_dir=chunk_cache_dir,
                     chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -1977,16 +2027,18 @@ class Executor(Configured):
                     post_execute_kwargs=post_execute_kwargs,
                     template_context=template_context,
                 )
-                return self.merge_outputs(
-                    outputs,
+                return self.merge_results(
+                    results,
                     keys=keys,
+                    filter_no_results=filter_no_results,
+                    raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
                     template_context=template_context,
                 )
             else:
                 tasks = list(tasks)
-                outputs = []
+                results = []
                 output_indices = []
 
                 self.call_pre_execute_func(
@@ -2007,7 +2059,7 @@ class Executor(Configured):
                         )
                     )
                     for chunk_idx, call_indices in enumerate(all_call_indices):
-                        call_outputs = self.call_pre_chunk_func(
+                        call_results = self.call_pre_chunk_func(
                             chunk_idx,
                             call_indices,
                             cache_chunks=cache_chunks,
@@ -2018,11 +2070,11 @@ class Executor(Configured):
                             pre_chunk_kwargs=pre_chunk_kwargs,
                             template_context=template_context,
                         )
-                        if call_outputs is None:
+                        if call_results is None:
                             _tasks = []
                             for idx in call_indices:
                                 _tasks.append(tasks[idx])
-                            call_outputs = self.call_execute(
+                            call_results = self.call_execute(
                                 engine,
                                 _tasks,
                                 size=len(call_indices),
@@ -2031,10 +2083,10 @@ class Executor(Configured):
                             chunk_executed = True
                         else:
                             chunk_executed = False
-                        call_outputs = self.call_post_chunk_func(
+                        call_results = self.call_post_chunk_func(
                             chunk_idx,
                             call_indices,
-                            call_outputs,
+                            call_results,
                             cache_chunks=cache_chunks,
                             chunk_cache_dir=chunk_cache_dir,
                             chunk_cache_save_kwargs=chunk_cache_save_kwargs,
@@ -2044,7 +2096,7 @@ class Executor(Configured):
                             chunk_executed=chunk_executed,
                             template_context=template_context,
                         )
-                        outputs.extend(call_outputs)
+                        results.extend(call_results)
                         output_indices.extend(call_indices)
                         if chunk_idx + 1 < len(all_call_indices):
                             pbar.set_description(
@@ -2057,8 +2109,8 @@ class Executor(Configured):
                             )
                         pbar.update()
                 if not post_execute_on_sorted:
-                    outputs = self.call_post_execute_func(
-                        outputs,
+                    results = self.call_post_execute_func(
+                        results,
                         cache_chunks=cache_chunks,
                         chunk_cache_dir=chunk_cache_dir,
                         chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -2069,10 +2121,10 @@ class Executor(Configured):
                         template_context=template_context,
                     )
                 if not in_chunk_order and not indices_sorted:
-                    outputs = [x for _, x in sorted(zip(output_indices, outputs))]
+                    results = [x for _, x in sorted(zip(output_indices, results))]
                 if post_execute_on_sorted:
-                    outputs = self.call_post_execute_func(
-                        outputs,
+                    results = self.call_post_execute_func(
+                        results,
                         cache_chunks=cache_chunks,
                         chunk_cache_dir=chunk_cache_dir,
                         chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -2082,9 +2134,11 @@ class Executor(Configured):
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
                     )
-                return self.merge_outputs(
-                    outputs,
+                return self.merge_results(
+                    results,
                     keys=keys,
+                    filter_no_results=filter_no_results,
+                    raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
                     template_context=template_context,
@@ -2115,14 +2169,14 @@ class Executor(Configured):
                     _tasks.append(func_args)
                 if len(_tasks) > 0:
                     task_chunks.append(self.build_serial_chunk(_tasks))
-                outputs = self.call_execute(
+                results = self.call_execute(
                     engine,
                     task_chunks,
                     size=len(task_chunks),
                 )
-                outputs = [x for o in outputs for x in o]
-                outputs = self.call_post_execute_func(
-                    outputs,
+                results = [x for o in results for x in o]
+                results = self.call_post_execute_func(
+                    results,
                     cache_chunks=cache_chunks,
                     chunk_cache_dir=chunk_cache_dir,
                     chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -2132,9 +2186,11 @@ class Executor(Configured):
                     post_execute_kwargs=post_execute_kwargs,
                     template_context=template_context,
                 )
-                return self.merge_outputs(
-                    outputs,
+                return self.merge_results(
+                    results,
                     keys=keys,
+                    filter_no_results=filter_no_results,
+                    raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
                     template_context=template_context,
@@ -2158,15 +2214,15 @@ class Executor(Configured):
                         _tasks.append(tasks[idx])
                     task_chunks.append(self.build_serial_chunk(_tasks))
                     output_indices.extend(call_indices)
-                outputs = self.call_execute(
+                results = self.call_execute(
                     engine,
                     task_chunks,
                     size=len(task_chunks),
                 )
-                outputs = [x for o in outputs for x in o]
+                results = [x for o in results for x in o]
                 if not post_execute_on_sorted:
-                    outputs = self.call_post_execute_func(
-                        outputs,
+                    results = self.call_post_execute_func(
+                        results,
                         cache_chunks=cache_chunks,
                         chunk_cache_dir=chunk_cache_dir,
                         chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -2177,10 +2233,10 @@ class Executor(Configured):
                         template_context=template_context,
                     )
                 if not in_chunk_order and not indices_sorted:
-                    outputs = [x for _, x in sorted(zip(output_indices, outputs))]
+                    results = [x for _, x in sorted(zip(output_indices, results))]
                 if post_execute_on_sorted:
-                    outputs = self.call_post_execute_func(
-                        outputs,
+                    results = self.call_post_execute_func(
+                        results,
                         cache_chunks=cache_chunks,
                         chunk_cache_dir=chunk_cache_dir,
                         chunk_cache_load_kwargs=chunk_cache_load_kwargs,
@@ -2190,9 +2246,11 @@ class Executor(Configured):
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
                     )
-                return self.merge_outputs(
-                    outputs,
+                return self.merge_results(
+                    results,
                     keys=keys,
+                    filter_no_results=filter_no_results,
+                    raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
                     template_context=template_context,
@@ -2231,6 +2289,8 @@ def execute(
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
+    filter_no_results: tp.Optional[bool] = None,
+    raise_no_results: tp.Optional[bool] = None,
     merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
@@ -2238,7 +2298,7 @@ def execute(
     pbar_kwargs: tp.KwargsLike = None,
     merge_to_engine_config: tp.Optional[bool] = None,
     **kwargs,
-) -> tp.Union[tp.ExecOutputs, tp.MergeOutput]:
+) -> tp.MergeableResults:
     """Execute functions and their arguments using `Executor`.
 
     Keyword arguments `**kwargs` and `engine_config` are merged into `engine_config`
@@ -2283,6 +2343,8 @@ def execute(
         post_execute_func=post_execute_func,
         post_execute_kwargs=post_execute_kwargs,
         post_execute_on_sorted=post_execute_on_sorted,
+        filter_no_results=filter_no_results,
+        raise_no_results=raise_no_results,
         merge_func=merge_func,
         merge_kwargs=merge_kwargs,
         template_context=template_context,
@@ -2336,7 +2398,7 @@ def parse_iterable_and_keys(
 
 def iterated(
     *args,
-    iter_arg: tp.Optional[tp.AnnArgQuery] = None,
+    over_arg: tp.Optional[tp.AnnArgQuery] = None,
     executor_cls: tp.Optional[tp.Type[Executor]] = None,
     engine: tp.Optional[tp.ExecutionEngineLike] = None,
     engine_config: tp.KwargsLike = None,
@@ -2363,6 +2425,8 @@ def iterated(
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
+    filter_no_results: tp.Optional[bool] = None,
+    raise_no_results: tp.Optional[bool] = None,
     merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
@@ -2375,7 +2439,7 @@ def iterated(
 
     Returns a new function with the same signature as the passed one.
     
-    Use `iter_arg` to specify which argument (position or name) should be iterated over.
+    Use `over_arg` to specify which argument (position or name) should be iterated over.
     If it's None (default), uses the first argument.
 
     Each option can be modified in the `options` attribute of the wrapper function or
@@ -2383,7 +2447,10 @@ def iterated(
     keys and size by passing them as `_keys` and `_size` respectively if the range-like object is an iterator.
 
     Keyword arguments `**kwargs` and `engine_config` are merged into `engine_config`
-    if `merge_to_engine_config` is True, otherwise, `**kwargs` are passed directly to `Executor`."""
+    if `merge_to_engine_config` is True, otherwise, `**kwargs` are passed directly to `Executor`.
+
+    If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
+    remove it from the final index."""
 
     def decorator(func: tp.Callable) -> tp.Callable:
         from vectorbtpro._settings import settings
@@ -2416,21 +2483,26 @@ def iterated(
             if executor_cls is None:
                 executor_cls = Executor
 
-            iter_arg = _resolve_key("iter_arg")
-            if iter_arg is None:
+            over_arg = _resolve_key("over_arg")
+            if over_arg is None:
                 iterable_like = args[0]
             else:
                 ann_args = annotate_args(func, args, kwargs)
-                iterable_like = match_ann_arg(ann_args, iter_arg)
+                iterable_like = match_ann_arg(ann_args, over_arg)
             size = kwargs.pop("_size", None)
             keys = kwargs.pop("_keys", None)
             iterable, keys = parse_iterable_and_keys(iterable_like, keys=keys)
             if keys is not None and size is None:
                 size = len(keys)
             if keys is not None and keys.name is None:
-                keys = keys.rename(get_func_arg_names(func)[0])
+                if over_arg is None:
+                    keys = keys.rename(get_func_arg_names(func)[0])
+                else:
+                    ann_args = annotate_args(func, args, kwargs)
+                    over_arg_name = match_ann_arg(ann_args, over_arg, return_name=True)
+                    keys = keys.rename(over_arg_name)
 
-            if iter_arg is None:
+            if over_arg is None:
                 def _get_task_generator():
                     for x in iterable:
                         yield Task(func, x, *args[1:], **kwargs)
@@ -2438,7 +2510,7 @@ def iterated(
                 def _get_task_generator():
                     for x in iterable:
                         flat_ann_args = annotate_args(func, args, kwargs, flatten=True)
-                        match_and_set_flat_ann_arg(flat_ann_args, iter_arg, x)
+                        match_and_set_flat_ann_arg(flat_ann_args, over_arg, x)
                         new_args, new_kwargs = flat_ann_args_to_args(flat_ann_args)
                         yield Task(func, *new_args, **new_kwargs)
 
@@ -2470,6 +2542,8 @@ def iterated(
                 post_execute_func=_resolve_key("post_execute_func"),
                 post_execute_kwargs=_resolve_key("post_execute_kwargs", merge=True),
                 post_execute_on_sorted=_resolve_key("post_execute_on_sorted"),
+                filter_no_results=_resolve_key("filter_no_results"),
+                raise_no_results=_resolve_key("raise_no_results"),
                 merge_func=_resolve_key("merge_func"),
                 merge_kwargs=_resolve_key("merge_kwargs", merge=True),
                 template_context=_resolve_key("template_context", merge=True),
@@ -2482,7 +2556,7 @@ def iterated(
         wrapper.name = func.__name__
         wrapper.is_executor = True
         wrapper.options = FrozenConfig(
-            iter_arg=iter_arg,
+            over_arg=over_arg,
             executor_cls=executor_cls,
             executor_kwargs=_executor_kwargs,
             engine=engine,
@@ -2510,6 +2584,8 @@ def iterated(
             post_execute_func=post_execute_func,
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
+            filter_no_results=filter_no_results,
+            raise_no_results=raise_no_results,
             merge_func=merge_func,
             merge_kwargs=merge_kwargs,
             template_context=template_context,

@@ -307,6 +307,7 @@ def cv_split(
     selection: tp.Union[str, tp.Selection] = "max",
     return_grid: tp.Union[bool, str] = False,
     skip_errored: bool = False,
+    raise_no_results: bool = True,
     template_context: tp.KwargsLike = None,
     **split_kwargs,
 ) -> tp.Callable:
@@ -461,7 +462,9 @@ def cv_split(
                                 all_grid_results.append(NoResult)
                             raise e
                     if isinstance(all_grid_results[-1], _NoResult):
-                        raise NoResultsException
+                        if raise_no_results:
+                            raise NoResultsException
+                        return NoResult
                     result = parameterized_func(
                         *_args,
                         _selection=selection,

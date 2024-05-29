@@ -3072,9 +3072,9 @@ class TestExecution:
         pre_chunk_arg_lst = []
         post_chunk_idx_lst = []
         post_call_indices_lst = []
-        post_call_outputs_lst = []
+        post_call_results_lst = []
         post_chunk_arg_lst = []
-        post_outputs_lst = []
+        post_results_lst = []
         post_execute_arg_lst = []
 
         def pre_execute_func(pre_execute_arg):
@@ -3085,18 +3085,18 @@ class TestExecution:
             pre_call_indices_lst.append(call_indices)
             pre_chunk_arg_lst.append(pre_chunk_arg)
 
-        def post_chunk_func(chunk_idx, call_indices, call_outputs, post_chunk_arg):
+        def post_chunk_func(chunk_idx, call_indices, call_results, post_chunk_arg):
             post_chunk_idx_lst.append(chunk_idx)
             post_call_indices_lst.append(call_indices)
-            post_call_outputs_lst.append(call_outputs)
+            post_call_results_lst.append(call_results)
             post_chunk_arg_lst.append(post_chunk_arg)
 
-        def post_execute_func(outputs, post_execute_arg):
-            post_outputs_lst.append(outputs)
+        def post_execute_func(results, post_execute_arg):
+            post_results_lst.append(results)
             post_execute_arg_lst.append(post_execute_arg)
-            return [output + 1 for output in outputs]
+            return [result + 1 for result in results]
 
-        outputs = execution.execute(
+        results = execution.execute(
             [(lambda _i=i: _i, (), {}) for i in range(10)],
             chunk_len=2,
             pre_execute_func=pre_execute_func,
@@ -3113,12 +3113,12 @@ class TestExecution:
             post_chunk_kwargs=dict(
                 chunk_idx=vbt.Rep("chunk_idx"),
                 call_indices=vbt.Rep("call_indices"),
-                call_outputs=vbt.Rep("call_outputs"),
+                call_results=vbt.Rep("call_results"),
                 post_chunk_arg=102,
             ),
             post_execute_func=post_execute_func,
             post_execute_kwargs=dict(
-                outputs=vbt.Rep("outputs"),
+                results=vbt.Rep("results"),
                 post_execute_arg=103,
             ),
         )
@@ -3128,11 +3128,11 @@ class TestExecution:
         assert pre_chunk_arg_lst == [101, 101, 101, 101, 101]
         assert post_chunk_idx_lst == [0, 1, 2, 3, 4]
         assert post_call_indices_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
-        assert post_call_outputs_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+        assert post_call_results_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
         assert post_chunk_arg_lst == [102, 102, 102, 102, 102]
-        assert post_outputs_lst == [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+        assert post_results_lst == [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
         assert post_execute_arg_lst == [103]
-        assert outputs == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        assert results == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     def test_iterated(self):
         def f(a, *args, b=None, **kwargs):
@@ -3169,6 +3169,15 @@ class TestExecution:
             f_iterated(iter([0, 1, 2]), 3, b=4, c=5),
             np.array([12, 13, 14]),
         )
+
+        @vbt.iterated
+        def f_iterated2(a, *args, b=None, **kwargs):
+            return vbt.NoResult
+
+        assert f_iterated2([0, 1, 2], 3, b=4, c=5) == [vbt.NoResult, vbt.NoResult, vbt.NoResult]
+        with pytest.raises(vbt.NoResultsException):
+            f_iterated2([0, 1, 2], 3, b=4, c=5, _filter_no_results=True)
+        assert f_iterated2([0, 1, 2], 3, b=4, c=5, _filter_no_results=True, _raise_no_results=False) == vbt.NoResult
 
 
 # ############# pickling ############# #

@@ -21,7 +21,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
 from vectorbtpro.utils.search import find_in_obj, replace_in_obj
-from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
+from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 __all__ = [
@@ -952,8 +952,6 @@ class Parameterizer(Configured):
         "seed",
         "clean_index_kwargs",
         "name_tuple_to_str",
-        "merge_func",
-        "merge_kwargs",
         "selection",
         "forward_kwargs_as",
         "mono_min_size",
@@ -963,6 +961,10 @@ class Parameterizer(Configured):
         "mono_reduce",
         "mono_merge_func",
         "mono_merge_kwargs",
+        "filter_no_results",
+        "raise_no_results",
+        "merge_func",
+        "merge_kwargs",
         "return_meta",
         "return_param_index",
         "execute_kwargs",
@@ -984,8 +986,6 @@ class Parameterizer(Configured):
         seed: tp.Optional[int] = None,
         clean_index_kwargs: tp.KwargsLike = None,
         name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
-        merge_func: tp.Optional[tp.MergeFuncLike] = None,
-        merge_kwargs: tp.KwargsLike = None,
         selection: tp.Optional[tp.Selection] = None,
         forward_kwargs_as: tp.KwargsLike = None,
         mono_min_size: tp.Optional[int] = None,
@@ -995,6 +995,10 @@ class Parameterizer(Configured):
         mono_reduce: tp.Union[bool, tp.Kwargs] = None,
         mono_merge_func: tp.Union[tp.MergeFuncLike, tp.Dict[str, tp.MergeFuncLike]] = None,
         mono_merge_kwargs: tp.KwargsLike = None,
+        filter_no_results: tp.Optional[bool] = None,
+        raise_no_results: tp.Optional[bool] = None,
+        merge_func: tp.Optional[tp.MergeFuncLike] = None,
+        merge_kwargs: tp.KwargsLike = None,
         return_meta: tp.Optional[bool] = None,
         return_param_index: tp.Optional[bool] = None,
         execute_kwargs: tp.KwargsLike = None,
@@ -1016,8 +1020,6 @@ class Parameterizer(Configured):
             seed=seed,
             clean_index_kwargs=clean_index_kwargs,
             name_tuple_to_str=name_tuple_to_str,
-            merge_func=merge_func,
-            merge_kwargs=merge_kwargs,
             selection=selection,
             forward_kwargs_as=forward_kwargs_as,
             mono_min_size=mono_min_size,
@@ -1027,6 +1029,10 @@ class Parameterizer(Configured):
             mono_reduce=mono_reduce,
             mono_merge_func=mono_merge_func,
             mono_merge_kwargs=mono_merge_kwargs,
+            filter_no_results=filter_no_results,
+            raise_no_results=raise_no_results,
+            merge_func=merge_func,
+            merge_kwargs=merge_kwargs,
             return_meta=return_meta,
             return_param_index=return_param_index,
             execute_kwargs=execute_kwargs,
@@ -1047,8 +1053,6 @@ class Parameterizer(Configured):
         self._seed = self.resolve_setting(seed, "seed")
         self._clean_index_kwargs = self.resolve_setting(clean_index_kwargs, "clean_index_kwargs", merge=True)
         self._name_tuple_to_str = self.resolve_setting(name_tuple_to_str, "name_tuple_to_str")
-        self._merge_func = self.resolve_setting(merge_func, "merge_func")
-        self._merge_kwargs = self.resolve_setting(merge_kwargs, "merge_kwargs", merge=True)
         self._selection = self.resolve_setting(selection, "selection")
         self._forward_kwargs_as = self.resolve_setting(forward_kwargs_as, "forward_kwargs_as", merge=True)
         self._mono_min_size = self.resolve_setting(mono_min_size, "mono_min_size")
@@ -1058,6 +1062,10 @@ class Parameterizer(Configured):
         self._mono_reduce = self.resolve_setting(mono_reduce, "mono_reduce")
         self._mono_merge_func = self.resolve_setting(mono_merge_func, "mono_merge_func")
         self._mono_merge_kwargs = self.resolve_setting(mono_merge_kwargs, "mono_merge_kwargs", merge=True)
+        self._filter_no_results = self.resolve_setting(filter_no_results, "filter_no_results")
+        self._raise_no_results = self.resolve_setting(raise_no_results, "raise_no_results")
+        self._merge_func = self.resolve_setting(merge_func, "merge_func")
+        self._merge_kwargs = self.resolve_setting(merge_kwargs, "merge_kwargs", merge=True)
         self._return_meta = self.resolve_setting(return_meta, "return_meta")
         self._return_param_index = self.resolve_setting(return_param_index, "return_param_index")
         self._execute_kwargs = self.resolve_setting(execute_kwargs, "execute_kwargs", merge=True)
@@ -1138,21 +1146,6 @@ class Parameterizer(Configured):
         return self._name_tuple_to_str
 
     @property
-    def merge_func(self) -> tp.Optional[tp.MergeFuncLike]:
-        """Merging function.
-
-        Resolved using `vectorbtpro.base.merging.resolve_merge_func`."""
-        return self._merge_func
-
-    @property
-    def merge_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to the merging function.
-
-        When defining a custom merging function, make sure to make use of `param_index`
-        (via templates) to build the final index hierarchy."""
-        return self._merge_kwargs
-
-    @property
     def selection(self) -> tp.Optional[tp.Selection]:
         """Parameter combination to select.
 
@@ -1220,6 +1213,36 @@ class Parameterizer(Configured):
         Can be a dictionary with a value per (unpacked) argument name. Otherwise,
         gets applied to each parameter, unless the parameter overrides it."""
         return self._mono_merge_kwargs
+
+    @property
+    def filter_no_results(self) -> bool:
+        """Whether to filter `vectorbtpro.utils.selection.NoResult` results."""
+        return self._filter_no_results
+
+    @property
+    def raise_no_results(self) -> bool:
+        """Whether to raise `vectorbtpro.utils.selection.NoResultsException` if there are no results.
+
+        Otherwise, returns `vectorbtpro.utils.selection.NoResult`.
+
+        Has effect only if `Parameterizer.filter_no_results` is True. But regardless of this setting,
+        gets passed to the merging function if the merging function is pre-configured."""
+        return self._raise_no_results
+
+    @property
+    def merge_func(self) -> tp.Optional[tp.MergeFuncLike]:
+        """Merging function.
+
+        Resolved using `vectorbtpro.base.merging.resolve_merge_func`."""
+        return self._merge_func
+
+    @property
+    def merge_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to the merging function.
+
+        When defining a custom merging function, make sure to make use of `param_index`
+        (via templates) to build the final index hierarchy."""
+        return self._merge_kwargs
 
     @property
     def return_meta(self) -> bool:
@@ -1333,11 +1356,14 @@ class Parameterizer(Configured):
         selection: tp.Selection,
         single_comb: bool = False,
         template_context: tp.KwargsLike = None,
+        raise_no_results: bool = True,
     ) -> tp.Tuple[tp.List[tp.Kwargs], tp.Optional[tp.Index], bool]:
         """Select a parameter combination from parameter configs and index."""
         selection = substitute_templates(selection, template_context, eval_id="selection")
         if isinstance(selection, _NoResult):
-            raise NoResultsException
+            if raise_no_results:
+                raise NoResultsException
+            return NoResult
         found_param = False
         kind = None
         if isinstance(selection, PosSel):
@@ -1550,35 +1576,37 @@ class Parameterizer(Configured):
         param_configs: tp.Optional[tp.MaybeSequence[tp.Kwargs]] = None,
         eval_id: tp.Optional[tp.Hashable] = None,
         **kwargs,
-    ) -> tp.Any:
+    ) -> tp.Union[dict, tp.MergeableResults, tp.Tuple[tp.MergeableResults, tp.Optional[tp.Index]]]:
         """Parameterize arguments and run the function."""
-        param_search_kwargs = self.resolve_setting(self.param_search_kwargs, "param_search_kwargs", merge=True)
-        skip_single_comb = self.resolve_setting(self.skip_single_comb, "skip_single_comb")
-        template_context = self.resolve_setting(self.template_context, "template_context", merge=True)
-        build_grid = self.resolve_setting(self.build_grid, "build_grid")
-        grid_indices = self.resolve_setting(self.grid_indices, "grid_indices")
-        random_subset = self.resolve_setting(self.random_subset, "random_subset")
-        random_replace = self.resolve_setting(self.random_replace, "random_replace")
-        random_sort = self.resolve_setting(self.random_sort, "random_sort")
-        max_guesses = self.resolve_setting(self.max_guesses, "max_guesses")
-        max_misses = self.resolve_setting(self.max_misses, "max_misses")
-        seed = self.resolve_setting(self.seed, "seed")
-        clean_index_kwargs = self.resolve_setting(self.clean_index_kwargs, "clean_index_kwargs", merge=True)
-        name_tuple_to_str = self.resolve_setting(self.name_tuple_to_str, "name_tuple_to_str")
-        merge_func = self.resolve_setting(self.merge_func, "merge_func")
-        merge_kwargs = self.resolve_setting(self.merge_kwargs, "merge_kwargs", merge=True)
-        selection = self.resolve_setting(self.selection, "selection")
-        forward_kwargs_as = self.resolve_setting(self.forward_kwargs_as, "forward_kwargs_as", merge=True)
-        mono_min_size = self.resolve_setting(self.mono_min_size, "mono_min_size")
-        mono_n_chunks = self.resolve_setting(self.mono_n_chunks, "mono_n_chunks")
-        mono_chunk_len = self.resolve_setting(self.mono_chunk_len, "mono_chunk_len")
-        mono_chunk_meta = self.resolve_setting(self.mono_chunk_meta, "mono_chunk_meta")
-        mono_reduce = self.resolve_setting(self.mono_reduce, "mono_reduce")
-        mono_merge_func = self.resolve_setting(self.mono_merge_func, "mono_merge_func")
-        mono_merge_kwargs = self.resolve_setting(self.mono_merge_kwargs, "mono_merge_kwargs", merge=True)
-        return_meta = self.resolve_setting(self.return_meta, "return_meta")
-        return_param_index = self.resolve_setting(self.return_param_index, "return_param_index")
-        execute_kwargs = self.resolve_setting(self.execute_kwargs, "execute_kwargs", merge=True)
+        param_search_kwargs = self.param_search_kwargs
+        skip_single_comb = self.skip_single_comb
+        template_context = self.template_context
+        build_grid = self.build_grid
+        grid_indices = self.grid_indices
+        random_subset = self.random_subset
+        random_replace = self.random_replace
+        random_sort = self.random_sort
+        max_guesses = self.max_guesses
+        max_misses = self.max_misses
+        seed = self.seed
+        clean_index_kwargs = self.clean_index_kwargs
+        name_tuple_to_str = self.name_tuple_to_str
+        selection = self.selection
+        forward_kwargs_as = self.forward_kwargs_as
+        mono_min_size = self.mono_min_size
+        mono_n_chunks = self.mono_n_chunks
+        mono_chunk_len = self.mono_chunk_len
+        mono_chunk_meta = self.mono_chunk_meta
+        mono_reduce = self.mono_reduce
+        mono_merge_func = self.mono_merge_func
+        mono_merge_kwargs = self.mono_merge_kwargs
+        filter_no_results = self.filter_no_results
+        raise_no_results = self.raise_no_results
+        merge_func = self.merge_func
+        merge_kwargs = self.merge_kwargs
+        return_meta = self.return_meta
+        return_param_index = self.return_param_index
+        execute_kwargs = self.execute_kwargs
 
         template_context["eval_id"] = eval_id
 
@@ -1721,6 +1749,7 @@ class Parameterizer(Configured):
                 selection,
                 single_comb=template_context["single_comb"],
                 template_context=template_context,
+                raise_no_results=raise_no_results,
             )
             template_context["param_configs"] = new_param_configs
             template_context["param_index"] = new_param_index
@@ -1737,7 +1766,9 @@ class Parameterizer(Configured):
             )
             result = tasks[0][0](*tasks[0][1], **tasks[0][2])
             if isinstance(result, _NoResult):
-                raise NoResultsException
+                if raise_no_results:
+                    raise NoResultsException
+                return NoResult
             return result
 
         if mono_n_chunks is not None or mono_chunk_len is not None or mono_chunk_meta is not None:
@@ -1809,29 +1840,33 @@ class Parameterizer(Configured):
             keys=keys,
             **execute_kwargs,
         )
+        if filter_no_results:
+            from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
 
-        skip_indices = set()
-        for i, result in enumerate(results):
-            if isinstance(result, _NoResult):
-                skip_indices.add(i)
-        if len(skip_indices) > 0:
-            new_results = []
-            keep_indices = []
-            for i, result in enumerate(results):
-                if i not in skip_indices:
-                    new_results.append(result)
-                    keep_indices.append(i)
-            results = new_results
-            if template_context["param_index"] is not None:
-                template_context["param_index"] = template_context["param_index"][keep_indices]
-        if len(results) == 0:
-            raise NoResultsException
+            try:
+                results, template_context["param_index"] = _filter_no_results(
+                    results,
+                    keys=template_context["param_index"],
+                )
+            except NoResultsException as e:
+                if raise_no_results:
+                    raise e
+                if return_param_index:
+                    return NoResult, None
+                return NoResult
+            no_results_filtered = True
+        else:
+            no_results_filtered = False
 
         if merge_func is not None:
             from vectorbtpro.base.merging import is_merge_func_from_config
 
             if is_merge_func_from_config(merge_func):
-                merge_kwargs = merge_dicts(dict(keys=template_context["param_index"]), merge_kwargs)
+                merge_kwargs = merge_dicts(dict(
+                    keys=template_context["param_index"],
+                    filter_no_results=not no_results_filtered,
+                    raise_no_results=raise_no_results,
+                ), merge_kwargs)
             if isinstance(merge_func, MergeFunc):
                 merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
             else:
@@ -1860,8 +1895,6 @@ def parameterized(
     seed: tp.Optional[int] = None,
     clean_index_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
-    merge_func: tp.Optional[tp.MergeFuncLike] = None,
-    merge_kwargs: tp.KwargsLike = None,
     selection: tp.Optional[tp.Selection] = None,
     forward_kwargs_as: tp.KwargsLike = None,
     mono_min_size: tp.Optional[int] = None,
@@ -1871,6 +1904,8 @@ def parameterized(
     mono_reduce: tp.Union[bool, tp.Kwargs] = None,
     mono_merge_func: tp.Union[tp.MergeFuncLike, tp.Dict[str, tp.MergeFuncLike]] = None,
     mono_merge_kwargs: tp.KwargsLike = None,
+    merge_func: tp.Optional[tp.MergeFuncLike] = None,
+    merge_kwargs: tp.KwargsLike = None,
     return_meta: tp.Optional[bool] = None,
     return_param_index: tp.Optional[bool] = None,
     execute_kwargs: tp.KwargsLike = None,
@@ -2077,8 +2112,6 @@ def parameterized(
                 seed=_resolve_key("seed"),
                 clean_index_kwargs=_resolve_key("clean_index_kwargs", merge=True),
                 name_tuple_to_str=_resolve_key("name_tuple_to_str"),
-                merge_func=_resolve_key("merge_func"),
-                merge_kwargs=_resolve_key("merge_kwargs", merge=True),
                 selection=_resolve_key("selection"),
                 forward_kwargs_as=_resolve_key("forward_kwargs_as", merge=True),
                 mono_min_size=_resolve_key("mono_min_size"),
@@ -2088,6 +2121,8 @@ def parameterized(
                 mono_reduce=_resolve_key("mono_reduce"),
                 mono_merge_func=_resolve_key("mono_merge_func"),
                 mono_merge_kwargs=_resolve_key("mono_merge_kwargs", merge=True),
+                merge_func=_resolve_key("merge_func"),
+                merge_kwargs=_resolve_key("merge_kwargs", merge=True),
                 return_meta=_resolve_key("return_meta"),
                 return_param_index=_resolve_key("return_param_index"),
                 execute_kwargs=_resolve_key("execute_kwargs", merge=True),
@@ -2113,8 +2148,6 @@ def parameterized(
             seed=seed,
             clean_index_kwargs=clean_index_kwargs,
             name_tuple_to_str=name_tuple_to_str,
-            merge_func=merge_func,
-            merge_kwargs=merge_kwargs,
             selection=selection,
             forward_kwargs_as=forward_kwargs_as,
             mono_min_size=mono_min_size,
@@ -2124,6 +2157,8 @@ def parameterized(
             mono_reduce=mono_reduce,
             mono_merge_func=mono_merge_func,
             mono_merge_kwargs=mono_merge_kwargs,
+            merge_func=merge_func,
+            merge_kwargs=merge_kwargs,
             return_meta=return_meta,
             return_param_index=return_param_index,
             execute_kwargs=_execute_kwargs,

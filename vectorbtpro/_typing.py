@@ -251,8 +251,8 @@ FuncsArgs = Iterable[FuncArgs]
 TaskLike = Union[FuncArgs, Task]
 TasksLike = Iterable[TaskLike]
 ExecutionEngineLike = Union[str, type, ExecutionEngine, Callable]
-ExecOutput = Any
-ExecOutputs = List[Any]
+ExecResult = Any
+ExecResults = List[Any]
 
 # JIT
 JittedOption = Union[None, bool, str, Callable, Kwargs]
@@ -261,7 +261,8 @@ TaskId = Union[Hashable, Callable]
 
 # Merging
 MergeFuncLike = MaybeSequence[Union[None, str, Callable, MergeFunc]]
-MergeOutput = Any
+MergeResult = Any
+MergeableResults = Union[ExecResults, MergeResult]
 
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]

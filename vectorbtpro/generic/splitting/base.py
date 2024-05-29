@@ -39,7 +39,7 @@ from vectorbtpro.utils.parsing import (
     unflatten_ann_args,
     ann_args_to_args,
 )
-from vectorbtpro.utils.selection import _NoResult, NoResultsException, PosSel, LabelSel
+from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException, PosSel, LabelSel
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 
 if tp.TYPE_CHECKING:
@@ -3471,6 +3471,8 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         iteration: str = "split_wise",
         execute_kwargs: tp.KwargsLike = None,
+        filter_no_results: bool = True,
+        raise_no_results: bool = True,
         merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
         merge_kwargs: tp.KwargsLike = None,
         merge_all: bool = True,
@@ -3942,37 +3944,14 @@ class Splitter(Analyzable):
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 
-        def _skip_iterations(results, keys=None, return_keep_indices=False):
-            skip_indices = set()
-            for i, result in enumerate(results):
-                if isinstance(result, _NoResult):
-                    skip_indices.add(i)
-            if len(skip_indices) > 0:
-                new_results = []
-                keep_indices = []
-                for i, result in enumerate(results):
-                    if i not in skip_indices:
-                        new_results.append(result)
-                        keep_indices.append(i)
-                results = new_results
-                if keys is not None:
-                    keys = keys[keep_indices]
-            else:
-                keep_indices = None
-            if keys is None:
-                if return_keep_indices:
-                    return results, keep_indices
-                return results
-            if return_keep_indices:
-                return results, keys, keep_indices
-            return results, keys
-
         if merge_all:
             if iteration.lower() in ("split_wise", "set_wise"):
                 results = [result for _results in results for result in _results]
             if one_range:
                 if isinstance(results[0], _NoResult):
-                    raise NoResultsException
+                    if raise_no_results:
+                        raise NoResultsException
+                    return NoResult
                 return results[0]
             if iteration.lower() in ("split_major", "split_wise"):
                 if one_set:
@@ -4000,9 +3979,18 @@ class Splitter(Analyzable):
                         for i in range(n_splits):
                             range_bounds.append(bounds[(i, j)])
                     keys = _attach_bounds(keys, range_bounds)
-            results, keys = _skip_iterations(results, keys=keys)
-            if len(results) == 0:
-                raise NoResultsException
+            if filter_no_results:
+                from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+                try:
+                    results, keys = _filter_no_results(results, keys=keys)
+                except NoResultsException as e:
+                    if raise_no_results:
+                        raise e
+                    return NoResult
+                no_results_filtered = True
+            else:
+                no_results_filtered = False
 
             def _wrap_output(_results):
                 try:
@@ -4014,7 +4002,11 @@ class Splitter(Analyzable):
                 template_context["tasks"] = tasks
                 template_context["keys"] = keys
                 if is_merge_func_from_config(merge_func):
-                    merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                    merge_kwargs = merge_dicts(dict(
+                        keys=keys,
+                        filter_no_results=not no_results_filtered,
+                        raise_no_results=raise_no_results,
+                    ), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
                     merge_func = merge_func.replace(
                         merge_kwargs=merge_kwargs,
@@ -4045,7 +4037,9 @@ class Splitter(Analyzable):
             results = new_results
         if one_range:
             if isinstance(results[0][0], _NoResult):
-                raise NoResultsException
+                if raise_no_results:
+                    raise NoResultsException
+                return NoResult
             return results[0][0]
 
         split_bounds = []
@@ -4090,11 +4084,25 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:
                         minor_keys_wbounds = minor_keys
-                    _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
+                    if filter_no_results:
+                        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+                        _results, minor_keys_wbounds = _filter_no_results(
+                            _results,
+                            keys=minor_keys_wbounds,
+                            raise_error=False,
+                        )
+                        no_results_filtered = True
+                    else:
+                        no_results_filtered = False
                     if len(_results) > 0:
                         _template_context["keys"] = minor_keys_wbounds
                         if is_merge_func_from_config(merge_func):
-                            _merge_kwargs = merge_dicts(dict(keys=minor_keys_wbounds), merge_kwargs)
+                            _merge_kwargs = merge_dicts(dict(
+                                keys=minor_keys_wbounds,
+                                filter_no_results=not no_results_filtered,
+                                raise_no_results=False,
+                            ), merge_kwargs)
                         else:
                             _merge_kwargs = merge_kwargs
                         if isinstance(merge_func, MergeFunc):
@@ -4108,10 +4116,14 @@ class Splitter(Analyzable):
                                 merge_kwargs=_merge_kwargs,
                                 context=_template_context,
                             )
-                        merged_results.append(_merge_func(_results))
-                        keep_major_indices.append(i)
+                        _result = _merge_func(_results)
+                        if not isinstance(_result, _NoResult):
+                            merged_results.append(_result)
+                            keep_major_indices.append(i)
             if len(merged_results) == 0:
-                raise NoResultsException
+                if raise_no_results:
+                    raise NoResultsException
+                return NoResult
             if len(merged_results) < len(major_keys):
                 major_keys = major_keys[keep_major_indices]
 
@@ -4142,9 +4154,15 @@ class Splitter(Analyzable):
                         major_keys_wbounds = _attach_bounds(major_keys, minor_bounds[0])
                     else:
                         major_keys_wbounds = major_keys
-                    _results, major_keys_wbounds = _skip_iterations(_results, keys=major_keys_wbounds)
-                    if len(_results) == 0:
-                        raise NoResultsException
+                    if filter_no_results:
+                        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+                        try:
+                            _results, major_keys_wbounds = _filter_no_results(_results, keys=major_keys_wbounds)
+                        except NoResultsException as e:
+                            if raise_no_results:
+                                raise e
+                            return NoResult
                     try:
                         return pd.Series(_results, index=major_keys_wbounds)
                     except Exception as e:
@@ -4154,9 +4172,15 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[0])
                     else:
                         minor_keys_wbounds = minor_keys
-                    _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
-                    if len(_results) == 0:
-                        raise NoResultsException
+                    if filter_no_results:
+                        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+                        try:
+                            _results, major_keys_wbounds = _filter_no_results(_results, keys=minor_keys_wbounds)
+                        except NoResultsException as e:
+                            if raise_no_results:
+                                raise e
+                            return NoResult
                     try:
                         return pd.Series(_results, index=minor_keys_wbounds)
                     except Exception as e:
@@ -4169,7 +4193,14 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:
                         minor_keys_wbounds = minor_keys
-                    r, minor_keys_wbounds = _skip_iterations(r, keys=minor_keys_wbounds)
+                    if filter_no_results:
+                        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+                        r, minor_keys_wbounds = _filter_no_results(
+                            r,
+                            keys=minor_keys_wbounds,
+                            raise_error=False,
+                        )
                     if len(r) > 0:
                         try:
                             new_r = pd.Series(r, index=minor_keys_wbounds)
@@ -4178,7 +4209,9 @@ class Splitter(Analyzable):
                         new_results.append(new_r)
                         keep_major_indices.append(i)
                 if len(new_results) == 0:
-                    raise NoResultsException
+                    if raise_no_results:
+                        raise NoResultsException
+                    return NoResult
                 if len(new_results) < len(major_keys):
                     _major_keys = major_keys[keep_major_indices]
                 else:
@@ -4227,9 +4260,15 @@ class Splitter(Analyzable):
                     return tuple(map(_wrap_output, new_results))
             return _wrap_output(results)
 
-        results = _skip_iterations(results)
-        if len(results) == 0:
-            raise NoResultsException
+        if filter_no_results:
+            from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+            try:
+                results = _filter_no_results(results)
+            except NoResultsException as e:
+                if raise_no_results:
+                    raise e
+                return NoResult
         return results
 
     # ############# Splits ############# #

@@ -30,7 +30,7 @@ from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pickling import pdict, RecState
-from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
+from vectorbtpro.utils.selection import NoResult, NoResultsException
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 
 try:
@@ -3729,6 +3729,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         silence_warnings: bool = False,
         raise_errors: bool = False,
         execute_kwargs: tp.KwargsLike = None,
+        filter_no_results: bool = True,
+        raise_no_results: bool = True,
         merge_func: tp.MergeFuncLike = None,
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
@@ -3845,28 +3847,28 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
             keys = pd.Index(keys, name="run_func")
             results = execute(tasks, size=len(keys), keys=keys, **execute_kwargs)
+            if filter_no_results:
+                from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
 
-            skip_indices = set()
-            for i, result in enumerate(results):
-                if isinstance(result, _NoResult):
-                    skip_indices.add(i)
-            if len(skip_indices) > 0:
-                new_results = []
-                keep_indices = []
-                for i, result in enumerate(results):
-                    if i not in skip_indices:
-                        new_results.append(result)
-                        keep_indices.append(i)
-                results = new_results
-                keys = keys[keep_indices]
-            if len(results) == 0:
-                raise NoResultsException
+                try:
+                    results, keys = _filter_no_results(results, keys=keys)
+                except NoResultsException as e:
+                    if raise_no_results:
+                        raise e
+                    return NoResult
+                no_results_filtered = True
+            else:
+                no_results_filtered = False
 
             if merge_func is None and concat:
                 merge_func = "column_stack"
             if merge_func is not None:
                 if is_merge_func_from_config(merge_func):
-                    merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                    merge_kwargs = merge_dicts(dict(
+                        keys=keys,
+                        filter_no_results=not no_results_filtered,
+                        raise_no_results=raise_no_results,
+                    ), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
                     merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
                 else:

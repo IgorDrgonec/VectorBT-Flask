@@ -14,6 +14,7 @@ from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig
 from vectorbtpro.utils.merging import MergeFunc
+from vectorbtpro.utils.selection import NoResult, NoResultsException
 
 __all__ = [
     "concat_arrays",
@@ -76,6 +77,8 @@ def column_stack_arrays(*arrs: tp.MaybeSequence[tp.AnyArray], expand_axis: int =
 def concat_merge(
     *objs,
     keys: tp.Optional[tp.Index] = None,
+    filter_no_results: bool = True,
+    raise_no_results: bool = True,
     wrap: tp.Optional[bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
@@ -132,6 +135,16 @@ def concat_merge(
         if checks.is_namedtuple(objs[0]):
             return type(objs[0])(*out_tuple)
         return type(objs[0])(out_tuple)
+
+    if filter_no_results:
+        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+        try:
+            objs, keys = _filter_no_results(objs, keys=keys)
+        except NoResultsException as e:
+            if raise_no_results:
+                raise e
+            return NoResult
 
     if isinstance(objs[0], Wrapping):
         raise TypeError("Concatenating Wrapping instances is not supported")
@@ -206,6 +219,8 @@ def concat_merge(
 def row_stack_merge(
     *objs,
     keys: tp.Optional[tp.Index] = None,
+    filter_no_results: bool = True,
+    raise_no_results: bool = True,
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
@@ -268,6 +283,16 @@ def row_stack_merge(
         if checks.is_namedtuple(objs[0]):
             return type(objs[0])(*out_tuple)
         return type(objs[0])(out_tuple)
+
+    if filter_no_results:
+        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+        try:
+            objs, keys = _filter_no_results(objs, keys=keys)
+        except NoResultsException as e:
+            if raise_no_results:
+                raise e
+            return NoResult
 
     if isinstance(objs[0], Wrapping):
         kwargs = merge_dicts(dict(wrapper_kwargs=dict(keys=keys)), kwargs)
@@ -344,6 +369,8 @@ def column_stack_merge(
     reset_index: tp.Union[None, bool, str] = None,
     fill_value: tp.Scalar = np.nan,
     keys: tp.Optional[tp.Index] = None,
+    filter_no_results: bool = True,
+    raise_no_results: bool = True,
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
@@ -421,6 +448,16 @@ def column_stack_merge(
         if checks.is_namedtuple(objs[0]):
             return type(objs[0])(*out_tuple)
         return type(objs[0])(out_tuple)
+
+    if filter_no_results:
+        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+        try:
+            objs, keys = _filter_no_results(objs, keys=keys)
+        except NoResultsException as e:
+            if raise_no_results:
+                raise e
+            return NoResult
 
     if isinstance(objs[0], Wrapping):
         if reset_index is not None:
@@ -555,6 +592,8 @@ def column_stack_merge(
 def imageio_merge(
     *objs,
     keys: tp.Optional[tp.Index] = None,
+    filter_no_results: bool = True,
+    raise_no_results: bool = True,
     to_image_kwargs: tp.KwargsLike = None,
     imread_kwargs: tp.KwargsLike = None,
     **imwrite_kwargs,
@@ -606,6 +645,16 @@ def imageio_merge(
             return type(objs[0])(*out_tuple)
         return type(objs[0])(out_tuple)
 
+    if filter_no_results:
+        from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
+
+        try:
+            objs, keys = _filter_no_results(objs, keys=keys)
+        except NoResultsException as e:
+            if raise_no_results:
+                raise e
+            return NoResult
+
     if imread_kwargs is None:
         imread_kwargs = {}
     if to_image_kwargs is None:
@@ -626,7 +675,6 @@ def imageio_merge(
 def mixed_merge(
     *objs,
     merge_funcs: tp.Optional[tp.MergeFuncLike] = None,
-    keys: tp.Optional[tp.Index] = None,
     mixed_kwargs: tp.Optional[tp.Sequence[tp.KwargsLike]] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
@@ -652,7 +700,7 @@ def mixed_merge(
                 _kwargs = kwargs
             else:
                 _kwargs = merge_dicts(kwargs, mixed_kwargs[i])
-            output = merge_func(output_objs, keys=keys, **_kwargs)
+            output = merge_func(output_objs, **_kwargs)
             outputs.append(output)
     return tuple(outputs)
 

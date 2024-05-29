@@ -3024,7 +3024,7 @@ Other keyword arguments are passed to `{0}.run`.
                     execute_kwargs["post_execute_func"] = post_execute_func
                     if "post_execute_kwargs" in execute_kwargs:
                         raise ValueError("Cannot use custom post_execute_kwargs when skipna=True")
-                    execute_kwargs["post_execute_kwargs"] = dict(outputs=Rep("outputs"), nan_masks=nan_masks)
+                    execute_kwargs["post_execute_kwargs"] = dict(outputs=Rep("results"), nan_masks=nan_masks)
                     if "post_execute_on_sorted" in execute_kwargs:
                         raise ValueError("Cannot use custom post_execute_on_sorted when skipna=True")
                     execute_kwargs["post_execute_on_sorted"] = True
