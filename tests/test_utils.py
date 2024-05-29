@@ -3176,8 +3176,8 @@ class TestExecution:
 
         assert f_iterated2([0, 1, 2], 3, b=4, c=5) == [vbt.NoResult, vbt.NoResult, vbt.NoResult]
         with pytest.raises(vbt.NoResultsException):
-            f_iterated2([0, 1, 2], 3, b=4, c=5, _filter_no_results=True)
-        assert f_iterated2([0, 1, 2], 3, b=4, c=5, _filter_no_results=True, _raise_no_results=False) == vbt.NoResult
+            f_iterated2([0, 1, 2], 3, b=4, c=5, _filter_results=True)
+        assert f_iterated2([0, 1, 2], 3, b=4, c=5, _filter_results=True, _raise_no_results=False) == vbt.NoResult
 
 
 # ############# pickling ############# #

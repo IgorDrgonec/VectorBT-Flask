@@ -21,14 +21,13 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
     match_and_set_flat_ann_arg,
 )
-from vectorbtpro.utils.attr_ import define, DefineMixin
+from vectorbtpro.utils.attr_ import define, DefineMixin, MISSING
 from vectorbtpro.utils.config import merge_dicts, Configured, FrozenConfig
 from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.path_ import remove_dir, file_exists
-from vectorbtpro.utils.pbar import ProgressBar
+from vectorbtpro.utils.pbar import ProgressBar, ProgressHidden
 from vectorbtpro.utils.pickling import load, save
-from vectorbtpro.utils.selection import NoResult, NoResultsException
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 try:
@@ -42,6 +41,9 @@ except ImportError:
 
 __all__ = [
     "Task",
+    "NoResult",
+    "NoResultsException",
+    "ExecutionEngine",
     "SerialEngine",
     "ThreadPoolEngine",
     "ProcessPoolEngine",
@@ -80,6 +82,58 @@ class Task(DefineMixin):
         return self.func(*self.args, **self.kwargs)
 
 
+class _NoResult(enum.Enum):
+    """Sentinel that represents no result."""
+
+    NoResult = enum.auto()
+
+    def __repr__(self):
+        return "NoResult"
+
+    def __bool__(self):
+        return False
+
+
+NoResult = _NoResult.NoResult
+"""Sentinel that represents no result."""
+
+
+class NoResultsException(Exception):
+    """Gets raised when there are no results."""
+
+    pass
+
+
+def filter_out_no_results(
+    objs: tp.Iterable[tp.Any],
+    keys: tp.Optional[tp.Index] = MISSING,
+    raise_error: bool = True,
+) -> tp.Union[tp.List, tp.Tuple[tp.List, tp.Optional[tp.Index]]]:
+    """Filter objects and keys by removing `NoResult` objects."""
+    skip_indices = set()
+    for i, obj in enumerate(objs):
+        if obj is NoResult:
+            skip_indices.add(i)
+    if len(skip_indices) > 0:
+        new_objs = []
+        keep_indices = []
+        for i, obj in enumerate(objs):
+            if i not in skip_indices:
+                new_objs.append(obj)
+                keep_indices.append(i)
+        objs = new_objs
+        if keys is not None and keys is not MISSING:
+            if isinstance(keys, pd.Index):
+                keys = keys[keep_indices]
+            else:
+                keys = [keys[i] for i in keep_indices]
+        if len(objs) == 0 and raise_error:
+            raise NoResultsException
+    if keys is not MISSING:
+        return objs, keys
+    return objs
+
+
 class ExecutionEngine(Configured):
     """Abstract class for executing functions."""
 
@@ -116,7 +170,7 @@ class SerialEngine(ExecutionEngine):
         pbar_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
-        delay: tp.Optional[int] = None,
+        delay: tp.Optional[float] = None,
         **kwargs,
     ) -> None:
         ExecutionEngine.__init__(
@@ -160,7 +214,7 @@ class SerialEngine(ExecutionEngine):
         return self._collect_garbage
 
     @property
-    def delay(self) -> tp.Optional[int]:
+    def delay(self) -> tp.Optional[float]:
         """Number of seconds to sleep after each call."""
         return self._delay
 
@@ -187,8 +241,9 @@ class SerialEngine(ExecutionEngine):
                     pbar_kwargs["bar_id"] = tuple(keys.names)
                 else:
                     pbar_kwargs["bar_id"] = keys.name
+        pbar = ProgressBar(total=size, show_progress=self.show_progress, **pbar_kwargs)
 
-        with ProgressBar(total=size, show_progress=self.show_progress, **pbar_kwargs) as pbar:
+        with pbar:
             if keys is not None:
                 if isinstance(keys, pd.MultiIndex):
                     pbar.set_description(dict(zip(keys.names, keys[0])))
@@ -259,15 +314,16 @@ class ThreadPoolEngine(ExecutionEngine):
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecResults:
-        with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
-            futures = {}
-            for i, (func, args, kwargs) in enumerate(tasks):
-                future = executor.submit(func, *args, **kwargs)
-                futures[future] = i
-            results = [None] * len(futures)
-            for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
-                results[futures[fut]] = fut.result()
-            return results
+        with ProgressHidden():
+            with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
+                futures = {}
+                for i, (func, args, kwargs) in enumerate(tasks):
+                    future = executor.submit(func, *args, **kwargs)
+                    futures[future] = i
+                results = [None] * len(futures)
+                for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
+                    results[futures[fut]] = fut.result()
+                return results
 
 
 class ProcessPoolEngine(ExecutionEngine):
@@ -309,15 +365,16 @@ class ProcessPoolEngine(ExecutionEngine):
         size: tp.Optional[int] = None,
         keys: tp.Optional[tp.IndexLike] = None,
     ) -> tp.ExecResults:
-        with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
-            futures = {}
-            for i, (func, args, kwargs) in enumerate(tasks):
-                future = executor.submit(func, *args, **kwargs)
-                futures[future] = i
-            results = [None] * len(futures)
-            for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
-                results[futures[fut]] = fut.result()
-            return results
+        with ProgressHidden():
+            with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
+                futures = {}
+                for i, (func, args, kwargs) in enumerate(tasks):
+                    future = executor.submit(func, *args, **kwargs)
+                    futures[future] = i
+                results = [None] * len(futures)
+                for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
+                    results[futures[fut]] = fut.result()
+                return results
 
 
 def pass_kwargs_as_args(func, args, kwargs):
@@ -336,7 +393,7 @@ class PathosEngine(ExecutionEngine):
         "pool_type",
         "init_kwargs",
         "timeout",
-        "sleep",
+        "check_delay",
         "show_progress",
         "pbar_kwargs",
         "join_pool",
@@ -347,7 +404,7 @@ class PathosEngine(ExecutionEngine):
         pool_type: tp.Optional[str] = None,
         init_kwargs: tp.KwargsLike = None,
         timeout: tp.Optional[int] = None,
-        sleep: tp.Optional[float] = None,
+        check_delay: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         join_pool: tp.Optional[bool] = None,
@@ -358,7 +415,7 @@ class PathosEngine(ExecutionEngine):
             pool_type=pool_type,
             init_kwargs=init_kwargs,
             timeout=timeout,
-            sleep=sleep,
+            check_delay=check_delay,
             show_progress=show_progress,
             pbar_kwargs=pbar_kwargs,
             join_pool=join_pool,
@@ -368,7 +425,7 @@ class PathosEngine(ExecutionEngine):
         self._pool_type = self.resolve_setting(pool_type, "pool_type")
         self._init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
         self._timeout = self.resolve_setting(timeout, "timeout")
-        self._sleep = self.resolve_setting(sleep, "sleep")
+        self._check_delay = self.resolve_setting(check_delay, "check_delay")
         self._show_progress = self.resolve_setting(show_progress, "show_progress")
         self._pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
         self._join_pool = self.resolve_setting(join_pool, "join_pool")
@@ -389,7 +446,7 @@ class PathosEngine(ExecutionEngine):
         return self._timeout
 
     @property
-    def sleep(self) -> tp.Optional[float]:
+    def check_delay(self) -> tp.Optional[float]:
         """Number of seconds to sleep between checks."""
         return self._timeout
 
@@ -428,6 +485,10 @@ class PathosEngine(ExecutionEngine):
             tasks = [(pass_kwargs_as_args, x, {}) for x in tasks]
         else:
             raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
+        if size is None and hasattr(tasks, "__len__"):
+            size = len(tasks)
+        elif keys is not None and hasattr(keys, "__len__"):
+            size = len(keys)
         pbar_kwargs = dict(self.pbar_kwargs)
         if "bar_id" not in pbar_kwargs:
             if keys is not None:
@@ -435,33 +496,35 @@ class PathosEngine(ExecutionEngine):
                     pbar_kwargs["bar_id"] = tuple(keys.names)
                 else:
                     pbar_kwargs["bar_id"] = keys.name
+        pbar = ProgressBar(total=size, show_progress=self.show_progress, **pbar_kwargs)
 
-        with Pool(**self.init_kwargs) as pool:
-            async_results = []
-            for func, args, kwargs in tasks:
-                async_result = pool.apipe(func, *args, **kwargs)
-                async_results.append(async_result)
-            if self.timeout is not None or self.show_progress:
-                pending = set(async_results)
-                total_futures = len(pending)
-                if self.timeout is not None:
-                    end_time = self.timeout + time.monotonic()
-                with ProgressBar(total=total_futures, show_progress=self.show_progress, **pbar_kwargs) as pbar:
-                    while pending:
-                        pending = {async_result for async_result in pending if not async_result.ready()}
-                        pbar.update_to(total_futures - len(pending))
-                        if len(pending) == 0:
-                            break
-                        if self.timeout is not None:
-                            if time.monotonic() > end_time:
-                                raise TimeoutError("%d (of %d) futures unfinished" % (len(pending), total_futures))
-                        if self.sleep is not None:
-                            time.sleep(self.sleep)
-            if self.join_pool:
-                pool.close()
-                pool.join()
-                pool.clear()
-        return [async_result.get() for async_result in async_results]
+        with ProgressHidden():
+            with Pool(**self.init_kwargs) as pool:
+                async_results = []
+                for func, args, kwargs in tasks:
+                    async_result = pool.apipe(func, *args, **kwargs)
+                    async_results.append(async_result)
+                if self.timeout is not None or self.show_progress:
+                    pending = set(async_results)
+                    total_futures = len(pending)
+                    if self.timeout is not None:
+                        end_time = self.timeout + time.monotonic()
+                    with pbar:
+                        while pending:
+                            pending = {async_result for async_result in pending if not async_result.ready()}
+                            pbar.update_to(total_futures - len(pending))
+                            if len(pending) == 0:
+                                break
+                            if self.timeout is not None:
+                                if time.monotonic() > end_time:
+                                    raise TimeoutError("%d (of %d) futures unfinished" % (len(pending), total_futures))
+                            if self.check_delay is not None:
+                                time.sleep(self.check_delay)
+                if self.join_pool:
+                    pool.close()
+                    pool.join()
+                    pool.clear()
+                return [async_result.get() for async_result in async_results]
 
 
 class MpireEngine(ExecutionEngine):
@@ -514,13 +577,14 @@ class MpireEngine(ExecutionEngine):
         assert_can_import("mpire")
         from mpire import WorkerPool
 
-        with WorkerPool(**self.init_kwargs) as pool:
-            async_results = []
-            for i, (func, args, kwargs) in enumerate(tasks):
-                async_result = pool.apply_async(func, args=args, kwargs=kwargs, **self.apply_kwargs)
-                async_results.append(async_result)
-            pool.stop_and_join()
-        return [async_result.get() for async_result in async_results]
+        with ProgressHidden():
+            with WorkerPool(**self.init_kwargs) as pool:
+                async_results = []
+                for i, (func, args, kwargs) in enumerate(tasks):
+                    async_result = pool.apply_async(func, args=args, kwargs=kwargs, **self.apply_kwargs)
+                    async_results.append(async_result)
+                pool.stop_and_join()
+                return [async_result.get() for async_result in async_results]
 
 
 class DaskEngine(ExecutionEngine):
@@ -563,10 +627,11 @@ class DaskEngine(ExecutionEngine):
         assert_can_import("dask")
         import dask
 
-        results_delayed = []
-        for func, args, kwargs in tasks:
-            results_delayed.append(dask.delayed(func)(*args, **kwargs))
-        return list(dask.compute(*results_delayed, **self.compute_kwargs))
+        with ProgressHidden():
+            results_delayed = []
+            for func, args, kwargs in tasks:
+                results_delayed.append(dask.delayed(func)(*args, **kwargs))
+            return list(dask.compute(*results_delayed, **self.compute_kwargs))
 
 
 class RayEngine(ExecutionEngine):
@@ -734,24 +799,25 @@ class RayEngine(ExecutionEngine):
         assert_can_import("ray")
         import ray
 
-        if self.restart:
-            if ray.is_initialized():
-                ray.shutdown()
-        if not ray.is_initialized():
-            ray.init(**self.init_kwargs)
-        task_refs = self.get_ray_refs(tasks, reuse_refs=self.reuse_refs, remote_kwargs=self.remote_kwargs)
-        result_refs = []
-        for func_remote, arg_refs, kwarg_refs in task_refs:
-            result_refs.append(func_remote.remote(*arg_refs, **kwarg_refs))
-        try:
-            results = ray.get(result_refs)
-        finally:
-            if self.del_refs:
-                # clear object store
-                del result_refs
-            if self.shutdown:
-                ray.shutdown()
-        return results
+        with ProgressHidden():
+            if self.restart:
+                if ray.is_initialized():
+                    ray.shutdown()
+            if not ray.is_initialized():
+                ray.init(**self.init_kwargs)
+            task_refs = self.get_ray_refs(tasks, reuse_refs=self.reuse_refs, remote_kwargs=self.remote_kwargs)
+            result_refs = []
+            for func_remote, arg_refs, kwarg_refs in task_refs:
+                result_refs.append(func_remote.remote(*arg_refs, **kwarg_refs))
+            try:
+                results = ray.get(result_refs)
+            finally:
+                if self.del_refs:
+                    # clear object store
+                    del result_refs
+                if self.shutdown:
+                    ray.shutdown()
+            return results
 
 
 class _Dummy(enum.Enum):
@@ -839,6 +905,7 @@ class Executor(Configured):
         "chunk_meta",
         "distribute",
         "warmup",
+        "in_chunk_order",
         "cache_chunks",
         "chunk_cache_dir",
         "chunk_cache_save_kwargs",
@@ -846,7 +913,9 @@ class Executor(Configured):
         "pre_clear_chunk_cache",
         "post_clear_chunk_cache",
         "release_chunk_cache",
-        "in_chunk_order",
+        "chunk_clear_cache",
+        "chunk_collect_garbage",
+        "chunk_delay",
         "pre_execute_func",
         "pre_execute_kwargs",
         "pre_chunk_func",
@@ -856,7 +925,7 @@ class Executor(Configured):
         "post_execute_func",
         "post_execute_kwargs",
         "post_execute_on_sorted",
-        "filter_no_results",
+        "filter_results",
         "raise_no_results",
         "merge_func",
         "merge_kwargs",
@@ -1010,8 +1079,8 @@ class Executor(Configured):
         chunk_len: tp.Union[None, int, str] = None,
         chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
         distribute: tp.Optional[str] = None,
-        in_chunk_order: tp.Optional[bool] = None,
         warmup: tp.Optional[bool] = None,
+        in_chunk_order: tp.Optional[bool] = None,
         cache_chunks: tp.Optional[bool] = None,
         chunk_cache_dir: tp.Optional[tp.PathLike] = None,
         chunk_cache_save_kwargs: tp.KwargsLike = None,
@@ -1019,6 +1088,9 @@ class Executor(Configured):
         pre_clear_chunk_cache: tp.Optional[bool] = None,
         post_clear_chunk_cache: tp.Optional[bool] = None,
         release_chunk_cache: tp.Optional[bool] = None,
+        chunk_clear_cache: tp.Union[None, bool, int] = None,
+        chunk_collect_garbage: tp.Union[None, bool, int] = None,
+        chunk_delay: tp.Optional[float] = None,
         pre_execute_func: tp.Optional[tp.Callable] = None,
         pre_execute_kwargs: tp.KwargsLike = None,
         pre_chunk_func: tp.Optional[tp.Callable] = None,
@@ -1028,7 +1100,7 @@ class Executor(Configured):
         post_execute_func: tp.Optional[tp.Callable] = None,
         post_execute_kwargs: tp.KwargsLike = None,
         post_execute_on_sorted: tp.Optional[bool] = None,
-        filter_no_results: tp.Optional[bool] = None,
+        filter_results: tp.Optional[bool] = None,
         raise_no_results: tp.Optional[bool] = None,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
         merge_kwargs: tp.KwargsLike = None,
@@ -1046,8 +1118,8 @@ class Executor(Configured):
             chunk_len=chunk_len,
             chunk_meta=chunk_meta,
             distribute=distribute,
-            in_chunk_order=in_chunk_order,
             warmup=warmup,
+            in_chunk_order=in_chunk_order,
             cache_chunks=cache_chunks,
             chunk_cache_dir=chunk_cache_dir,
             chunk_cache_save_kwargs=chunk_cache_save_kwargs,
@@ -1055,6 +1127,9 @@ class Executor(Configured):
             pre_clear_chunk_cache=pre_clear_chunk_cache,
             post_clear_chunk_cache=post_clear_chunk_cache,
             release_chunk_cache=release_chunk_cache,
+            chunk_clear_cache=chunk_clear_cache,
+            chunk_collect_garbage=chunk_collect_garbage,
+            chunk_delay=chunk_delay,
             pre_execute_func=pre_execute_func,
             pre_execute_kwargs=pre_execute_kwargs,
             pre_chunk_func=pre_chunk_func,
@@ -1064,7 +1139,7 @@ class Executor(Configured):
             post_execute_func=post_execute_func,
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
-            filter_no_results=filter_no_results,
+            filter_results=filter_results,
             raise_no_results=raise_no_results,
             merge_func=merge_func,
             merge_kwargs=merge_kwargs,
@@ -1112,6 +1187,11 @@ class Executor(Configured):
             "warmup",
             engine_name=engine_name,
         )
+        in_chunk_order = self.resolve_engine_setting(
+            in_chunk_order,
+            "in_chunk_order",
+            engine_name=engine_name,
+        )
         cache_chunks = self.resolve_engine_setting(
             cache_chunks,
             "cache_chunks",
@@ -1149,9 +1229,19 @@ class Executor(Configured):
             "release_chunk_cache",
             engine_name=engine_name,
         )
-        in_chunk_order = self.resolve_engine_setting(
-            in_chunk_order,
-            "in_chunk_order",
+        chunk_clear_cache = self.resolve_engine_setting(
+            chunk_clear_cache,
+            "chunk_clear_cache",
+            engine_name=engine_name,
+        )
+        chunk_collect_garbage = self.resolve_engine_setting(
+            chunk_collect_garbage,
+            "chunk_collect_garbage",
+            engine_name=engine_name,
+        )
+        chunk_delay = self.resolve_engine_setting(
+            chunk_delay,
+            "chunk_delay",
             engine_name=engine_name,
         )
         pre_execute_func = self.resolve_engine_setting(
@@ -1205,7 +1295,7 @@ class Executor(Configured):
         )
         if release_chunk_cache and post_execute_on_sorted:
             raise ValueError("Cannot use release_chunk_cache and post_execute_on_sorted together")
-        filter_no_results = self.resolve_engine_setting(filter_no_results, "filter_no_results")
+        filter_results = self.resolve_engine_setting(filter_results, "filter_results")
         raise_no_results = self.resolve_engine_setting(raise_no_results, "raise_no_results")
         merge_func = self.resolve_engine_setting(merge_func, "merge_func")
         merge_kwargs = self.resolve_engine_setting(merge_kwargs, "merge_kwargs", merge=True)
@@ -1224,8 +1314,8 @@ class Executor(Configured):
         self._chunk_len = chunk_len
         self._chunk_meta = chunk_meta
         self._distribute = distribute
-        self._in_chunk_order = in_chunk_order
         self._warmup = warmup
+        self._in_chunk_order = in_chunk_order
         self._cache_chunks = cache_chunks
         self._chunk_cache_dir = chunk_cache_dir
         self._chunk_cache_save_kwargs = chunk_cache_save_kwargs
@@ -1233,6 +1323,9 @@ class Executor(Configured):
         self._pre_clear_chunk_cache = pre_clear_chunk_cache
         self._post_clear_chunk_cache = post_clear_chunk_cache
         self._release_chunk_cache = release_chunk_cache
+        self._chunk_clear_cache = chunk_clear_cache
+        self._chunk_collect_garbage = chunk_collect_garbage
+        self._chunk_delay = chunk_delay
         self._pre_execute_func = pre_execute_func
         self._pre_execute_kwargs = pre_execute_kwargs
         self._pre_chunk_func = pre_chunk_func
@@ -1242,7 +1335,7 @@ class Executor(Configured):
         self._post_execute_func = post_execute_func
         self._post_execute_kwargs = post_execute_kwargs
         self._post_execute_on_sorted = post_execute_on_sorted
-        self._filter_no_results = filter_no_results
+        self._filter_results = filter_results
         self._raise_no_results = raise_no_results
         self._merge_func = merge_func
         self._merge_kwargs = merge_kwargs
@@ -1281,16 +1374,16 @@ class Executor(Configured):
         return self._distribute
 
     @property
+    def warmup(self) -> bool:
+        """Whether to call the first item of `tasks` once before distribution."""
+        return self._warmup
+
+    @property
     def in_chunk_order(self) -> bool:
         """Whether to return the results in the order they appear in `chunk_meta`.
 
         Otherwise, always returns them in the same order as in `tasks`."""
         return self._in_chunk_order
-
-    @property
-    def warmup(self) -> bool:
-        """Whether to call the first item of `tasks` once before distribution."""
-        return self._warmup
 
     @property
     def cache_chunks(self) -> bool:
@@ -1327,6 +1420,21 @@ class Executor(Configured):
         """Whether to replace chunk cache with dummy objects once the chunk has been executed
         and then load all cache at once after all chunks have been executed."""
         return self._release_chunk_cache
+
+    @property
+    def chunk_clear_cache(self) -> tp.Union[bool, int]:
+        """Whether to clear global cache after each chunk or every n chunks."""
+        return self._chunk_clear_cache
+
+    @property
+    def chunk_collect_garbage(self) -> tp.Union[bool, int]:
+        """Whether to collect garbage after each chunk or every n chunks."""
+        return self._chunk_collect_garbage
+
+    @property
+    def chunk_delay(self) -> tp.Optional[float]:
+        """Number of seconds to sleep after each chunk."""
+        return self._chunk_delay
 
     @property
     def pre_execute_func(self) -> tp.Optional[tp.Callable]:
@@ -1381,17 +1489,15 @@ class Executor(Configured):
         return self._post_execute_func
 
     @property
-    def filter_no_results(self) -> bool:
-        """Whether to filter `vectorbtpro.utils.selection.NoResult` results."""
-        return self._filter_no_results
+    def filter_results(self) -> bool:
+        """Whether to filter `NoResult` results."""
+        return self._filter_results
 
     @property
     def raise_no_results(self) -> bool:
-        """Whether to raise `vectorbtpro.utils.selection.NoResultsException` if there are no results.
+        """Whether to raise `NoResultsException` if there are no results. Otherwise, returns `NoResult`.
 
-        Otherwise, returns `vectorbtpro.utils.selection.NoResult`.
-
-        Has effect only if `Executor.filter_no_results` is True. But regardless of this setting,
+        Has effect only if `Executor.filter_results` is True. But regardless of this setting,
         gets passed to the merging function if the merging function is pre-configured."""
         return self._raise_no_results
 
@@ -1571,12 +1677,17 @@ class Executor(Configured):
         chunk_cache_dir: tp.Optional[tp.PathLike] = None,
         chunk_cache_save_kwargs: tp.KwargsLike = None,
         release_chunk_cache: bool = False,
+        chunk_clear_cache: tp.Union[bool, int] = False,
+        chunk_collect_garbage: tp.Union[bool, int] = False,
+        chunk_delay: tp.Optional[float] = None,
         post_chunk_func: tp.Optional[tp.Callable] = None,
         post_chunk_kwargs: tp.KwargsLike = None,
         chunk_executed: bool = True,
         template_context: tp.KwargsLike = None,
     ) -> tp.ExecResults:
         """Call `Executor.post_chunk_func`."""
+        from vectorbtpro.registries.ca_registry import clear_cache, collect_garbage
+
         if chunk_executed:
             if cache_chunks:
                 if chunk_cache_dir is None:
@@ -1612,7 +1723,21 @@ class Executor(Configured):
             )
             new_call_results = post_chunk_func(**post_chunk_kwargs)
             if new_call_results is not None:
-                return new_call_results
+                call_results = new_call_results
+
+        if isinstance(chunk_clear_cache, bool):
+            if chunk_clear_cache:
+                clear_cache()
+        elif chunk_idx > 0 and (chunk_idx + 1) % chunk_clear_cache == 0:
+            clear_cache()
+        if isinstance(chunk_collect_garbage, bool):
+            if chunk_collect_garbage:
+                collect_garbage()
+        elif chunk_idx > 0 and (chunk_idx + 1) % chunk_collect_garbage == 0:
+            collect_garbage()
+        if chunk_delay is not None:
+            time.sleep(chunk_delay)
+
         return call_results
 
     @classmethod
@@ -1673,18 +1798,16 @@ class Executor(Configured):
         cls,
         results: tp.ExecResults,
         keys: tp.Optional[tp.IndexLike] = None,
-        filter_no_results: bool = False,
+        filter_results: bool = False,
         raise_no_results: bool = True,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.Union[tp.ExecResults, tp.MergeResult]:
         """Merge results using `Executor.merge_func` and `Executor.merge_kwargs`."""
-        if filter_no_results:
-            from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
-
+        if filter_results:
             try:
-                results, keys = _filter_no_results(results, keys=keys)
+                results, keys = filter_out_no_results(results, keys=keys)
             except NoResultsException as e:
                 if raise_no_results:
                     raise e
@@ -1700,11 +1823,14 @@ class Executor(Configured):
             from vectorbtpro.base.merging import is_merge_func_from_config
 
             if is_merge_func_from_config(merge_func):
-                merge_kwargs = merge_dicts(dict(
-                    keys=keys,
-                    filter_no_results=not no_results_filtered,
-                    raise_no_results=raise_no_results,
-                ), merge_kwargs)
+                merge_kwargs = merge_dicts(
+                    dict(
+                        keys=keys,
+                        filter_results=not no_results_filtered,
+                        raise_no_results=raise_no_results,
+                    ),
+                    merge_kwargs,
+                )
             if isinstance(merge_func, MergeFunc):
                 merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
             else:
@@ -1727,8 +1853,8 @@ class Executor(Configured):
         chunk_len = self.chunk_len
         chunk_meta = self.chunk_meta
         distribute = self.distribute
-        in_chunk_order = self.in_chunk_order
         warmup = self.warmup
+        in_chunk_order = self.in_chunk_order
         cache_chunks = self.cache_chunks
         chunk_cache_dir = self.chunk_cache_dir
         chunk_cache_load_kwargs = self.chunk_cache_load_kwargs
@@ -1736,6 +1862,9 @@ class Executor(Configured):
         pre_clear_chunk_cache = self.pre_clear_chunk_cache
         post_clear_chunk_cache = self.post_clear_chunk_cache
         release_chunk_cache = self.release_chunk_cache
+        chunk_clear_cache = self.chunk_clear_cache
+        chunk_collect_garbage = self.chunk_collect_garbage
+        chunk_delay = self.chunk_delay
         pre_execute_func = self.pre_execute_func
         pre_execute_kwargs = self.pre_execute_kwargs
         pre_chunk_func = self.pre_chunk_func
@@ -1745,7 +1874,7 @@ class Executor(Configured):
         post_execute_func = self.post_execute_func
         post_execute_kwargs = self.post_execute_kwargs
         post_execute_on_sorted = self.post_execute_on_sorted
-        filter_no_results = self.filter_no_results
+        filter_results = self.filter_results
         raise_no_results = self.raise_no_results
         merge_func = self.merge_func
         merge_kwargs = self.merge_kwargs
@@ -1806,7 +1935,7 @@ class Executor(Configured):
                 return self.merge_results(
                     results,
                     keys=keys,
-                    filter_no_results=filter_no_results,
+                    filter_results=filter_results,
                     raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
@@ -1877,7 +2006,7 @@ class Executor(Configured):
             return self.merge_results(
                 results,
                 keys=keys,
-                filter_no_results=filter_no_results,
+                filter_results=filter_results,
                 raise_no_results=raise_no_results,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,
@@ -1959,6 +2088,9 @@ class Executor(Configured):
                                 chunk_cache_dir=chunk_cache_dir,
                                 chunk_cache_save_kwargs=chunk_cache_save_kwargs,
                                 release_chunk_cache=release_chunk_cache,
+                                chunk_clear_cache=chunk_clear_cache,
+                                chunk_collect_garbage=chunk_collect_garbage,
+                                chunk_delay=chunk_delay,
                                 post_chunk_func=post_chunk_func,
                                 post_chunk_kwargs=post_chunk_kwargs,
                                 chunk_executed=chunk_executed,
@@ -2009,6 +2141,9 @@ class Executor(Configured):
                             chunk_cache_dir=chunk_cache_dir,
                             chunk_cache_save_kwargs=chunk_cache_save_kwargs,
                             release_chunk_cache=release_chunk_cache,
+                            chunk_clear_cache=chunk_clear_cache,
+                            chunk_collect_garbage=chunk_collect_garbage,
+                            chunk_delay=chunk_delay,
                             post_chunk_func=post_chunk_func,
                             post_chunk_kwargs=post_chunk_kwargs,
                             chunk_executed=chunk_executed,
@@ -2030,7 +2165,7 @@ class Executor(Configured):
                 return self.merge_results(
                     results,
                     keys=keys,
-                    filter_no_results=filter_no_results,
+                    filter_results=filter_results,
                     raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
@@ -2091,6 +2226,9 @@ class Executor(Configured):
                             chunk_cache_dir=chunk_cache_dir,
                             chunk_cache_save_kwargs=chunk_cache_save_kwargs,
                             release_chunk_cache=release_chunk_cache,
+                            chunk_clear_cache=chunk_clear_cache,
+                            chunk_collect_garbage=chunk_collect_garbage,
+                            chunk_delay=chunk_delay,
                             post_chunk_func=post_chunk_func,
                             post_chunk_kwargs=post_chunk_kwargs,
                             chunk_executed=chunk_executed,
@@ -2137,7 +2275,7 @@ class Executor(Configured):
                 return self.merge_results(
                     results,
                     keys=keys,
-                    filter_no_results=filter_no_results,
+                    filter_results=filter_results,
                     raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
@@ -2189,7 +2327,7 @@ class Executor(Configured):
                 return self.merge_results(
                     results,
                     keys=keys,
-                    filter_no_results=filter_no_results,
+                    filter_results=filter_results,
                     raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
@@ -2249,7 +2387,7 @@ class Executor(Configured):
                 return self.merge_results(
                     results,
                     keys=keys,
-                    filter_no_results=filter_no_results,
+                    filter_results=filter_results,
                     raise_no_results=raise_no_results,
                     merge_func=merge_func,
                     merge_kwargs=merge_kwargs,
@@ -2271,8 +2409,8 @@ def execute(
     chunk_len: tp.Union[None, int, str] = None,
     chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
     distribute: tp.Optional[str] = None,
-    in_chunk_order: tp.Optional[bool] = None,
     warmup: tp.Optional[bool] = None,
+    in_chunk_order: tp.Optional[bool] = None,
     cache_chunks: tp.Optional[bool] = None,
     chunk_cache_dir: tp.Optional[tp.PathLike] = None,
     chunk_cache_save_kwargs: tp.KwargsLike = None,
@@ -2280,6 +2418,9 @@ def execute(
     pre_clear_chunk_cache: tp.Optional[bool] = None,
     post_clear_chunk_cache: tp.Optional[bool] = None,
     release_chunk_cache: tp.Optional[bool] = None,
+    chunk_clear_cache: tp.Union[None, bool, int] = None,
+    chunk_collect_garbage: tp.Union[None, bool, int] = None,
+    chunk_delay: tp.Optional[float] = None,
     pre_execute_func: tp.Optional[tp.Callable] = None,
     pre_execute_kwargs: tp.KwargsLike = None,
     pre_chunk_func: tp.Optional[tp.Callable] = None,
@@ -2289,7 +2430,7 @@ def execute(
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
-    filter_no_results: tp.Optional[bool] = None,
+    filter_results: tp.Optional[bool] = None,
     raise_no_results: tp.Optional[bool] = None,
     merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
@@ -2325,8 +2466,8 @@ def execute(
         chunk_len=chunk_len,
         chunk_meta=chunk_meta,
         distribute=distribute,
-        in_chunk_order=in_chunk_order,
         warmup=warmup,
+        in_chunk_order=in_chunk_order,
         cache_chunks=cache_chunks,
         chunk_cache_dir=chunk_cache_dir,
         chunk_cache_save_kwargs=chunk_cache_save_kwargs,
@@ -2334,6 +2475,9 @@ def execute(
         pre_clear_chunk_cache=pre_clear_chunk_cache,
         post_clear_chunk_cache=post_clear_chunk_cache,
         release_chunk_cache=release_chunk_cache,
+        chunk_clear_cache=chunk_clear_cache,
+        chunk_collect_garbage=chunk_collect_garbage,
+        chunk_delay=chunk_delay,
         pre_execute_func=pre_execute_func,
         pre_execute_kwargs=pre_execute_kwargs,
         pre_chunk_func=pre_chunk_func,
@@ -2343,7 +2487,7 @@ def execute(
         post_execute_func=post_execute_func,
         post_execute_kwargs=post_execute_kwargs,
         post_execute_on_sorted=post_execute_on_sorted,
-        filter_no_results=filter_no_results,
+        filter_results=filter_results,
         raise_no_results=raise_no_results,
         merge_func=merge_func,
         merge_kwargs=merge_kwargs,
@@ -2407,8 +2551,8 @@ def iterated(
     chunk_len: tp.Union[None, int, str] = None,
     chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
     distribute: tp.Optional[str] = None,
-    in_chunk_order: tp.Optional[bool] = None,
     warmup: tp.Optional[bool] = None,
+    in_chunk_order: tp.Optional[bool] = None,
     cache_chunks: tp.Optional[bool] = None,
     chunk_cache_dir: tp.Optional[tp.PathLike] = None,
     chunk_cache_save_kwargs: tp.KwargsLike = None,
@@ -2416,6 +2560,9 @@ def iterated(
     pre_clear_chunk_cache: tp.Optional[bool] = None,
     post_clear_chunk_cache: tp.Optional[bool] = None,
     release_chunk_cache: tp.Optional[bool] = None,
+    chunk_clear_cache: tp.Union[None, bool, int] = None,
+    chunk_collect_garbage: tp.Union[None, bool, int] = None,
+    chunk_delay: tp.Optional[float] = None,
     pre_execute_func: tp.Optional[tp.Callable] = None,
     pre_execute_kwargs: tp.KwargsLike = None,
     pre_chunk_func: tp.Optional[tp.Callable] = None,
@@ -2425,7 +2572,7 @@ def iterated(
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
     post_execute_on_sorted: tp.Optional[bool] = None,
-    filter_no_results: tp.Optional[bool] = None,
+    filter_results: tp.Optional[bool] = None,
     raise_no_results: tp.Optional[bool] = None,
     merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
@@ -2438,7 +2585,7 @@ def iterated(
     """Decorator that executes a function in iteration using `Executor`.
 
     Returns a new function with the same signature as the passed one.
-    
+
     Use `over_arg` to specify which argument (position or name) should be iterated over.
     If it's None (default), uses the first argument.
 
@@ -2449,8 +2596,7 @@ def iterated(
     Keyword arguments `**kwargs` and `engine_config` are merged into `engine_config`
     if `merge_to_engine_config` is True, otherwise, `**kwargs` are passed directly to `Executor`.
 
-    If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
-    remove it from the final index."""
+    If `NoResult` is returned, will skip the current iteration and remove it from the final index."""
 
     def decorator(func: tp.Callable) -> tp.Callable:
         from vectorbtpro._settings import settings
@@ -2503,10 +2649,13 @@ def iterated(
                     keys = keys.rename(over_arg_name)
 
             if over_arg is None:
+
                 def _get_task_generator():
                     for x in iterable:
                         yield Task(func, x, *args[1:], **kwargs)
+
             else:
+
                 def _get_task_generator():
                     for x in iterable:
                         flat_ann_args = annotate_args(func, args, kwargs, flatten=True)
@@ -2524,8 +2673,8 @@ def iterated(
                 chunk_len=_resolve_key("chunk_len"),
                 chunk_meta=_resolve_key("chunk_meta"),
                 distribute=_resolve_key("distribute"),
-                in_chunk_order=_resolve_key("in_chunk_order"),
                 warmup=_resolve_key("warmup"),
+                in_chunk_order=_resolve_key("in_chunk_order"),
                 cache_chunks=_resolve_key("cache_chunks"),
                 chunk_cache_dir=_resolve_key("chunk_cache_dir"),
                 chunk_cache_save_kwargs=_resolve_key("chunk_cache_save_kwargs", merge=True),
@@ -2533,6 +2682,9 @@ def iterated(
                 pre_clear_chunk_cache=_resolve_key("pre_clear_chunk_cache"),
                 post_clear_chunk_cache=_resolve_key("post_clear_chunk_cache"),
                 release_chunk_cache=_resolve_key("release_chunk_cache"),
+                chunk_clear_cache=_resolve_key("chunk_clear_cache"),
+                chunk_collect_garbage=_resolve_key("chunk_collect_garbage"),
+                chunk_delay=_resolve_key("chunk_delay"),
                 pre_execute_func=_resolve_key("pre_execute_func"),
                 pre_execute_kwargs=_resolve_key("pre_execute_kwargs", merge=True),
                 pre_chunk_func=_resolve_key("pre_chunk_func"),
@@ -2542,7 +2694,7 @@ def iterated(
                 post_execute_func=_resolve_key("post_execute_func"),
                 post_execute_kwargs=_resolve_key("post_execute_kwargs", merge=True),
                 post_execute_on_sorted=_resolve_key("post_execute_on_sorted"),
-                filter_no_results=_resolve_key("filter_no_results"),
+                filter_results=_resolve_key("filter_results"),
                 raise_no_results=_resolve_key("raise_no_results"),
                 merge_func=_resolve_key("merge_func"),
                 merge_kwargs=_resolve_key("merge_kwargs", merge=True),
@@ -2566,8 +2718,8 @@ def iterated(
             chunk_len=chunk_len,
             chunk_meta=chunk_meta,
             distribute=distribute,
-            in_chunk_order=in_chunk_order,
             warmup=warmup,
+            in_chunk_order=in_chunk_order,
             cache_chunks=cache_chunks,
             chunk_cache_dir=chunk_cache_dir,
             chunk_cache_save_kwargs=chunk_cache_save_kwargs,
@@ -2575,6 +2727,9 @@ def iterated(
             pre_clear_chunk_cache=pre_clear_chunk_cache,
             post_clear_chunk_cache=post_clear_chunk_cache,
             release_chunk_cache=release_chunk_cache,
+            chunk_clear_cache=chunk_clear_cache,
+            chunk_collect_garbage=chunk_collect_garbage,
+            chunk_delay=chunk_delay,
             pre_execute_func=pre_execute_func,
             pre_execute_kwargs=pre_execute_kwargs,
             pre_chunk_func=pre_chunk_func,
@@ -2584,7 +2739,7 @@ def iterated(
             post_execute_func=post_execute_func,
             post_execute_kwargs=post_execute_kwargs,
             post_execute_on_sorted=post_execute_on_sorted,
-            filter_no_results=filter_no_results,
+            filter_results=filter_results,
             raise_no_results=raise_no_results,
             merge_func=merge_func,
             merge_kwargs=merge_kwargs,

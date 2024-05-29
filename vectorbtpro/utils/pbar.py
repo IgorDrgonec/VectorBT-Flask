@@ -40,8 +40,9 @@ class ProgressBar:
     def __init__(
         self,
         iterable: tp.Optional[tp.Iterable] = None,
-        bar_type: tp.Optional[str] = None,
         bar_id: tp.Optional[tp.Hashable] = None,
+        bar_type: tp.Optional[str] = None,
+        force_open_bar: tp.Optional[bool] = None,
         reuse: tp.Optional[bool] = None,
         disable: tp.Optional[bool] = None,
         show_progress: tp.Optional[bool] = None,
@@ -67,6 +68,8 @@ class ProgressBar:
             from tqdm import tqdm as bar_type
         else:
             raise ValueError(f"Invalid option bar_type='{bar_type}'")
+        if force_open_bar is None:
+            force_open_bar = pbar_cfg["force_open_bar"]
         if reuse is None:
             reuse = pbar_cfg["reuse"]
         if disable is not None:
@@ -96,7 +99,9 @@ class ProgressBar:
             silence_warnings = pbar_cfg["silence_warnings"]
 
         self._iterable = iterable
+        self._bar_id = bar_id
         self._bar_type = bar_type
+        self._force_open_bar = force_open_bar
         self._reuse = reuse
         self._show_progress = show_progress
         self._kwargs = kwargs
@@ -105,7 +110,6 @@ class ProgressBar:
         self._registry = registry
         self._silence_warnings = silence_warnings
 
-        self._bar_id = bar_id
         self._bar = None
         self._open_time = None
         self._update_time = None
@@ -113,9 +117,19 @@ class ProgressBar:
         self._close_time = None
 
     @property
+    def bar_id(self) -> tp.Optional[tp.Hashable]:
+        """Bar id."""
+        return self._bar_id
+
+    @property
     def bar_type(self) -> tp.Type[tqdm]:
         """Bar type."""
         return self._bar_type
+
+    @property
+    def force_open_bar(self) -> bool:
+        """Whether to force-open a bar even if progress is not shown."""
+        return self._force_open_bar
 
     @property
     def reuse(self) -> bool:
@@ -158,11 +172,6 @@ class ProgressBar:
     def silence_warnings(self) -> bool:
         """Whether to silence warnings."""
         return self._silence_warnings
-
-    @property
-    def bar_id(self) -> tp.Optional[tp.Hashable]:
-        """Bar id."""
-        return self._bar_id
 
     @property
     def bar(self) -> tp.Optional[tqdm]:
@@ -278,6 +287,8 @@ class ProgressBar:
     @property
     def disabled(self) -> bool:
         """Whether the bar is disabled."""
+        if not self.show_progress:
+            return True
         if self.bar is None:
             if self.bar_id is not None:
                 if isinstance(self.bar_id, str):
@@ -470,7 +481,8 @@ class ProgressBar:
             self.set_prefix_str(desc, refresh=refresh)
 
     def __enter__(self: ProgressBarT) -> ProgressBarT:
-        self.open()
+        if self.show_progress or self.force_open_bar:
+            self.open()
         return self
 
     def __exit__(self, *args) -> None:
@@ -482,11 +494,17 @@ class ProgressBar:
     def __contains__(self, item: tp.Any) -> bool:
         return self.bar.__contains__(item)
 
+    def iter(self) -> tp.Iterator:
+        """Get iterator over `ProgressBar.iterable`."""
+        for obj in self.iterable:
+            yield obj
+
     def __iter__(self) -> tp.Iterator:
         if self.bar is None:
-            self.open()
+            if self.show_progress or self.force_open_bar:
+                self.open()
         if self.disabled:
-            return self.bar.__iter__()
+            return self.iter()
         for i, obj in enumerate(self.bar.__iter__()):
             if i > 0:
                 self._update_time = utc_time()

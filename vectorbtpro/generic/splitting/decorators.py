@@ -9,6 +9,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.generic.splitting.base import Splitter, Takeable
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import FrozenConfig, merge_dicts
+from vectorbtpro.utils.execution import NoResult, NoResultsException
 from vectorbtpro.utils.params import parameterized
 from vectorbtpro.utils.parsing import (
     annotate_args,
@@ -18,7 +19,6 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
     get_func_arg_names,
 )
-from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.template import Rep, RepEval, substitute_templates
 
 __all__ = [
@@ -332,7 +332,7 @@ def cv_split(
     is 'all', executes the grid on each set and returns along with the selection.
     Otherwise, returns only the selection.
 
-    If `vectorbtpro.utils.selection.NoResultsException` is raised or `skip_errored` is True and
+    If `vectorbtpro.utils.execution.NoResultsException` is raised or `skip_errored` is True and
     any exception is raised, will skip the current iteration and remove it from the final index.
 
     Usage:
@@ -461,7 +461,7 @@ def cv_split(
                             if skip_errored or isinstance(e, NoResultsException):
                                 all_grid_results.append(NoResult)
                             raise e
-                    if isinstance(all_grid_results[-1], _NoResult):
+                    if all_grid_results[-1] is NoResult:
                         if raise_no_results:
                             raise NoResultsException
                         return NoResult

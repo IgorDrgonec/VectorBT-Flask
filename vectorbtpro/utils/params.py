@@ -17,11 +17,11 @@ from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.config import FrozenConfig, Configured, merge_dicts
 from vectorbtpro.utils.eval_ import Evaluable
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import NoResult, NoResultsException, filter_out_no_results, execute
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
 from vectorbtpro.utils.search import find_in_obj, replace_in_obj
-from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResult, NoResultsException
+from vectorbtpro.utils.selection import PosSel, LabelSel
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 __all__ = [
@@ -930,7 +930,7 @@ class Parameterizer(Configured):
     must be dictionaries where keys are argument names in the flattened signature and values are
     functions and keyword arguments respectively.
 
-    If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
+    If `vectorbtpro.utils.execution.NoResult` is returned, will skip the current iteration and
     remove it from the final index.
 
     For defaults, see `vectorbtpro._settings.params`."""
@@ -961,7 +961,7 @@ class Parameterizer(Configured):
         "mono_reduce",
         "mono_merge_func",
         "mono_merge_kwargs",
-        "filter_no_results",
+        "filter_results",
         "raise_no_results",
         "merge_func",
         "merge_kwargs",
@@ -995,7 +995,7 @@ class Parameterizer(Configured):
         mono_reduce: tp.Union[bool, tp.Kwargs] = None,
         mono_merge_func: tp.Union[tp.MergeFuncLike, tp.Dict[str, tp.MergeFuncLike]] = None,
         mono_merge_kwargs: tp.KwargsLike = None,
-        filter_no_results: tp.Optional[bool] = None,
+        filter_results: tp.Optional[bool] = None,
         raise_no_results: tp.Optional[bool] = None,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
         merge_kwargs: tp.KwargsLike = None,
@@ -1029,7 +1029,7 @@ class Parameterizer(Configured):
             mono_reduce=mono_reduce,
             mono_merge_func=mono_merge_func,
             mono_merge_kwargs=mono_merge_kwargs,
-            filter_no_results=filter_no_results,
+            filter_results=filter_results,
             raise_no_results=raise_no_results,
             merge_func=merge_func,
             merge_kwargs=merge_kwargs,
@@ -1062,7 +1062,7 @@ class Parameterizer(Configured):
         self._mono_reduce = self.resolve_setting(mono_reduce, "mono_reduce")
         self._mono_merge_func = self.resolve_setting(mono_merge_func, "mono_merge_func")
         self._mono_merge_kwargs = self.resolve_setting(mono_merge_kwargs, "mono_merge_kwargs", merge=True)
-        self._filter_no_results = self.resolve_setting(filter_no_results, "filter_no_results")
+        self._filter_results = self.resolve_setting(filter_results, "filter_results")
         self._raise_no_results = self.resolve_setting(raise_no_results, "raise_no_results")
         self._merge_func = self.resolve_setting(merge_func, "merge_func")
         self._merge_kwargs = self.resolve_setting(merge_kwargs, "merge_kwargs", merge=True)
@@ -1153,7 +1153,7 @@ class Parameterizer(Configured):
         The selection value(s) can be wrapped with `vectorbtpro.utils.selection.PosSel` or
         `vectorbtpro.utils.selection.LabelSel` to instruct vectorbtpro what the value(s) should denote.
         Make sure that it's a sequence (for example, by wrapping it with a list) to attach
-        the parameter index to the final result. It can be also `vectorbtpro.utils.selection.NoResult`
+        the parameter index to the final result. It can be also `vectorbtpro.utils.execution.NoResult`
         to indicate that there's no result, or a template to yield any of the above."""
         return self._selection
 
@@ -1215,17 +1215,17 @@ class Parameterizer(Configured):
         return self._mono_merge_kwargs
 
     @property
-    def filter_no_results(self) -> bool:
-        """Whether to filter `vectorbtpro.utils.selection.NoResult` results."""
-        return self._filter_no_results
+    def filter_results(self) -> bool:
+        """Whether to filter `vectorbtpro.utils.execution.NoResult` results."""
+        return self._filter_results
 
     @property
     def raise_no_results(self) -> bool:
-        """Whether to raise `vectorbtpro.utils.selection.NoResultsException` if there are no results.
+        """Whether to raise `vectorbtpro.utils.execution.NoResultsException` if there are no results.
 
-        Otherwise, returns `vectorbtpro.utils.selection.NoResult`.
+        Otherwise, returns `vectorbtpro.utils.execution.NoResult`.
 
-        Has effect only if `Parameterizer.filter_no_results` is True. But regardless of this setting,
+        Has effect only if `Parameterizer.filter_results` is True. But regardless of this setting,
         gets passed to the merging function if the merging function is pre-configured."""
         return self._raise_no_results
 
@@ -1360,7 +1360,7 @@ class Parameterizer(Configured):
     ) -> tp.Tuple[tp.List[tp.Kwargs], tp.Optional[tp.Index], bool]:
         """Select a parameter combination from parameter configs and index."""
         selection = substitute_templates(selection, template_context, eval_id="selection")
-        if isinstance(selection, _NoResult):
+        if selection is NoResult:
             if raise_no_results:
                 raise NoResultsException
             return NoResult
@@ -1600,7 +1600,7 @@ class Parameterizer(Configured):
         mono_reduce = self.mono_reduce
         mono_merge_func = self.mono_merge_func
         mono_merge_kwargs = self.mono_merge_kwargs
-        filter_no_results = self.filter_no_results
+        filter_results = self.filter_results
         raise_no_results = self.raise_no_results
         merge_func = self.merge_func
         merge_kwargs = self.merge_kwargs
@@ -1765,7 +1765,7 @@ class Parameterizer(Configured):
                 )
             )
             result = tasks[0][0](*tasks[0][1], **tasks[0][2])
-            if isinstance(result, _NoResult):
+            if result is NoResult:
                 if raise_no_results:
                     raise NoResultsException
                 return NoResult
@@ -1840,11 +1840,9 @@ class Parameterizer(Configured):
             keys=keys,
             **execute_kwargs,
         )
-        if filter_no_results:
-            from vectorbtpro.utils.selection import filter_no_results as _filter_no_results
-
+        if filter_results:
             try:
-                results, template_context["param_index"] = _filter_no_results(
+                results, template_context["param_index"] = filter_out_no_results(
                     results,
                     keys=template_context["param_index"],
                 )
@@ -1864,7 +1862,7 @@ class Parameterizer(Configured):
             if is_merge_func_from_config(merge_func):
                 merge_kwargs = merge_dicts(dict(
                     keys=template_context["param_index"],
-                    filter_no_results=not no_results_filtered,
+                    filter_results=not no_results_filtered,
                     raise_no_results=raise_no_results,
                 ), merge_kwargs)
             if isinstance(merge_func, MergeFunc):

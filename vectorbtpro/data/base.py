@@ -25,12 +25,11 @@ from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
-from vectorbtpro.utils.execution import Task, execute
+from vectorbtpro.utils.execution import Task, NoResult, NoResultsException, filter_out_no_results, execute
 from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pickling import pdict, RecState
-from vectorbtpro.utils.selection import NoResult, NoResultsException
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 
 try:
@@ -3848,10 +3847,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             keys = pd.Index(keys, name="run_func")
             results = execute(tasks, size=len(keys), keys=keys, **execute_kwargs)
             if filter_results:
-                from vectorbtpro.utils.selection import filter_results as _filter_results
-
                 try:
-                    results, keys = _filter_results(results, keys=keys)
+                    results, keys = filter_out_no_results(results, keys=keys)
                 except NoResultsException as e:
                     if raise_no_results:
                         raise e
