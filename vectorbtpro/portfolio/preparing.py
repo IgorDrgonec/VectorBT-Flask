@@ -12,7 +12,6 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
-from vectorbtpro.base.indexing import AutoIdxr
 from vectorbtpro.base.preparing import BasePreparer
 from vectorbtpro.base.reshaping import to_2d_array, broadcast_array_to, broadcast
 from vectorbtpro.base.wrapping import ArrayWrapper
