@@ -33,6 +33,12 @@ try:
 except:
     technical_available = False
 
+smc_available = True
+try:
+    import smartmoneyconcepts
+except:
+    smc_available = False
+
 seed = 42
 
 
@@ -3150,6 +3156,38 @@ class TestFactory:
                     columns=close.columns,
                 ),
             )
+
+    def test_list_smc_indicators(self):
+        if smc_available:
+            assert len(vbt.IndicatorFactory.list_smc_indicators()) > 0
+
+    def test_from_smc(self):
+        if smc_available:
+            assert_frame_equal(
+                vbt.smc("swing_highs_lows").run(open, high, low, close, volume, swing_length=1).high_low,
+                pd.DataFrame(
+                    [[1.0, -1.0], [-1.0, 1.0], [np.nan, np.nan], [np.nan, np.nan], [1.0, -1.0]],
+                    index=close.index,
+                    columns=pd.MultiIndex.from_tuples(
+                        [(1, "a"), (1, "b")],
+                        names=["swing_highs_lows_swing_length", None],
+                    ),
+                ),
+            )
+            assert_frame_equal(
+                vbt.smc("swing_highs_lows").run(open, high, low, close, volume, swing_length=1).level,
+                pd.DataFrame(
+                    [[2.5, 4.5], [1.5, 5.5], [np.nan, np.nan], [np.nan, np.nan], [6.5, 0.5]],
+                    index=close.index,
+                    columns=pd.MultiIndex.from_tuples(
+                        [(1, "a"), (1, "b")],
+                        names=["swing_highs_lows_swing_length", None],
+                    ),
+                ),
+            )
+            for ind_name in vbt.IndicatorFactory.list_smc_indicators():
+                if ind_name != "SESSIONS":
+                    vbt.smc(ind_name).run(open, high, low, close, volume)
 
     def test_custom_indicators(self):
         custom_ma = lambda x: x

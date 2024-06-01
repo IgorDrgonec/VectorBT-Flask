@@ -75,7 +75,7 @@ data = [
     "databento",
 ]
 ind-base = ["TA-Lib"]
-ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical"]
+ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical", "smartmoneyconcepts"]
 perf-base = ["numexpr"]
 perf = ["vectorbtpro[perf-base]", "Bottleneck"]
 opt-base = ["hyperopt", "optuna"]
