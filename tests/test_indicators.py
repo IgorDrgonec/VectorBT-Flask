@@ -4640,3 +4640,14 @@ class TestBasic:
                     std_influence=sr.values[:, None],
                 )[i],
             )
+
+    def test_HURST(self):
+        close = vbt.RandomData.pull(start="2020", periods=200, seed=42).get()
+        hurst = vbt.HURST.run(close, method=["standard", "logrs", "rs", "dma", "dsod"])
+        assert_series_equal(
+            hurst.hurst.iloc[-1].rename(None),
+            pd.Series(
+                [0.4764129065260935, 0.6132611955700931, 0.6145327842667652, 0.3569452731447068, 0.47570178547480757],
+                index=pd.Index(["standard", "logrs", "rs", "dma", "dsod"], name="hurst_method"),
+            )
+        )

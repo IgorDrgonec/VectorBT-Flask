@@ -1123,6 +1123,46 @@ def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: boo
     return out
 
 
+@register_jitted(cache=True)
+def polyfit_1d_nb(x: tp.Array1d, y: tp.Array1d, deg: int, stabilize: bool = False) -> tp.Array1d:
+    """Compute the least squares polynomial fit."""
+    if stabilize:
+        mat_ = np.ones(shape=(x.shape[0], deg + 1))
+        mat_[:, 1] = x
+        if deg > 1:
+            for n in range(2, deg + 1):
+                mat_[:, n] = mat_[:, n - 1] * x
+        scale_vect = np.empty((deg + 1,), dtype=np.float_)
+        for n in range(0, deg + 1):
+            col_norm = np.linalg.norm(mat_[:, n])
+            scale_vect[n] = col_norm
+            mat_[:, n] /= col_norm
+        det_ = np.linalg.lstsq(mat_, y)[0] / scale_vect
+    else:
+        mat_ = np.zeros(shape=(x.shape[0], deg + 1))
+        const = np.ones_like(x)
+        mat_[:, 0] = const
+        mat_[:, 1] = x
+        if deg > 1:
+            for n in range(2, deg + 1):
+                mat_[:, n] = x**n
+        det_ = np.linalg.lstsq(mat_, y)[0]
+    return det_[::-1]
+
+
+@register_jitted(cache=True)
+def fir_filter_1d_nb(b: tp.Array1d, x: tp.Array1d) -> tp.Array1d:
+    """Filter data along one-dimension with an FIR filter."""
+    n = len(x)
+    m = len(b)
+    y = np.zeros(n)
+    for i in range(n):
+        for j in range(m):
+            if i - j >= 0:
+                y[i] += b[j] * x[i - j]
+    return y
+
+
 # ############# Value counts ############# #
 
 

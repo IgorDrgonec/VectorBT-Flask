@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from vectorbtpro.indicators.custom.adx import *
     from vectorbtpro.indicators.custom.atr import *
     from vectorbtpro.indicators.custom.bbands import *
+    from vectorbtpro.indicators.custom.hurst import *
     from vectorbtpro.indicators.custom.ma import *
     from vectorbtpro.indicators.custom.macd import *
     from vectorbtpro.indicators.custom.msd import *

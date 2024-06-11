@@ -1582,6 +1582,10 @@ def broadcast(
             # Broadcast regular objects
             old_obj = aligned_objs[k]
             new_obj = ready_objs[k]
+            if _axis in (None, 0) and new_obj.ndim == 1 and new_obj.shape[0] > 1 and new_obj.shape[0] != to_shape[0]:
+                raise ValueError(f"Could not broadcast argument {k} of shape {new_obj.shape} to {to_shape}")
+            if _axis in (None, 1) and new_obj.ndim == 2 and new_obj.shape[1] > 1 and new_obj.shape[1] != to_shape[1]:
+                raise ValueError(f"Could not broadcast argument {k} of shape {new_obj.shape} to {to_shape}")
             if _keep_flex:
                 if n_params > 0 and _axis in (None, 1):
                     if len(to_shape) == 1:

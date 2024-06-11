@@ -1659,6 +1659,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Uses `Data.prepare_dt_index` with `parse_dates=True` and `force_tz_convert=True`.
 
         For defaults, see `vectorbtpro._settings.data`."""
+        obj = obj.copy(deep=False)
         tz_localize = cls.resolve_base_setting(tz_localize, "tz_localize")
         if isinstance(tz_localize, bool):
             if tz_localize:

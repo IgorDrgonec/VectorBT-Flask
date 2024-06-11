@@ -13,7 +13,7 @@ from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_col_nb
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
-from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS
+from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS, HurstMethod
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
@@ -1757,3 +1757,321 @@ def signal_detection_nb(
             std_influence=flex_select_col_nb(std_influence_, col),
         )
     return signal, upper_band, lower_band
+
+
+# ############# HURST ############# #
+
+
+@register_jitted(cache=True)
+def get_standard_hurst_nb(
+    close: tp.Array1d,
+    max_lag: int = 20,
+    stabilize: bool = False,
+) -> float:
+    """Estimate the Hurst exponent using standard method."""
+    if max_lag is None:
+        lags = np.arange(2, len(close) - 1)
+    else:
+        lags = np.arange(2, min(max_lag, len(close) - 1))
+    tau = np.empty(len(lags), dtype=np.float_)
+    for i, lag in enumerate(lags):
+        tau[i] = np.var(np.subtract(close[lag:], close[:-lag]))
+    coef = generic_nb.polyfit_1d_nb(np.log(lags), np.log(tau), 1, stabilize=stabilize)
+    return coef[0] / 2
+
+
+@register_jitted(cache=True)
+def get_rs_nb(close: tp.Array1d) -> float:
+    """Get rescaled range (R/S) for Hurst exponent estimation."""
+    incs = close[1:] / close[:-1] - 1.0
+    mean_inc = np.sum(incs) / len(incs)
+    deviations = incs - mean_inc
+    Z = np.cumsum(deviations)
+    R = np.max(Z) - np.min(Z)
+    S = generic_nb.nanstd_1d_nb(incs, ddof=1)
+    if R == 0 or S == 0:
+        return 0
+    return R / S
+
+
+@register_jitted(cache=True)
+def get_log_rs_hurst_nb(
+    close: tp.Array1d,
+    min_log: int = 1,
+    max_log: int = 2,
+    log_step: int = 0.25,
+) -> float:
+    """Estimate the Hurst exponent using R/S method.
+
+    Windows are log-distributed."""
+    max_log = min(max_log, np.log10(len(close) - 1))
+    log_range = np.arange(min_log, max_log, log_step)
+    windows = np.empty(len(log_range) + 1, dtype=np.int_)
+    windows[: len(log_range)] = 10**log_range
+    windows[-1] = len(close)
+    RS = np.empty(len(windows), dtype=np.float_)
+    W = np.empty(len(windows), dtype=np.int_)
+    k = 0
+
+    for i, w in enumerate(windows):
+        rs_sum = 0.0
+        rs_count = 0
+        for start in range(0, len(close), w):
+            if (start + w) > len(close):
+                break
+            rs = get_rs_nb(close[start : start + w])
+            if rs != 0:
+                rs_sum += rs
+                rs_count += 1
+        if rs_count != 0:
+            RS[k] = rs_sum / rs_count
+            W[k] = w
+            k += 1
+
+    if k == 0:
+        return np.nan
+    A = np.vstack((np.log10(W[:k]), np.ones(len(RS[:k])))).T
+    H, c = np.linalg.lstsq(A, np.log10(RS[:k]), rcond=-1)[0]
+    return H
+
+
+@register_jitted(cache=True)
+def get_rs_hurst_nb(
+    close: tp.Array1d,
+    min_chunk: int = 8,
+    max_chunk: int = 100,
+    num_chunks: int = 5,
+) -> float:
+    """Estimate the Hurst exponent using R/S method.
+
+    Windows are linearly distributed."""
+    diff = close[1:] - close[:-1]
+    N = len(diff)
+    max_chunk += 1
+    max_chunk = min(max_chunk, len(diff) - 1)
+    rs_tmp = np.empty(N, dtype=np.float_)
+    chunk_size_range = np.linspace(min_chunk, max_chunk, num_chunks).astype(np.int_)
+    chunk_size_list = np.empty(len(chunk_size_range), dtype=np.int_)
+    rs_values_list = np.empty(len(chunk_size_range), dtype=np.float_)
+    k = 0
+
+    for chunk_size in chunk_size_range:
+        number_of_chunks = int(len(diff) / chunk_size)
+
+        for idx in range(number_of_chunks):
+            ini = idx * chunk_size
+            end = ini + chunk_size
+            chunk = diff[ini:end]
+            z = np.cumsum(chunk - np.mean(chunk))
+            rs_tmp[idx] = np.divide(np.max(z) - np.min(z), np.nanstd(chunk))
+
+        rs = np.nanmean(rs_tmp[: idx + 1])
+        if not np.isnan(rs) and rs != 0:
+            chunk_size_list[k] = chunk_size
+            rs_values_list[k] = rs
+            k += 1
+
+    H, c = np.linalg.lstsq(
+        a=np.vstack((np.log(chunk_size_list[:k]), np.ones(len(chunk_size_list[:k])))).T,
+        b=np.log(rs_values_list[:k]),
+    )[0]
+    return H
+
+
+@register_jitted(cache=True)
+def get_dma_hurst_nb(
+    close: tp.Array1d,
+    min_chunk: int = 8,
+    max_chunk: int = 100,
+    num_chunks: int = 5,
+) -> float:
+    """Estimate the Hurst exponent using DMA method.
+
+    Windows are linearly distributed."""
+    max_chunk += 1
+    max_chunk = min(max_chunk, len(close) - 1)
+    N = len(close)
+    n_range = np.linspace(min_chunk, max_chunk, num_chunks).astype(np.int_)
+    n_list = np.empty(len(n_range), dtype=np.int_)
+    dma_list = np.empty(len(n_range), dtype=np.float_)
+    k = 0
+    factor = 1 / (N - max_chunk)
+
+    for i, n in enumerate(n_range):
+        x1 = np.full(n, -1, np.int_)
+        x1[0] = n - 1
+        b = np.divide(x1, n)  # do the same as:  y - y_ma_n
+        noise = np.power(generic_nb.fir_filter_1d_nb(b, close)[max_chunk:], 2)
+        dma = np.sqrt(factor * np.sum(noise))
+        if not np.isnan(dma) and dma != 0:
+            n_list[k] = n
+            dma_list[k] = dma
+            k += 1
+
+    if k == 0:
+        return np.nan
+    H, const = np.linalg.lstsq(
+        a=np.vstack((np.log10(n_list[:k]), np.ones(len(n_list[:k])))).T, b=np.log10(dma_list[:k])
+    )[0]
+    return H
+
+
+@register_jitted(cache=True)
+def get_dsod_hurst_nb(close: tp.Array1d) -> float:
+    """Estimate the Hurst exponent using discrete second order derivative."""
+    diff = close[1:] - close[:-1]
+    y = np.cumsum(diff)
+
+    b1 = [1, -2, 1]
+    y1 = generic_nb.fir_filter_1d_nb(b1, y)
+    y1 = y1[len(b1) - 1 :]
+
+    b2 = [1, 0, -2, 0, 1]
+    y2 = generic_nb.fir_filter_1d_nb(b2, y)
+    y2 = y2[len(b2) - 1 :]
+
+    s1 = np.mean(y1**2)
+    s2 = np.mean(y2**2)
+
+    return 0.5 * np.log2(s2 / s1)
+
+
+@register_jitted(cache=True)
+def get_hurst_nb(
+    close: tp.Array1d,
+    method: int = HurstMethod.Standard,
+    max_lag: int = 20,
+    min_log: int = 1,
+    max_log: int = 2,
+    log_step: int = 0.25,
+    min_chunk: int = 8,
+    max_chunk: int = 100,
+    num_chunks: int = 5,
+    stabilize: bool = False,
+) -> float:
+    """Estimate the Hurst exponent using various methods.
+
+    Uses the following methods:
+
+    * `HurstMethod.Standard`: `vectorbtpro.generic.nb.base.get_standard_hurst_nb`
+    * `HurstMethod.LogRS`: `vectorbtpro.generic.nb.base.get_log_rs_hurst_nb`
+    * `HurstMethod.RS`: `vectorbtpro.generic.nb.base.get_rs_hurst_nb`
+    * `HurstMethod.DMA`: `vectorbtpro.generic.nb.base.get_dma_hurst_nb`
+    * `HurstMethod.DSOD`: `vectorbtpro.generic.nb.base.get_dsod_hurst_nb`
+    """
+    if method == HurstMethod.Standard:
+        return get_standard_hurst_nb(close, max_lag=max_lag, stabilize=stabilize)
+    if method == HurstMethod.LogRS:
+        return get_log_rs_hurst_nb(close, min_log=min_log, max_log=max_log, log_step=log_step)
+    if method == HurstMethod.RS:
+        return get_rs_hurst_nb(close, min_chunk=min_chunk, max_chunk=max_chunk, num_chunks=num_chunks)
+    if method == HurstMethod.DMA:
+        return get_dma_hurst_nb(close, min_chunk=min_chunk, max_chunk=max_chunk, num_chunks=num_chunks)
+    if method == HurstMethod.DSOD:
+        return get_dsod_hurst_nb(close)
+    raise ValueError("Invalid HurstMethod option")
+
+
+@register_jitted(cache=True)
+def rolling_hurst_1d_nb(
+    close: tp.Array1d,
+    window: int,
+    method: int = HurstMethod.Standard,
+    max_lag: int = 20,
+    min_log: int = 1,
+    max_log: int = 2,
+    log_step: int = 0.25,
+    min_chunk: int = 8,
+    max_chunk: int = 100,
+    num_chunks: int = 5,
+    minp: tp.Optional[int] = None,
+    stabilize: bool = False,
+) -> tp.Array1d:
+    """Rolling version of `get_hurst_nb`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(close, dtype=np.float_)
+    nancnt = 0
+    for i in range(close.shape[0]):
+        if np.isnan(close[i]):
+            nancnt = nancnt + 1
+        if i < window:
+            valid_cnt = i + 1 - nancnt
+        else:
+            if np.isnan(close[i - window]):
+                nancnt = nancnt - 1
+            valid_cnt = window - nancnt
+        if valid_cnt < minp:
+            out[i] = np.nan
+        else:
+            from_i = max(0, i + 1 - window)
+            to_i = i + 1
+            close_window = close[from_i:to_i]
+            out[i] = get_hurst_nb(
+                close_window,
+                method=method,
+                max_lag=max_lag,
+                min_log=min_log,
+                max_log=max_log,
+                log_step=log_step,
+                min_chunk=min_chunk,
+                max_chunk=max_chunk,
+                num_chunks=num_chunks,
+                stabilize=stabilize,
+            )
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="close", axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        method=None,
+        max_lag=None,
+        min_log=None,
+        max_log=None,
+        log_step=None,
+        min_chunk=None,
+        max_chunk=None,
+        num_chunks=None,
+        minp=None,
+        stabilize=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_hurst_nb(
+    close: tp.Array2d,
+    window: int,
+    method: int = HurstMethod.Standard,
+    max_lag: int = 20,
+    min_log: int = 1,
+    max_log: int = 2,
+    log_step: int = 0.25,
+    min_chunk: int = 8,
+    max_chunk: int = 100,
+    num_chunks: int = 5,
+    minp: tp.Optional[int] = None,
+    stabilize: bool = False,
+) -> tp.Array2d:
+    """2-dim version of `rolling_hurst_1d_nb`."""
+    out = np.empty_like(close, dtype=np.float_)
+    for col in prange(close.shape[1]):
+        out[:, col] = rolling_hurst_1d_nb(
+            close[:, col],
+            window,
+            method=method,
+            max_lag=max_lag,
+            min_log=min_log,
+            max_log=max_log,
+            log_step=log_step,
+            min_chunk=min_chunk,
+            max_chunk=max_chunk,
+            num_chunks=num_chunks,
+            minp=minp,
+            stabilize=stabilize,
+        )
+    return out
