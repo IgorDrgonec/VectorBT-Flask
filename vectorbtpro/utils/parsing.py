@@ -111,6 +111,7 @@ def annotate_args(
     only_passed: bool = False,
     allow_partial: bool = False,
     attach_annotations: bool = False,
+    flatten: bool = False,
 ) -> tp.AnnArgs:
     """Annotate arguments and keyword arguments using the function's signature.
 
@@ -183,6 +184,8 @@ def annotate_args(
             raise TypeError(f"{func.__name__}() got an unexpected keyword argument '{list(kwargs.keys())[0]}'")
         if len(kwargs) > 1:
             raise TypeError(f"{func.__name__}() got unexpected keyword arguments {list(kwargs.keys())}")
+    if flatten:
+        return flatten_ann_args(ann_args)
     return ann_args
 
 
@@ -202,6 +205,11 @@ def ann_args_to_args(ann_args: tp.AnnArgs) -> tp.Tuple[tp.Args, tp.Kwargs]:
             for _k, _v in v["value"].items():
                 kwargs[_k] = _v
     return args, kwargs
+
+
+def flat_ann_args_to_args(ann_args: tp.AnnArgs) -> tp.Tuple[tp.Args, tp.Kwargs]:
+    """Convert flattened annotated arguments back to positional and keyword arguments."""
+    return ann_args_to_args(flatten_ann_args(ann_args))
 
 
 def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
@@ -287,23 +295,22 @@ def unflatten_ann_args(flat_ann_args: tp.FlatAnnArgs, partial_ann_args: tp.Optio
     return ann_args
 
 
-def match_ann_arg(
-    ann_args: tp.AnnArgs,
+def match_flat_ann_arg(
+    flat_ann_args: tp.FlatAnnArgs,
     query: tp.AnnArgQuery,
     return_name: bool = False,
     return_index: bool = False,
 ) -> tp.Any:
-    """Match an argument from annotated arguments.
+    """Match an argument from flattened annotated arguments.
 
     A query can be an integer indicating the position of the argument, or a string containing the name
-    of the argument or a regular expression for matching the name of the argument.
+    of the argument, or a regular expression for matching the name of the argument.
 
     If multiple arguments were matched, returns the first one.
 
     The position can stretch over any variable argument."""
     if return_name and return_index:
         raise ValueError("Either return_name or return_index can be provided, not both")
-    flat_ann_args = flatten_ann_args(ann_args)
     for i, (arg_name, ann_arg) in enumerate(flat_ann_args.items()):
         if (
             (isinstance(query, int) and query == i)
@@ -316,6 +323,44 @@ def match_ann_arg(
                 return i
             return ann_arg["value"]
     raise KeyError(f"Query '{query}' could not be matched with any argument")
+
+
+def match_ann_arg(
+    ann_args: tp.AnnArgs,
+    query: tp.AnnArgQuery,
+    return_name: bool = False,
+    return_index: bool = False,
+) -> tp.Any:
+    """Match an argument from annotated arguments.
+
+    See `match_flat_ann_arg` for matching logic."""
+    return match_flat_ann_arg(
+        flatten_ann_args(ann_args),
+        query,
+        return_name=return_name,
+        return_index=return_index,
+    )
+
+
+def match_and_set_flat_ann_arg(
+    flat_ann_args: tp.FlatAnnArgs,
+    query: tp.AnnArgQuery,
+    new_value: tp.Any,
+) -> None:
+    """Match an argument from flattened annotated arguments and set it to a new value.
+
+    See `match_flat_ann_arg` for matching logic."""
+    matched = False
+    for i, (arg_name, ann_arg) in enumerate(flat_ann_args.items()):
+        if (
+            (isinstance(query, int) and query == i)
+            or (isinstance(query, str) and query == arg_name)
+            or (isinstance(query, Regex) and query.matches(arg_name))
+        ):
+            ann_arg["value"] = new_value
+            matched = True
+    if not matched:
+        raise KeyError(f"Query '{query}' could not be matched with any argument")
 
 
 def ignore_flat_ann_args(flat_ann_args: tp.FlatAnnArgs, ignore_args: tp.Iterable[tp.AnnArgQuery]) -> tp.FlatAnnArgs:

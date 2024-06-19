@@ -8,6 +8,7 @@ from vectorbtpro.utils.formatting import prettify
 __pdoc__all__ = __all__ = [
     "Pivot",
     "TrendMode",
+    "HurstMethod",
     "SuperTrendAIS",
     "SuperTrendAOS",
 ]
@@ -50,6 +51,27 @@ __pdoc__[
 
 ```python
 {prettify(TrendMode)}
+```
+"""
+
+
+class HurstMethodT(tp.NamedTuple):
+    Standard: int = 0
+    LogRS: int = 1
+    RS: int = 2
+    DMA: int = 3
+    DSOD: int = 4
+
+
+HurstMethod = HurstMethodT()
+"""_"""
+
+__pdoc__[
+    "HurstMethod"
+] = f"""Hurst method.
+
+```python
+{prettify(HurstMethod)}
 ```
 """
 

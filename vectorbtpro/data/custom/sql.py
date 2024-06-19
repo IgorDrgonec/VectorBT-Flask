@@ -244,6 +244,7 @@ class SQLData(DBData):
                 continue
             if schema not in schemas:
                 schemas.append(schema)
+
         if dispose_engine:
             engine.dispose()
         if sort:
@@ -341,6 +342,7 @@ class SQLData(DBData):
                     table = str(schema) + ":" + table
                 if table not in tables:
                     tables.append(table)
+
         if dispose_engine:
             engine.dispose()
         if sort:
@@ -391,7 +393,7 @@ class SQLData(DBData):
             engine_name=engine_name,
             **engine_config,
         )
-        if not cls.has_schema(schema, engine=engine):
+        if not cls.has_schema(schema, engine=engine, engine_name=engine_name):
             with engine.connect() as connection:
                 connection.execute(CreateSchema(schema))
                 connection.commit()
@@ -475,7 +477,7 @@ class SQLData(DBData):
             "row_number_column",
             engine_name=engine_name,
         )
-        table_relation = cls.get_table_relation(table, schema=schema, engine=engine)
+        table_relation = cls.get_table_relation(table, schema=schema, engine=engine, engine_name=engine_name)
         table_column_names = []
         for column in table_relation.columns:
             table_column_names.append(column.name)
@@ -776,7 +778,7 @@ class SQLData(DBData):
         if query is None or isinstance(query, (Selectable, FromClause)):
             if query is None:
                 if isinstance(table, str):
-                    table = cls.get_table_relation(table, schema=schema, engine=engine)
+                    table = cls.get_table_relation(table, schema=schema, engine=engine, engine_name=engine_name)
             else:
                 table = query
 
@@ -833,6 +835,9 @@ class SQLData(DBData):
                 query = table.select()
             else:
                 query = table
+            if index_col is not None:
+                for col in index_col:
+                    query = query.order_by(col)
             if index_col is not None and columns is not None:
                 pre_columns = []
                 for col in index_col:
@@ -1006,11 +1011,12 @@ class SQLData(DBData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
+
         if dispose_engine:
             engine.dispose()
         if keep_row_number:
-            return obj, dict(tz_convert=tz, row_number_column=row_number_column)
-        return obj, dict(tz_convert=tz)
+            return obj, dict(tz=tz, row_number_column=row_number_column)
+        return obj, dict(tz=tz)
 
     @classmethod
     def fetch_feature(cls, feature: str, **kwargs) -> tp.FeatureData:

@@ -242,7 +242,7 @@ class BentoData(RemoteData):
             return client, params
 
         df = client.timeseries.get_range(**params).to_df(**df_kwargs)
-        return df, dict(tz_convert=tz, freq=freq)
+        return df, dict(tz=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

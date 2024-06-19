@@ -128,7 +128,7 @@ class CSVDataSaver(DataSaver):
             to_csv_kwargs,
         )
 
-        self._data.to_csv(**to_csv_kwargs)
+        self.data.to_csv(**to_csv_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -143,7 +143,7 @@ class CSVDataSaver(DataSaver):
             to_csv_kwargs,
         )
 
-        self._data.to_csv(**to_csv_kwargs)
+        self.data.to_csv(**to_csv_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -160,7 +160,7 @@ class HDFDataSaver(DataSaver):
             to_hdf_kwargs,
         )
 
-        self._data.to_hdf(**to_hdf_kwargs)
+        self.data.to_hdf(**to_hdf_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -175,7 +175,7 @@ class HDFDataSaver(DataSaver):
             to_hdf_kwargs,
         )
 
-        self._data.to_hdf(**to_hdf_kwargs)
+        self.data.to_hdf(**to_hdf_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -192,7 +192,7 @@ class SQLDataSaver(DataSaver):
             to_sql_kwargs,
         )
 
-        self._data.to_sql(**to_sql_kwargs)
+        self.data.to_sql(**to_sql_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -207,7 +207,7 @@ class SQLDataSaver(DataSaver):
             to_sql_kwargs,
         )
 
-        self._data.to_sql(**to_sql_kwargs)
+        self.data.to_sql(**to_sql_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -224,7 +224,7 @@ class DuckDBDataSaver(DataSaver):
             to_duckdb_kwargs,
         )
 
-        self._data.to_duckdb(**to_duckdb_kwargs)
+        self.data.to_duckdb(**to_duckdb_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
@@ -239,6 +239,6 @@ class DuckDBDataSaver(DataSaver):
             to_duckdb_kwargs,
         )
 
-        self._data.to_duckdb(**to_duckdb_kwargs)
+        self.data.to_duckdb(**to_duckdb_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")

@@ -29,7 +29,8 @@ from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.eval_ import Evaluable
+from vectorbtpro.utils.execution import Task, NoResult, NoResultsException, filter_out_no_results, execute
 from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
 from vectorbtpro.utils.parsing import (
     get_func_arg_names,
@@ -38,7 +39,7 @@ from vectorbtpro.utils.parsing import (
     unflatten_ann_args,
     ann_args_to_args,
 )
-from vectorbtpro.utils.selection import _NoResult, NoResultsException, PosSel, LabelSel
+from vectorbtpro.utils.selection import PosSel, LabelSel
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 
 if tp.TYPE_CHECKING:
@@ -298,7 +299,7 @@ class RelRange(DefineMixin):
 
 
 @define
-class Takeable(Annotatable, DefineMixin):
+class Takeable(Evaluable, Annotatable, DefineMixin):
     """Class that represents an object from which a range can be taken."""
 
     obj: tp.Any = define.required_field()
@@ -322,17 +323,6 @@ class Takeable(Annotatable, DefineMixin):
 
     eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
     """One or more identifiers at which to evaluate this instance."""
-
-    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
-        """Return whether the evaluation id of the instance meets the global evaluation id."""
-        if self.eval_id is not None and eval_id is not None:
-            if checks.is_complex_sequence(self.eval_id):
-                if eval_id not in self.eval_id:
-                    return False
-            else:
-                if eval_id != self.eval_id:
-                    return False
-        return True
 
 
 class ZeroLengthError(ValueError):
@@ -1757,10 +1747,8 @@ class Splitter(Analyzable):
 
         Keyword arguments `splitter_kwargs` are passed to the factory method. Keyword arguments
         `take_kwargs` are passed to `Splitter.take`. If variable keyword arguments are provided, they
-        will be used as `splitter_kwargs` if `take_kwargs` is already set, and vice versa. If
-        `splitter_kwargs` and `take_kwargs` aren't set, they will be used as `take_kwargs` if a splitter
-        instance has been built, otherwise arguments will be distributed based on the signatures of the
-        factory method and `Splitter.take`. If both arguments are set, will raise an error."""
+        will be used as `take_kwargs` if a splitter instance has been built, otherwise, arguments will
+        be distributed based on the signatures of the factory method and `Splitter.take`."""
         if splitter_kwargs is None:
             splitter_kwargs = {}
         else:
@@ -1806,10 +1794,14 @@ class Splitter(Analyzable):
                 var_take_kwargs = var_kwargs
             splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
             take_kwargs = merge_dicts(var_take_kwargs, take_kwargs)
-        if splitter is None:
-            splitter = cls.guess_method(**splitter_kwargs)
-        if splitter is None:
-            raise ValueError("Must provide splitter")
+        if len(splitter_kwargs) > 0:
+            if splitter is None:
+                splitter = cls.guess_method(**splitter_kwargs)
+            if splitter is None:
+                raise ValueError("Splitter method couldn't be guessed")
+        else:
+            if splitter is None:
+                raise ValueError("Must provide splitter or splitter method")
         if not isinstance(splitter, cls):
             if isinstance(splitter, str):
                 splitter = getattr(cls, splitter)
@@ -1821,6 +1813,95 @@ class Splitter(Analyzable):
             if k not in take_kwargs:
                 take_kwargs[k] = v
         return splitter.take(obj, template_context=template_context, **take_kwargs)
+
+    @classmethod
+    def split_and_apply(
+        cls,
+        index: tp.IndexLike,
+        apply_func: tp.Callable,
+        *apply_args,
+        splitter: tp.Union[None, str, SplitterT, tp.Callable] = None,
+        splitter_kwargs: tp.KwargsLike = None,
+        apply_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        _splitter_kwargs: tp.KwargsLike = None,
+        _apply_kwargs: tp.KwargsLike = None,
+        **var_kwargs,
+    ) -> tp.Any:
+        """Split an index and apply a function.
+
+        Argument `splitter` can be an actual `Splitter` instance, the name of a factory method
+        (such as "from_n_rolling"), or the factory method itself. If `splitter` is None,
+        the right method will be guessed based on the supplied arguments using `Splitter.guess_method`.
+
+        Keyword arguments `splitter_kwargs` are passed to the factory method. Keyword arguments
+        `apply_kwargs` are passed to `Splitter.apply`. If variable keyword arguments are provided, they
+        will be used as `apply_kwargs` if a splitter instance has been built, otherwise, arguments will
+        be distributed based on the signatures of the factory method and `Splitter.apply`."""
+        if splitter_kwargs is None:
+            splitter_kwargs = {}
+        else:
+            splitter_kwargs = dict(splitter_kwargs)
+        if apply_kwargs is None:
+            apply_kwargs = {}
+        else:
+            apply_kwargs = dict(apply_kwargs)
+        if _splitter_kwargs is None:
+            _splitter_kwargs = {}
+        if _apply_kwargs is None:
+            _apply_kwargs = {}
+        if len(var_kwargs) > 0:
+            var_splitter_kwargs = {}
+            var_apply_kwargs = {}
+            if splitter is None or not isinstance(splitter, cls):
+                apply_arg_names = get_func_arg_names(cls.apply)
+                if splitter is not None:
+                    if isinstance(splitter, str):
+                        splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
+                    else:
+                        splitter_arg_names = get_func_arg_names(splitter)
+                    for k, v in var_kwargs.items():
+                        assigned = False
+                        if k in splitter_arg_names:
+                            var_splitter_kwargs[k] = v
+                            assigned = True
+                        if k != "split" and k in apply_arg_names:
+                            var_apply_kwargs[k] = v
+                            assigned = True
+                        if not assigned:
+                            raise ValueError(f"Argument '{k}' couldn't be assigned")
+                else:
+                    for k, v in var_kwargs.items():
+                        if k == "freq":
+                            var_splitter_kwargs[k] = v
+                            var_apply_kwargs[k] = v
+                        elif k == "split" or k not in apply_arg_names:
+                            var_splitter_kwargs[k] = v
+                        else:
+                            var_apply_kwargs[k] = v
+            else:
+                var_apply_kwargs = var_kwargs
+            splitter_kwargs = merge_dicts(var_splitter_kwargs, splitter_kwargs)
+            apply_kwargs = merge_dicts(var_apply_kwargs, apply_kwargs)
+        if len(splitter_kwargs) > 0:
+            if splitter is None:
+                splitter = cls.guess_method(**splitter_kwargs)
+            if splitter is None:
+                raise ValueError("Splitter method couldn't be guessed")
+        else:
+            if splitter is None:
+                raise ValueError("Must provide splitter or splitter method")
+        if not isinstance(splitter, cls):
+            if isinstance(splitter, str):
+                splitter = getattr(cls, splitter)
+            for k, v in _splitter_kwargs.items():
+                if k not in splitter_kwargs:
+                    splitter_kwargs[k] = v
+            splitter = splitter(index, template_context=template_context, **splitter_kwargs)
+        for k, v in _apply_kwargs.items():
+            if k not in apply_kwargs:
+                apply_kwargs[k] = v
+        return splitter.apply(apply_func, *apply_args, template_context=template_context, **apply_kwargs)
 
     @classmethod
     def resolve_row_stack_kwargs(
@@ -2895,6 +2976,57 @@ class Splitter(Analyzable):
             return tuple(obj[i] for i in np.arange(len(obj))[ready_range])
         return obj[ready_range]
 
+    @class_or_instancemethod
+    def take_range_from_takeable(
+        cls_or_self,
+        takeable: Takeable,
+        range_: tp.FixRangeLike,
+        remap_to_obj: bool = True,
+        obj_index: tp.Optional[tp.IndexLike] = None,
+        obj_freq: tp.Optional[tp.FrequencyLike] = None,
+        point_wise: bool = False,
+        template_context: tp.KwargsLike = None,
+        return_obj_meta: bool = False,
+        return_meta: bool = False,
+        **ready_obj_range_kwargs,
+    ) -> tp.Any:
+        """Take a range from a takeable object."""
+        takeable.assert_field_not_missing("obj")
+        obj_meta, obj_range_meta = cls_or_self.get_ready_obj_range(
+            takeable.obj,
+            range_,
+            remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not MISSING else remap_to_obj,
+            obj_index=takeable.index if takeable.index is not MISSING else obj_index,
+            obj_freq=takeable.freq if takeable.freq is not MISSING else obj_freq,
+            template_context=template_context,
+            return_obj_meta=True,
+            return_meta=True,
+            **ready_obj_range_kwargs,
+        )
+        if isinstance(takeable.obj, CustomTemplate):
+            template_context = merge_dicts(
+                dict(
+                    range_=obj_range_meta["range_"],
+                    range_meta=obj_range_meta,
+                    point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
+                ),
+                template_context,
+            )
+            obj_slice = substitute_templates(takeable.obj, template_context, eval_id="take_range")
+        else:
+            obj_slice = cls_or_self.take_range(
+                takeable.obj,
+                obj_range_meta["range_"],
+                point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
+            )
+        if return_obj_meta and return_meta:
+            return obj_meta, obj_range_meta, obj_slice
+        if return_obj_meta:
+            return obj_meta, obj_slice
+        if return_meta:
+            return obj_range_meta, obj_slice
+        return obj_slice
+
     def take(
         self,
         obj: tp.Any,
@@ -3339,6 +3471,8 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         iteration: str = "split_wise",
         execute_kwargs: tp.KwargsLike = None,
+        filter_results: bool = True,
+        raise_no_results: bool = True,
         merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
         merge_kwargs: tp.KwargsLike = None,
         merge_all: bool = True,
@@ -3395,7 +3529,7 @@ class Splitter(Analyzable):
         If `merge_all` is True, will merge all results in a flattened manner irrespective of the
         iteration mode. Otherwise, will merge by split/set.
 
-        If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
+        If `vectorbtpro.utils.execution.NoResult` is returned, will skip the current iteration and
         remove it from the final index.
 
         Usage:
@@ -3479,7 +3613,7 @@ class Splitter(Analyzable):
             index_combine_kwargs = {}
         if execute_kwargs is None:
             execute_kwargs = {}
-        parsed_merge_func = parse_merge_func(apply_func)
+        parsed_merge_func = parse_merge_func(apply_func, eval_id=eval_id)
         if parsed_merge_func is not None:
             if merge_func is not None:
                 raise ValueError(
@@ -3526,6 +3660,7 @@ class Splitter(Analyzable):
             },
             template_context,
         )
+        template_context["eval_id"] = eval_id
 
         if has_annotatables(apply_func):
             ann_args = annotate_args(
@@ -3557,39 +3692,6 @@ class Splitter(Analyzable):
             )
             return range_meta
 
-        def _take_range(takeable, range_, _template_context):
-            takeable.assert_field_not_missing("obj")
-            obj_meta, obj_range_meta = self.get_ready_obj_range(
-                takeable.obj,
-                range_,
-                remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not MISSING else remap_to_obj,
-                obj_index=takeable.index if takeable.index is not MISSING else obj_index,
-                obj_freq=takeable.freq if takeable.freq is not MISSING else obj_freq,
-                range_format=range_format,
-                template_context=_template_context,
-                silence_warnings=silence_warnings,
-                freq=freq,
-                return_obj_meta=True,
-                return_meta=True,
-            )
-            if isinstance(takeable.obj, CustomTemplate):
-                _template_context = merge_dicts(
-                    dict(
-                        range_=obj_range_meta["range_"],
-                        range_meta=obj_range_meta,
-                        point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
-                    ),
-                    _template_context,
-                )
-                obj_slice = substitute_templates(takeable.obj, _template_context, eval_id="take_range")
-            else:
-                obj_slice = self.take_range(
-                    takeable.obj,
-                    obj_range_meta["range_"],
-                    point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
-                )
-            return obj_meta, obj_range_meta, obj_slice
-
         def _take_args(args, range_, _template_context):
             obj_meta = {}
             obj_range_meta = {}
@@ -3597,7 +3699,20 @@ class Splitter(Analyzable):
             if args is not None:
                 for i, v in enumerate(args):
                     if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
-                        _obj_meta, _obj_range_meta, obj_slice = _take_range(v, range_, _template_context)
+                        _obj_meta, _obj_range_meta, obj_slice = self.take_range_from_takeable(
+                            v,
+                            range_,
+                            remap_to_obj=remap_to_obj,
+                            obj_index=obj_index,
+                            obj_freq=obj_freq,
+                            range_format=range_format,
+                            point_wise=point_wise,
+                            template_context=_template_context,
+                            silence_warnings=silence_warnings,
+                            freq=freq,
+                            return_obj_meta=True,
+                            return_meta=True,
+                        )
                         new_args += (obj_slice,)
                         obj_meta[i] = _obj_meta
                         obj_range_meta[i] = _obj_range_meta
@@ -3612,7 +3727,20 @@ class Splitter(Analyzable):
             if kwargs is not None:
                 for k, v in kwargs.items():
                     if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
-                        _obj_meta, _obj_range_meta, obj_slice = _take_range(v, range_, _template_context)
+                        _obj_meta, _obj_range_meta, obj_slice = self.take_range_from_takeable(
+                            v,
+                            range_,
+                            remap_to_obj=remap_to_obj,
+                            obj_index=obj_index,
+                            obj_freq=obj_freq,
+                            range_format=range_format,
+                            point_wise=point_wise,
+                            template_context=_template_context,
+                            silence_warnings=silence_warnings,
+                            freq=freq,
+                            return_obj_meta=True,
+                            return_meta=True,
+                        )
                         new_kwargs[k] = obj_slice
                         obj_meta[k] = _obj_meta
                         obj_range_meta[k] = _obj_range_meta
@@ -3674,7 +3802,7 @@ class Splitter(Analyzable):
 
         bounds = {}
 
-        def _get_func_args(i, j, _bounds=bounds):
+        def _get_task(i, j, _bounds=bounds):
             split_idx = split_group_indices[i]
             set_idx = set_group_indices[j]
             _template_context = merge_dicts(
@@ -3711,7 +3839,7 @@ class Splitter(Analyzable):
             _apply_func = substitute_templates(apply_func, _template_context, eval_id="apply_func")
             _apply_args = substitute_templates(_apply_args, _template_context, eval_id="apply_args")
             _apply_kwargs = substitute_templates(_apply_kwargs, _template_context, eval_id="apply_kwargs")
-            return _apply_func, _apply_args, _apply_kwargs
+            return Task(_apply_func, *_apply_args, **_apply_kwargs)
 
         def _attach_bounds(keys, range_bounds):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
@@ -3723,96 +3851,107 @@ class Splitter(Analyzable):
 
         if iteration.lower() == "split_major":
 
-            def _get_generator():
+            def _get_task_generator():
                 for i in range(n_splits):
                     for j in range(n_sets):
-                        yield _get_func_args(i, j)
+                        yield _get_task(i, j)
 
-            funcs_args = _get_generator()
+            tasks = _get_task_generator()
             keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
+            results = execute(tasks, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
-            def _get_generator():
+            def _get_task_generator():
                 for j in range(n_sets):
                     for i in range(n_splits):
-                        yield _get_func_args(i, j)
+                        yield _get_task(i, j)
 
-            funcs_args = _get_generator()
+            tasks = _get_task_generator()
             keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split and one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
+            results = execute(tasks, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
-            def _process_chunk(chunk):
+            def _process_chunk_tasks(chunk_tasks):
                 results = []
-                for func, args, kwargs in chunk:
+                for func, args, kwargs in chunk_tasks:
                     results.append(func(*args, **kwargs))
                 return results
 
-            def _get_generator():
+            def _get_task_generator():
                 for i in range(n_splits):
-                    chunk = []
+                    chunk_tasks = []
                     for j in range(n_sets):
-                        chunk.append(_get_func_args(i, j))
-                    yield _process_chunk, (chunk,), {}
+                        chunk_tasks.append(_get_task(i, j))
+                    yield Task(_process_chunk_tasks, chunk_tasks)
 
-            funcs_args = _get_generator()
+            tasks = _get_task_generator()
+            keys = split_labels
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_split else None), execute_kwargs)
-            results = execute(funcs_args, size=n_splits, keys=split_labels, **execute_kwargs)
+            results = execute(tasks, size=n_splits, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
-            def _process_chunk(chunk):
+            def _process_chunk_tasks(chunk_tasks):
                 results = []
-                for func, args, kwargs in chunk:
+                for func, args, kwargs in chunk_tasks:
                     results.append(func(*args, **kwargs))
                 return results
 
-            def _get_generator():
+            def _get_task_generator():
                 for j in range(n_sets):
-                    chunk = []
+                    chunk_tasks = []
                     for i in range(n_splits):
-                        chunk.append(_get_func_args(i, j))
-                    yield _process_chunk, (chunk,), {}
+                        chunk_tasks.append(_get_task(i, j))
+                    yield Task(_process_chunk_tasks, chunk_tasks)
 
-            funcs_args = _get_generator()
+            tasks = _get_task_generator()
+            keys = set_labels
+            if eval_id is not None:
+                new_keys = []
+                for key in keys:
+                    if isinstance(keys, pd.MultiIndex):
+                        new_keys.append((MISSING, *key))
+                    else:
+                        new_keys.append((MISSING, key))
+                keys = pd.MultiIndex.from_tuples(new_keys, names=(f"eval_id={eval_id}", *keys.names))
             execute_kwargs = merge_dicts(dict(show_progress=False if one_set else None), execute_kwargs)
-            results = execute(funcs_args, size=n_sets, keys=set_labels, **execute_kwargs)
+            results = execute(tasks, size=n_sets, keys=keys, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
-
-        def _skip_iterations(results, keys=None, return_keep_indices=False):
-            skip_indices = set()
-            for i, result in enumerate(results):
-                if isinstance(result, _NoResult):
-                    skip_indices.add(i)
-            if len(skip_indices) > 0:
-                new_results = []
-                keep_indices = []
-                for i, result in enumerate(results):
-                    if i not in skip_indices:
-                        new_results.append(result)
-                        keep_indices.append(i)
-                results = new_results
-                if keys is not None:
-                    keys = keys[keep_indices]
-            else:
-                keep_indices = None
-            if keys is None:
-                if return_keep_indices:
-                    return results, keep_indices
-                return results
-            if return_keep_indices:
-                return results, keys, keep_indices
-            return results, keys
 
         if merge_all:
             if iteration.lower() in ("split_wise", "set_wise"):
                 results = [result for _results in results for result in _results]
             if one_range:
-                if isinstance(results[0], _NoResult):
-                    raise NoResultsException
+                if results[0] is NoResult:
+                    if raise_no_results:
+                        raise NoResultsException
+                    return NoResult
                 return results[0]
             if iteration.lower() in ("split_major", "split_wise"):
                 if one_set:
@@ -3840,9 +3979,16 @@ class Splitter(Analyzable):
                         for i in range(n_splits):
                             range_bounds.append(bounds[(i, j)])
                     keys = _attach_bounds(keys, range_bounds)
-            results, keys = _skip_iterations(results, keys=keys)
-            if len(results) == 0:
-                raise NoResultsException
+            if filter_results:
+                try:
+                    results, keys = filter_out_no_results(results, keys=keys)
+                except NoResultsException as e:
+                    if raise_no_results:
+                        raise e
+                    return NoResult
+                no_results_filtered = True
+            else:
+                no_results_filtered = False
 
             def _wrap_output(_results):
                 try:
@@ -3851,10 +3997,14 @@ class Splitter(Analyzable):
                     return pd.Series(_results, index=keys, dtype=object)
 
             if merge_func is not None:
-                template_context["funcs_args"] = funcs_args
+                template_context["tasks"] = tasks
                 template_context["keys"] = keys
                 if is_merge_func_from_config(merge_func):
-                    merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                    merge_kwargs = merge_dicts(dict(
+                        keys=keys,
+                        filter_results=not no_results_filtered,
+                        raise_no_results=raise_no_results,
+                    ), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
                     merge_func = merge_func.replace(
                         merge_kwargs=merge_kwargs,
@@ -3884,8 +4034,10 @@ class Splitter(Analyzable):
                 new_results.append(results[i * n_splits : (i + 1) * n_splits])
             results = new_results
         if one_range:
-            if isinstance(results[0][0], _NoResult):
-                raise NoResultsException
+            if results[0][0] is NoResult:
+                if raise_no_results:
+                    raise NoResultsException
+                return NoResult
             return results[0][0]
 
         split_bounds = []
@@ -3920,21 +4072,33 @@ class Splitter(Analyzable):
             keep_major_indices = []
             for i, _results in enumerate(results):
                 if one_minor:
-                    if not isinstance(_results[0], _NoResult):
+                    if _results[0] is not NoResult:
                         merged_results.append(_results[0])
                         keep_major_indices.append(i)
                 else:
                     _template_context = dict(template_context)
-                    _template_context["funcs_args"] = funcs_args
+                    _template_context["tasks"] = tasks
                     if attach_bounds is not None:
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:
                         minor_keys_wbounds = minor_keys
-                    _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
+                    if filter_results:
+                        _results, minor_keys_wbounds = filter_out_no_results(
+                            _results,
+                            keys=minor_keys_wbounds,
+                            raise_error=False,
+                        )
+                        no_results_filtered = True
+                    else:
+                        no_results_filtered = False
                     if len(_results) > 0:
                         _template_context["keys"] = minor_keys_wbounds
                         if is_merge_func_from_config(merge_func):
-                            _merge_kwargs = merge_dicts(dict(keys=minor_keys_wbounds), merge_kwargs)
+                            _merge_kwargs = merge_dicts(dict(
+                                keys=minor_keys_wbounds,
+                                filter_results=not no_results_filtered,
+                                raise_no_results=False,
+                            ), merge_kwargs)
                         else:
                             _merge_kwargs = merge_kwargs
                         if isinstance(merge_func, MergeFunc):
@@ -3948,10 +4112,14 @@ class Splitter(Analyzable):
                                 merge_kwargs=_merge_kwargs,
                                 context=_template_context,
                             )
-                        merged_results.append(_merge_func(_results))
-                        keep_major_indices.append(i)
+                        _result = _merge_func(_results)
+                        if _result is not NoResult:
+                            merged_results.append(_result)
+                            keep_major_indices.append(i)
             if len(merged_results) == 0:
-                raise NoResultsException
+                if raise_no_results:
+                    raise NoResultsException
+                return NoResult
             if len(merged_results) < len(major_keys):
                 major_keys = major_keys[keep_major_indices]
 
@@ -3982,9 +4150,13 @@ class Splitter(Analyzable):
                         major_keys_wbounds = _attach_bounds(major_keys, minor_bounds[0])
                     else:
                         major_keys_wbounds = major_keys
-                    _results, major_keys_wbounds = _skip_iterations(_results, keys=major_keys_wbounds)
-                    if len(_results) == 0:
-                        raise NoResultsException
+                    if filter_results:
+                        try:
+                            _results, major_keys_wbounds = filter_out_no_results(_results, keys=major_keys_wbounds)
+                        except NoResultsException as e:
+                            if raise_no_results:
+                                raise e
+                            return NoResult
                     try:
                         return pd.Series(_results, index=major_keys_wbounds)
                     except Exception as e:
@@ -3994,9 +4166,13 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[0])
                     else:
                         minor_keys_wbounds = minor_keys
-                    _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
-                    if len(_results) == 0:
-                        raise NoResultsException
+                    if filter_results:
+                        try:
+                            _results, major_keys_wbounds = filter_out_no_results(_results, keys=minor_keys_wbounds)
+                        except NoResultsException as e:
+                            if raise_no_results:
+                                raise e
+                            return NoResult
                     try:
                         return pd.Series(_results, index=minor_keys_wbounds)
                     except Exception as e:
@@ -4009,7 +4185,12 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:
                         minor_keys_wbounds = minor_keys
-                    r, minor_keys_wbounds = _skip_iterations(r, keys=minor_keys_wbounds)
+                    if filter_results:
+                        r, minor_keys_wbounds = filter_out_no_results(
+                            r,
+                            keys=minor_keys_wbounds,
+                            raise_error=False,
+                        )
                     if len(r) > 0:
                         try:
                             new_r = pd.Series(r, index=minor_keys_wbounds)
@@ -4018,7 +4199,9 @@ class Splitter(Analyzable):
                         new_results.append(new_r)
                         keep_major_indices.append(i)
                 if len(new_results) == 0:
-                    raise NoResultsException
+                    if raise_no_results:
+                        raise NoResultsException
+                    return NoResult
                 if len(new_results) < len(major_keys):
                     _major_keys = major_keys[keep_major_indices]
                 else:
@@ -4039,7 +4222,7 @@ class Splitter(Analyzable):
                     for k in range(n_results):
                         new_results.append([])
                         for i in range(len(results)):
-                            if isinstance(results[i], _NoResult):
+                            if results[i] is NoResult:
                                 new_results[-1].append(results[i])
                             else:
                                 new_results[-1].append(results[i][k])
@@ -4060,16 +4243,20 @@ class Splitter(Analyzable):
                         for i in range(len(results)):
                             new_results[-1].append([])
                             for j in range(len(results[0])):
-                                if isinstance(results[i][j], _NoResult):
+                                if results[i][j] is NoResult:
                                     new_results[-1][-1].append(results[i][j])
                                 else:
                                     new_results[-1][-1].append(results[i][j][k])
                     return tuple(map(_wrap_output, new_results))
             return _wrap_output(results)
 
-        results = _skip_iterations(results)
-        if len(results) == 0:
-            raise NoResultsException
+        if filter_results:
+            try:
+                results = filter_out_no_results(results)
+            except NoResultsException as e:
+                if raise_no_results:
+                    raise e
+                return NoResult
         return results
 
     # ############# Splits ############# #

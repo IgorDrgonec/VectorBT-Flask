@@ -93,28 +93,46 @@ class DuckDBData(DBData):
     def resolve_connection(
         cls,
         connection: tp.Union[None, str, tp.PathLike, DuckDBPyConnectionT] = None,
+        read_only: bool = True,
+        return_meta: bool = False,
         **connection_config,
-    ) -> DuckDBPyConnectionT:
+    ) -> tp.Union[DuckDBPyConnectionT, dict]:
         """Resolve the connection."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("duckdb")
         from duckdb import connect, default_connection
 
+        connection_meta = {}
         connection = cls.resolve_custom_setting(connection, "connection")
         if connection_config is None:
             connection_config = {}
         has_connection_config = len(connection_config) > 0
         connection_config = cls.resolve_custom_setting(connection_config, "connection_config", merge=True)
+        should_close = False
         if connection is None:
             if len(connection_config) == 0:
                 connection = default_connection
             else:
-                connection = connect(**connection_config)
+                database = connection_config.pop("database", None)
+                if "config" in connection_config or len(connection_config) == 0:
+                    connection = connect(database, read_only=read_only, **connection_config)
+                else:
+                    connection = connect(database, read_only=read_only, config=connection_config)
+                should_close = True
         elif isinstance(connection, (str, Path)):
-            connection = connect(str(connection), **connection_config)
+            if "config" in connection_config or len(connection_config) == 0:
+                connection = connect(str(connection), read_only=read_only, **connection_config)
+            else:
+                connection = connect(str(connection), read_only=read_only, config=connection_config)
+            should_close = True
         elif has_connection_config:
             raise ValueError("Cannot apply connection_config on already created connection")
+
+        if return_meta:
+            connection_meta["connection"] = connection
+            connection_meta["should_close"] = should_close
+            return connection_meta
         return connection
 
     @classmethod
@@ -134,7 +152,9 @@ class DuckDBData(DBData):
         Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`."""
         if connection_config is None:
             connection_config = {}
-        connection = cls.resolve_connection(connection, **connection_config)
+        connection_meta = cls.resolve_connection(connection, return_meta=True, **connection_config)
+        connection = connection_meta["connection"]
+        should_close = connection_meta["should_close"]
         schemata_df = connection.sql("SELECT * FROM information_schema.schemata").df()
         catalogs = []
         for catalog in schemata_df["catalog_name"].tolist():
@@ -147,6 +167,9 @@ class DuckDBData(DBData):
                 continue
             if catalog not in catalogs:
                 catalogs.append(catalog)
+
+        if should_close:
+            connection.close()
         if sort:
             return sorted(catalogs)
         return catalogs
@@ -173,7 +196,9 @@ class DuckDBData(DBData):
         Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`."""
         if connection_config is None:
             connection_config = {}
-        connection = cls.resolve_connection(connection, **connection_config)
+        connection_meta = cls.resolve_connection(connection, return_meta=True, **connection_config)
+        connection = connection_meta["connection"]
+        should_close = connection_meta["should_close"]
         if catalog is None:
             catalogs = cls.list_catalogs(
                 pattern=catalog_pattern,
@@ -206,6 +231,9 @@ class DuckDBData(DBData):
                     schema = catalog + ":" + schema
                 if schema not in schemas:
                     schemas.append(schema)
+
+        if should_close:
+            connection.close()
         if sort:
             return sorted(schemas)
         return schemas
@@ -219,8 +247,14 @@ class DuckDBData(DBData):
         """Get the current schema."""
         if connection_config is None:
             connection_config = {}
-        connection = cls.resolve_connection(connection, **connection_config)
-        return connection.sql("SELECT current_schema()").fetchall()[0][0]
+        connection_meta = cls.resolve_connection(connection, return_meta=True, **connection_config)
+        connection = connection_meta["connection"]
+        should_close = connection_meta["should_close"]
+        current_schema = connection.sql("SELECT current_schema()").fetchall()[0][0]
+
+        if should_close:
+            connection.close()
+        return current_schema
 
     @classmethod
     def list_tables(
@@ -250,7 +284,9 @@ class DuckDBData(DBData):
         `schema_pattern` and each table against `table_pattern`."""
         if connection_config is None:
             connection_config = {}
-        connection = cls.resolve_connection(connection, **connection_config)
+        connection_meta = cls.resolve_connection(connection, return_meta=True, **connection_config)
+        connection = connection_meta["connection"]
+        should_close = connection_meta["should_close"]
         if catalog is None:
             catalogs = cls.list_catalogs(
                 pattern=catalog_pattern,
@@ -333,6 +369,9 @@ class DuckDBData(DBData):
                     table = catalog + ":" + schema + ":" + table
                 if table not in tables:
                     tables.append(table)
+
+        if should_close:
+            connection.close()
         if sort:
             return sorted(tables)
         return tables
@@ -420,7 +459,11 @@ class DuckDBData(DBData):
         if share_connection:
             if connection_config is None:
                 connection_config = {}
-            connection = cls.resolve_connection(connection=connection, **connection_config)
+            connection_meta = cls.resolve_connection(connection, return_meta=True, **connection_config)
+            connection = connection_meta["connection"]
+            should_close = connection_meta["should_close"]
+        else:
+            should_close = False
         keys_meta = cls.resolve_keys_meta(
             keys=keys,
             keys_are_features=keys_are_features,
@@ -476,6 +519,9 @@ class DuckDBData(DBData):
             connection_config=connection_config,
             **kwargs,
         )
+
+        if should_close:
+            connection.close()
         return outputs
 
     @classmethod
@@ -614,7 +660,9 @@ class DuckDBData(DBData):
 
         if connection_config is None:
             connection_config = {}
-        connection = cls.resolve_connection(connection, **connection_config)
+        connection_meta = cls.resolve_connection(connection, return_meta=True, **connection_config)
+        connection = connection_meta["connection"]
+        should_close = connection_meta["should_close"]
         if catalog is not None and query is not None:
             raise ValueError("Cannot use catalog and query together")
         if schema is not None and query is not None:
@@ -809,7 +857,10 @@ class DuckDBData(DBData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
-        return obj, dict(tz_convert=tz)
+
+        if should_close:
+            connection.close()
+        return obj, dict(tz=tz)
 
     @classmethod
     def fetch_feature(cls, feature: str, **kwargs) -> tp.FeatureData:

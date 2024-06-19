@@ -7,10 +7,9 @@ from string import Template
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.eval_ import multiline_eval
+from vectorbtpro.utils.eval_ import multiline_eval, Evaluable
 from vectorbtpro.utils.module_ import package_shortcut_config
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.search import any_in_obj, find_and_replace_in_obj
@@ -26,7 +25,7 @@ __all__ = [
 
 
 @define
-class CustomTemplate(DefineMixin):
+class CustomTemplate(Evaluable, DefineMixin):
     """Class for substituting templates."""
 
     template: tp.Any = define.field()
@@ -45,17 +44,6 @@ class CustomTemplate(DefineMixin):
 
     eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
     """One or more identifiers at which to evaluate this instance."""
-
-    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
-        """Return whether the evaluation id of the instance meets the global evaluation id."""
-        if self.eval_id is not None and eval_id is not None:
-            if checks.is_complex_sequence(self.eval_id):
-                if eval_id not in self.eval_id:
-                    return False
-            else:
-                if eval_id != self.eval_id:
-                    return False
-        return True
 
     def resolve_context(
         self,

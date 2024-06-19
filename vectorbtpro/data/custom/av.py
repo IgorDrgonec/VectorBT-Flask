@@ -613,7 +613,7 @@ class AVData(RemoteData):
         if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None and tz is not None:
             df = df.tz_localize(tz)
 
-        return df, dict(tz_convert=tz, freq=freq)
+        return df, dict(tz=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

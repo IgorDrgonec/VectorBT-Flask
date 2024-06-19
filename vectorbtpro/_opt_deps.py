@@ -159,6 +159,9 @@ opt_dep_config = HybridConfig(
         databento=dict(
             link="https://pypi.org/project/databento/",
         ),
+        smartmoneyconcepts=dict(
+            link="https://github.com/joshyattridge/smart-money-concepts/",
+        ),
     )
 )
 """_"""

@@ -337,7 +337,7 @@ class AlpacaData(RemoteData):
                 end = dt.to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
-        return df, dict(tz_convert=tz, freq=freq)
+        return df, dict(tz=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

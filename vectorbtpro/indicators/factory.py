@@ -51,7 +51,8 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configur
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
-from vectorbtpro.utils.formatting import prettify
+from vectorbtpro.utils.execution import Task
+from vectorbtpro.utils.formatting import camel_to_snake_case, prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.module_ import search_package_for_funcs
 from vectorbtpro.utils.params import (
@@ -82,6 +83,7 @@ __all__ = [
     "wqa101",
     "technical",
     "techcon",
+    "smc",
 ]
 
 __pdoc__ = {}
@@ -3023,7 +3025,7 @@ Other keyword arguments are passed to `{0}.run`.
                     execute_kwargs["post_execute_func"] = post_execute_func
                     if "post_execute_kwargs" in execute_kwargs:
                         raise ValueError("Cannot use custom post_execute_kwargs when skipna=True")
-                    execute_kwargs["post_execute_kwargs"] = dict(outputs=Rep("outputs"), nan_masks=nan_masks)
+                    execute_kwargs["post_execute_kwargs"] = dict(outputs=Rep("results"), nan_masks=nan_masks)
                     if "post_execute_on_sorted" in execute_kwargs:
                         raise ValueError("Cannot use custom post_execute_on_sorted when skipna=True")
                     execute_kwargs["post_execute_on_sorted"] = True
@@ -3080,7 +3082,7 @@ Other keyword arguments are passed to `{0}.run`.
                     execute_kwargs=execute_kwargs,
                 )
 
-            funcs_args = []
+            tasks = []
             for i in range(_n_params):
                 if select_params:
                     _inputs = tuple(_inputs[i] for _inputs in _input_tuple)
@@ -3090,24 +3092,20 @@ Other keyword arguments are passed to `{0}.run`.
                     _inputs = _input_tuple
                     _in_outputs = _in_output_tuple
                     _params = _param_tuple
-                funcs_args.append(
-                    (
-                        apply_func,
-                        (
-                            *((i,) if not select_params else ()),
-                            *args_before,
-                            *((_inputs,) if pass_packed else _inputs),
-                            *((_in_outputs,) if pass_packed else _in_outputs),
-                            *((_params,) if pass_packed else _params),
-                            *_args,
-                            *more_args,
-                            *cache,
-                        ),
-                        _kwargs,
-                    )
-                )
+                tasks.append(Task(
+                    apply_func,
+                    *((i,) if not select_params else ()),
+                    *args_before,
+                    *((_inputs,) if pass_packed else _inputs),
+                    *((_in_outputs,) if pass_packed else _in_outputs),
+                    *((_params,) if pass_packed else _params),
+                    *_args,
+                    *more_args,
+                    *cache,
+                    **_kwargs,
+                ))
             return combining.apply_and_concat_each(
-                funcs_args,
+                tasks,
                 n_outputs=num_ret_outputs,
                 execute_kwargs=execute_kwargs,
             )
@@ -3150,6 +3148,7 @@ Other keyword arguments are passed to `{0}.run`.
             "ta",
             "technical",
             "techcon",
+            "smc",
             "wqa101",
         ]
 
@@ -3417,6 +3416,10 @@ Other keyword arguments are passed to `{0}.run`.
                         lambda x: "techcon:" + x if prepend_location else x,
                         cls.list_techcon_indicators() if check_installed("technical") else [],
                     ),
+                    *map(
+                        lambda x: "smc:" + x if prepend_location else x,
+                        cls.list_smc_indicators() if check_installed("smartmoneyconcepts") else [],
+                    ),
                     *map(lambda x: "wqa101:" + str(x) if prepend_location else str(x), range(1, 102)),
                 ]
         found_indicators = []
@@ -3477,6 +3480,8 @@ Other keyword arguments are passed to `{0}.run`.
                     return cls.from_technical(name)
                 if location == "techcon":
                     return cls.from_techcon(name)
+                if location == "smc":
+                    return cls.from_smc(name)
                 if location == "wqa101":
                     return cls.from_wqa101(int(name))
                 raise ValueError(f"Location '{location}' not found")
@@ -3490,6 +3495,8 @@ Other keyword arguments are passed to `{0}.run`.
                     return getattr(vbt, name)
                 if str(name).isnumeric():
                     return cls.from_wqa101(int(name))
+                if check_installed("smc") and name in cls.list_smc_indicators():
+                    return cls.from_smc(name)
                 if check_installed("technical") and name in cls.list_techcon_indicators():
                     return cls.from_techcon(name)
                 if check_installed("talib") and name in cls.list_talib_indicators():
@@ -3681,14 +3688,14 @@ Other keyword arguments are passed to `{0}.run`.
         silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Kwargs:
-        """Get the config of a `pandas_ta` indicator."""
+        """Parse the config of a `pandas_ta` indicator."""
         if test_input_names is None:
             test_input_names = {"open_", "open", "high", "low", "close", "adj_close", "volume", "dividends", "split"}
 
         input_names = []
         param_names = []
-        defaults = {}
         output_names = []
+        defaults = {}
 
         # Parse the function signature of the indicator to get input names
         sig = inspect.signature(func)
@@ -3977,7 +3984,7 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classmethod
     def parse_ta_config(cls, ind_cls: IndicatorMixinT) -> tp.Kwargs:
-        """Get the config of a `ta` indicator."""
+        """Parse the config of a `ta` indicator."""
         input_names = []
         param_names = []
         defaults = {}
@@ -4129,7 +4136,7 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classmethod
     def parse_technical_config(cls, func: tp.Callable, test_index_len: int = 100) -> tp.Kwargs:
-        """Get the config of a `technical` indicator."""
+        """Parse the config of a `technical` indicator."""
         df = pd.DataFrame(
             np.random.randint(1, 10, size=(test_index_len, 5)),
             index=pd.date_range("2020", periods=test_index_len),
@@ -4541,6 +4548,178 @@ Other keyword arguments are passed to `{0}.run`.
     def list_techcon_indicators(cls) -> tp.List[str]:
         """List all consensus indicators in `technical`."""
         return sorted({"MACON", "OSCCON", "SUMCON"})
+
+    @classmethod
+    def find_smc_indicator(cls, func_name: str, raise_error: bool = True) -> tp.Optional[tp.Callable]:
+        """Get `smartmoneyconcepts` indicator class by its name."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("smartmoneyconcepts")
+        from smartmoneyconcepts import smc
+
+        for k in dir(smc):
+            if not k.startswith("_"):
+                if camel_to_snake_case(func_name) == camel_to_snake_case(k):
+                    return getattr(smc, k)
+        if raise_error:
+            raise AttributeError(f"Indicator '{func_name}' not found")
+        return None
+
+    @classmethod
+    def parse_smc_config(cls, func: tp.Callable, collapse: bool = True, snake_case: bool = True) -> tp.Kwargs:
+        """Parse the config of a `smartmoneyconcepts` indicator."""
+        func_arg_names = get_func_arg_names(func)
+        input_names = []
+        param_names = []
+        defaults = {}
+        dep_input_names = {}
+        sig = inspect.signature(func)
+        for k in func_arg_names:
+            if k == "ohlc":
+                input_names.extend(["open", "high", "low", "close", "volume"])
+            else:
+                found_smc_indicator = cls.find_smc_indicator(k, raise_error=False)
+                if found_smc_indicator is not None:
+                    dep_input_names[k] = []
+                    k_func_config = cls.parse_smc_config(found_smc_indicator)
+                    if collapse:
+                        for input_name in k_func_config["input_names"]:
+                            if input_name not in input_names:
+                                input_names.append(input_name)
+                        for param_name in k_func_config["param_names"]:
+                            if param_name not in param_names:
+                                param_names.append(param_name)
+                        for k2, v2 in k_func_config["defaults"].items():
+                            defaults[k2] = v2
+                    else:
+                        for output_name in k_func_config["output_names"]:
+                            if output_name not in input_names:
+                                input_names.append(output_name)
+                            dep_input_names[k].append(output_name)
+                else:
+                    v = sig.parameters[k]
+                    if v.kind not in (v.VAR_POSITIONAL, v.VAR_KEYWORD):
+                        if v.default == inspect.Parameter.empty and v.annotation == pd.DataFrame:
+                            if k not in input_names:
+                                input_names.append(k)
+                        else:
+                            if k not in param_names:
+                                param_names.append(k)
+                            if v.default != inspect.Parameter.empty:
+                                defaults[k] = v.default
+
+        func_doc = inspect.getsource(func)
+        output_names = re.findall(r'name="([^"]+)"', func_doc)
+        output_names = [k.replace("%", "") for k in output_names]
+        if snake_case:
+            input_names = list(map(camel_to_snake_case, input_names))
+            param_names = list(map(camel_to_snake_case, param_names))
+            output_names = list(map(camel_to_snake_case, output_names))
+        return dict(
+            class_name=func.__name__.upper(),
+            class_docstring=func.__doc__,
+            input_names=input_names,
+            param_names=param_names,
+            output_names=output_names,
+            defaults=defaults,
+            dep_input_names=dep_input_names,
+        )
+
+    @classmethod
+    def list_smc_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
+        """List all parseable indicators in `smartmoneyconcepts`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("smartmoneyconcepts")
+        from smartmoneyconcepts import smc
+
+        indicators = set()
+        for func_name in dir(smc):
+            if not func_name.startswith("_"):
+                try:
+                    cls.parse_smc_config(getattr(smc, func_name), **kwargs)
+                    indicators.add(func_name.upper())
+                except Exception as e:
+                    if not silence_warnings:
+                        warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
+        return sorted(indicators)
+
+    @classmethod
+    def from_smc(
+        cls,
+        func_name: str,
+        collapse: bool = True,
+        parse_kwargs: tp.KwargsLike = None,
+        factory_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Type[IndicatorBase]:
+        """Build an indicator class around a `smartmoneyconcepts` function.
+
+        Requires [smart-money-concepts](https://github.com/joshyattridge/smart-money-concepts) installed.
+
+        Args:
+            func_name (str): Function name.
+            collapse (bool): Whether to collapse all nested indicators into a single one.
+            parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_smc_config`.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
+        """
+        func = cls.find_smc_indicator(func_name)
+        func_arg_names = get_func_arg_names(func)
+
+        if parse_kwargs is None:
+            parse_kwargs = {}
+        collapsed_config = cls.parse_smc_config(func, collapse=True, snake_case=True, **parse_kwargs)
+        _ = collapsed_config.pop("dep_input_names")
+        expanded_config = cls.parse_smc_config(func, collapse=False, snake_case=True, **parse_kwargs)
+        dep_input_names = expanded_config.pop("dep_input_names")
+        if collapse:
+            config = collapsed_config
+        else:
+            config = expanded_config
+
+        def apply_func(
+            input_tuple: tp.Tuple[tp.Series, ...],
+            in_output_tuple: tp.Tuple[tp.Series, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
+            **_kwargs,
+        ) -> tp.MaybeTuple[tp.Array1d]:
+            named_args = dict(_kwargs)
+            for i, input_name in enumerate(config["input_names"]):
+                named_args[input_name] = input_tuple[i]
+            for i, param_name in enumerate(config["param_names"]):
+                named_args[param_name] = param_tuple[i]
+            named_args["ohlc"] = pd.concat([
+                named_args["open"].rename("open"),
+                named_args["high"].rename("high"),
+                named_args["low"].rename("low"),
+                named_args["close"].rename("close"),
+                named_args["volume"].rename("volume"),
+            ], axis=1)
+            if collapse and len(dep_input_names) > 0:
+                for dep_func_name in dep_input_names:
+                    dep_func = cls.find_smc_indicator(dep_func_name)
+                    dep_func_arg_names = get_func_arg_names(dep_func)
+                    dep_output = dep_func(*[named_args[camel_to_snake_case(k)] for k in dep_func_arg_names])
+                    dep_output.index = input_tuple[0].index
+                    named_args[dep_func_name] = dep_output
+            elif not collapse:
+                for dep_func_name in dep_input_names:
+                    dep_func = cls.find_smc_indicator(dep_func_name)
+                    dep_config = cls.parse_smc_config(dep_func, collapse=False, snake_case=False, **parse_kwargs)
+                    named_args[dep_func_name] = pd.concat(
+                        [named_args[input_name] for input_name in dep_input_names[dep_func_name]],
+                        axis=1,
+                        keys=dep_config["output_names"]
+                    )
+            output = func(*[named_args[camel_to_snake_case(k)] for k in func_arg_names])
+            return tuple([output[c] for c in output.columns])
+
+        kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
+        Indicator = cls(
+            **merge_dicts(dict(module_name=__name__ + ".smc"), config, factory_kwargs),
+        ).with_apply_func(apply_func, pass_packed=True, keep_pd=True, takes_1d=True, **kwargs)
+        return Indicator
 
     # ############# Expressions ############# #
 
@@ -5205,3 +5384,8 @@ def technical(*args, **kwargs) -> tp.Type[IndicatorBase]:
 def techcon(*args, **kwargs) -> tp.Type[IndicatorBase]:
     """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_techcon`."""
     return IndicatorFactory.from_techcon(*args, **kwargs)
+
+
+def smc(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_smc`."""
+    return IndicatorFactory.from_smc(*args, **kwargs)

@@ -16,6 +16,7 @@ from numba import njit
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining
 from vectorbtpro.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.signals.enums import FactoryMode
 from vectorbtpro.signals.nb import generate_nb, generate_ex_nb, generate_enex_nb, first_place_nb
 from vectorbtpro.utils import checks
@@ -208,14 +209,15 @@ class SignalFactory(IndicatorFactory):
         self,
         entry_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
         exit_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
-        generate_func_nb: tp.Callable = generate_nb,
-        generate_ex_func_nb: tp.Callable = generate_ex_nb,
-        generate_enex_func_nb: tp.Callable = generate_enex_nb,
+        generate_func_nb: tp.Optional[tp.Callable] = None,
+        generate_ex_func_nb: tp.Optional[tp.Callable] = None,
+        generate_enex_func_nb: tp.Optional[tp.Callable] = None,
         cache_func: tp.Callable = None,
         entry_settings: tp.KwargsLike = None,
         exit_settings: tp.KwargsLike = None,
         cache_settings: tp.KwargsLike = None,
         jit_kwargs: tp.KwargsLike = None,
+        jitted: tp.JittedOption = None,
         **kwargs,
     ) -> tp.Type[IndicatorBase]:
         """Build signal generator class around entry and exit placement functions.
@@ -249,6 +251,10 @@ class SignalFactory(IndicatorFactory):
             jit_kwargs (dict): Keyword arguments passed to `@njit` decorator of the parameter selection function.
 
                 By default, has `nogil` set to True.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+
+                Gets applied to generation functions only. If the respective generation
+                function is not jitted, then the apply function won't be jitted as well.
             **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
 
         !!! note
@@ -499,22 +505,37 @@ class SignalFactory(IndicatorFactory):
         param_names = self.param_names
         in_output_names = self.in_output_names
 
+        if generate_func_nb is None:
+            generate_func_nb = generate_nb
+        if generate_ex_func_nb is None:
+            generate_ex_func_nb = generate_ex_nb
+        if generate_enex_func_nb is None:
+            generate_enex_func_nb = generate_enex_nb
+        if jitted is not None:
+            generate_func_nb = jit_reg.resolve_option(generate_func_nb, jitted)
+            generate_ex_func_nb = jit_reg.resolve_option(generate_ex_func_nb, jitted)
+            generate_enex_func_nb = jit_reg.resolve_option(generate_enex_func_nb, jitted)
+
         default_chain_entry_func = True
         if mode == FactoryMode.Entries:
+            jit_apply_func = checks.is_numba_func(generate_func_nb)
             require_input_shape = len(input_names) == 0
             checks.assert_not_none(entry_place_func_nb, arg_name="entry_place_func_nb")
             if exit_place_func_nb is not None:
                 raise ValueError("exit_place_func_nb cannot be used with FactoryMode.Entries")
         elif mode == FactoryMode.Exits:
+            jit_apply_func = checks.is_numba_func(generate_ex_func_nb)
             require_input_shape = False
             if entry_place_func_nb is not None:
                 raise ValueError("entry_place_func_nb cannot be used with FactoryMode.Exits")
             checks.assert_not_none(exit_place_func_nb, arg_name="exit_place_func_nb")
         elif mode == FactoryMode.Both:
+            jit_apply_func = checks.is_numba_func(generate_enex_func_nb)
             require_input_shape = len(input_names) == 0
             checks.assert_not_none(entry_place_func_nb, arg_name="entry_place_func_nb")
             checks.assert_not_none(exit_place_func_nb, arg_name="exit_place_func_nb")
         else:
+            jit_apply_func = checks.is_numba_func(generate_enex_func_nb)
             require_input_shape = False
             if entry_place_func_nb is None:
                 entry_place_func_nb = first_place_nb
@@ -671,8 +692,9 @@ class SignalFactory(IndicatorFactory):
         apply_func = scope["apply_func"]
         if module_name is not None:
             apply_func.__module__ = module_name
-        jit_kwargs = merge_dicts(dict(nogil=True), jit_kwargs)
-        apply_func = njit(apply_func, **jit_kwargs)
+        if jit_apply_func:
+            jit_kwargs = merge_dicts(dict(nogil=True), jit_kwargs)
+            apply_func = njit(apply_func, **jit_kwargs)
 
         setattr(Indicator, "apply_func", apply_func)
 
@@ -871,7 +893,7 @@ class SignalFactory(IndicatorFactory):
                     only_once,
                     entry_wait,
                     n_outputs=1,
-                    jitted_loop=True,
+                    jitted_loop=jit_apply_func,
                     execute_kwargs=execute_kwargs,
                 )
 
@@ -891,7 +913,7 @@ class SignalFactory(IndicatorFactory):
                     until_next,
                     skip_until_exit,
                     n_outputs=1,
-                    jitted_loop=True,
+                    jitted_loop=jit_apply_func,
                     execute_kwargs=execute_kwargs,
                 )
 
@@ -916,8 +938,13 @@ class SignalFactory(IndicatorFactory):
                     entry_wait,
                     exit_wait,
                     n_outputs=2,
-                    jitted_loop=True,
+                    jitted_loop=jit_apply_func,
                     execute_kwargs=execute_kwargs,
                 )
 
-        return self.with_custom_func(custom_func, pass_packed=True, require_input_shape=require_input_shape, **kwargs)
+        return self.with_custom_func(
+            custom_func,
+            pass_packed=True,
+            require_input_shape=require_input_shape,
+            **kwargs,
+        )

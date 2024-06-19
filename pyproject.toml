@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vectorbtpro"
-version = "2024.5.15"
+version = "2024.6.19"
 description = "Next-Generation Quantitative Analysis Tool"
 license = { file = "LICENSE" }
 authors = [{ name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro" }]
@@ -75,7 +75,7 @@ data = [
     "databento",
 ]
 ind-base = ["TA-Lib"]
-ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical"]
+ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical", "smartmoneyconcepts"]
 perf-base = ["numexpr"]
 perf = ["vectorbtpro[perf-base]", "Bottleneck"]
 opt-base = ["hyperopt", "optuna"]

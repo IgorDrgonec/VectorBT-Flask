@@ -925,7 +925,7 @@ class TVData(RemoteData):
             inplace=True,
         )
         if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
-            df = df.tz_localize("UTC")
+            df = df.tz_localize("utc")
 
         if "Symbol" in df:
             del df["Symbol"]
@@ -940,7 +940,7 @@ class TVData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df, dict(tz_convert=tz, freq=freq)
+        return df, dict(tz=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

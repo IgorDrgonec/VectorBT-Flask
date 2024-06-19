@@ -33,6 +33,12 @@ try:
 except:
     technical_available = False
 
+smc_available = True
+try:
+    import smartmoneyconcepts
+except:
+    smc_available = False
+
 seed = 42
 
 
@@ -3151,6 +3157,38 @@ class TestFactory:
                 ),
             )
 
+    def test_list_smc_indicators(self):
+        if smc_available:
+            assert len(vbt.IndicatorFactory.list_smc_indicators()) > 0
+
+    def test_from_smc(self):
+        if smc_available:
+            assert_frame_equal(
+                vbt.smc("swing_highs_lows").run(open, high, low, close, volume, swing_length=1).high_low,
+                pd.DataFrame(
+                    [[1.0, -1.0], [-1.0, 1.0], [np.nan, np.nan], [np.nan, np.nan], [1.0, -1.0]],
+                    index=close.index,
+                    columns=pd.MultiIndex.from_tuples(
+                        [(1, "a"), (1, "b")],
+                        names=["swing_highs_lows_swing_length", None],
+                    ),
+                ),
+            )
+            assert_frame_equal(
+                vbt.smc("swing_highs_lows").run(open, high, low, close, volume, swing_length=1).level,
+                pd.DataFrame(
+                    [[2.5, 4.5], [1.5, 5.5], [np.nan, np.nan], [np.nan, np.nan], [6.5, 0.5]],
+                    index=close.index,
+                    columns=pd.MultiIndex.from_tuples(
+                        [(1, "a"), (1, "b")],
+                        names=["swing_highs_lows_swing_length", None],
+                    ),
+                ),
+            )
+            for ind_name in vbt.IndicatorFactory.list_smc_indicators():
+                if ind_name != "SESSIONS":
+                    vbt.smc(ind_name).run(open, high, low, close, volume)
+
     def test_custom_indicators(self):
         custom_ma = lambda x: x
         vbt.IF.register_custom_indicator(custom_ma, "MA")
@@ -4602,3 +4640,14 @@ class TestBasic:
                     std_influence=sr.values[:, None],
                 )[i],
             )
+
+    def test_HURST(self):
+        close = vbt.RandomData.pull(start="2020", periods=200, seed=42).get()
+        hurst = vbt.HURST.run(close, method=["standard", "logrs", "rs", "dma", "dsod"])
+        assert_series_equal(
+            hurst.hurst.iloc[-1].rename(None),
+            pd.Series(
+                [0.4764129065260935, 0.6132611955700931, 0.6145327842667652, 0.3569452731447068, 0.47570178547480757],
+                index=pd.Index(["standard", "logrs", "rs", "dma", "dsod"], name="hurst_method"),
+            )
+        )

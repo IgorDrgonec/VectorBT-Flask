@@ -294,7 +294,7 @@ class HDFData(FileData):
                 obj = chunk_func(obj)
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
             tz = obj.index.tz
-        return obj, dict(last_row=start_row + len(obj.index) - 1, tz_convert=tz)
+        return obj, dict(last_row=start_row + len(obj.index) - 1, tz=tz)
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:

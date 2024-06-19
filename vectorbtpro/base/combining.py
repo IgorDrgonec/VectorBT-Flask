@@ -12,7 +12,7 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.template import RepFunc
 
 __all__ = []
@@ -126,7 +126,7 @@ def apply_and_concat_multiple_nb(
 
 
 def apply_and_concat_each(
-    funcs_args: tp.FuncsArgs,
+    tasks: tp.TasksLike,
     n_outputs: tp.Optional[int] = None,
     execute_kwargs: tp.KwargsLike = None,
 ) -> tp.Union[None, tp.Array2d, tp.List[tp.Array2d]]:
@@ -138,7 +138,7 @@ def apply_and_concat_each(
     if execute_kwargs is None:
         execute_kwargs = {}
 
-    out = execute(funcs_args, **execute_kwargs)
+    out = execute(tasks, **execute_kwargs)
     if n_outputs is None:
         if out[0] is None:
             n_outputs = 0
@@ -190,8 +190,8 @@ def apply_and_concat(
         if jitted_warmup:
             func(np.array([0]), apply_func, *args, **kwargs)
 
-        def _funcs_args_template(chunk_meta):
-            funcs_args = []
+        def _tasks_template(chunk_meta):
+            tasks = []
             for _chunk_meta in chunk_meta:
                 if _chunk_meta.indices is not None:
                     chunk_indices = np.asarray(_chunk_meta.indices)
@@ -199,17 +199,17 @@ def apply_and_concat(
                     if _chunk_meta.start is None or _chunk_meta.end is None:
                         raise ValueError("Each chunk must have a start and an end index")
                     chunk_indices = np.arange(_chunk_meta.start, _chunk_meta.end)
-                funcs_args.append((func, (chunk_indices, apply_func, *args), kwargs))
-            return funcs_args
+                tasks.append(Task(func, chunk_indices, apply_func, *args, **kwargs))
+            return tasks
 
-        funcs_args = RepFunc(_funcs_args_template)
+        tasks = RepFunc(_tasks_template)
     else:
-        funcs_args = [(apply_func, (i, *args), kwargs) for i in range(ntimes)]
+        tasks = [(apply_func, (i, *args), kwargs) for i in range(ntimes)]
     if execute_kwargs is None:
         execute_kwargs = {}
     execute_kwargs["size"] = ntimes
     return apply_and_concat_each(
-        funcs_args,
+        tasks,
         n_outputs=n_outputs,
         execute_kwargs=execute_kwargs,
     )

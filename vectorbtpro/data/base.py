@@ -25,12 +25,11 @@ from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, NoResult, NoResultsException, filter_out_no_results, execute
 from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pickling import pdict, RecState
-from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 
 try:
@@ -1660,6 +1659,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Uses `Data.prepare_dt_index` with `parse_dates=True` and `force_tz_convert=True`.
 
         For defaults, see `vectorbtpro._settings.data`."""
+        obj = obj.copy(deep=False)
         tz_localize = cls.resolve_base_setting(tz_localize, "tz_localize")
         if isinstance(tz_localize, bool):
             if tz_localize:
@@ -1703,18 +1703,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         index = None
         index_changed = False
         for k, obj in data.items():
-            obj_index = obj.index.sort_values()
             if index is None:
-                index = obj_index
+                index = obj.index
             else:
-                if not index.equals(obj_index):
+                if not index.equals(obj.index):
                     if missing == "nan":
                         if not silence_warnings:
                             warnings.warn(
                                 "Symbols have mismatching index. Setting missing data points to NaN.",
                                 stacklevel=2,
                             )
-                        index = index.union(obj_index)
+                        index = index.union(obj.index)
                         index_changed = True
                     elif missing == "drop":
                         if not silence_warnings:
@@ -1722,7 +1721,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 "Symbols have mismatching index. Dropping missing data points.",
                                 stacklevel=2,
                             )
-                        index = index.intersection(obj_index)
+                        index = index.intersection(obj.index)
                         index_changed = True
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
@@ -1884,9 +1883,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = type(data)(data)
         for k, obj in data.items():
             obj = to_pd_array(obj)
+            obj = cls_or_self.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
+            if obj.index.is_monotonic_decreasing:
+                obj = obj.iloc[::-1]
+            elif not obj.index.is_monotonic_increasing:
+                obj = obj.sort_index()
             if obj.index.has_duplicates:
                 obj = obj[~obj.index.duplicated(keep="last")]
-            obj = cls_or_self.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
             data[k] = obj
             if (isinstance(data, symbol_dict) and isinstance(last_index, symbol_dict)) or (
                 isinstance(data, feature_dict) and isinstance(last_index, feature_dict)
@@ -2888,7 +2891,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         execute_kwargs = cls.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
         execute_kwargs = merge_dicts(dict(show_progress=not single_key), execute_kwargs)
 
-        funcs_args = []
+        tasks = []
         if keys_are_features:
             func_arg_names = get_func_arg_names(cls.fetch_feature)
         else:
@@ -2905,26 +2908,25 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if k in fetch_kwargs:
                 key_fetch_kwargs = merge_dicts(key_fetch_kwargs, fetch_kwargs[k])
 
-            funcs_args.append(
-                (
-                    key_fetch_func,
-                    (k,),
-                    dict(
-                        skip_on_error=skip_on_error,
-                        silence_warnings=silence_warnings,
-                        fetch_kwargs=key_fetch_kwargs,
-                    ),
-                )
-            )
+            tasks.append(Task(
+                key_fetch_func,
+                k,
+                skip_on_error=skip_on_error,
+                silence_warnings=silence_warnings,
+                fetch_kwargs=key_fetch_kwargs,
+            ))
             fetch_kwargs[k] = key_fetch_kwargs
 
         key_index = cls.get_key_index(keys=keys, level_name=level_name, feature_oriented=keys_are_features)
-        outputs = execute(funcs_args, size=len(keys), keys=key_index, **execute_kwargs)
+        outputs = execute(tasks, size=len(keys), keys=key_index, **execute_kwargs)
         if return_raw:
             return outputs
 
         data = dict_type()
         returned_kwargs = dict_type()
+        common_tz_localize = None
+        common_tz_convert = None
+        common_freq = None
         for i, out in enumerate(outputs):
             k = keys[i]
             if out is not None:
@@ -2935,21 +2937,35 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     _data = out
                     _returned_kwargs = {}
                 _data = to_any_array(_data)
+                _tz = _returned_kwargs.pop("tz", None)
                 _tz_localize = _returned_kwargs.pop("tz_localize", None)
-                if _tz_localize is not None:
-                    if tz_localize is None:
-                        tz_localize = _tz_localize
-                    elif tz_localize != _tz_localize:
-                        raise ValueError("Cannot localize using different timezones")
                 _tz_convert = _returned_kwargs.pop("tz_convert", None)
-                if _tz_convert is not None:
-                    if tz_convert is None:
-                        tz_convert = _tz_convert
-                    elif tz_convert != _tz_convert:
-                        tz_convert = "utc"
                 _freq = _returned_kwargs.pop("freq", None)
-                if wrapper_kwargs.get("freq", None) is None:
-                    wrapper_kwargs["freq"] = _freq
+                if _tz is not None:
+                    if _tz_localize is None:
+                        _tz_localize = _tz
+                    if _tz_convert is None:
+                        _tz_convert = _tz
+                if _tz_localize is not None:
+                    if common_tz_localize is None:
+                        common_tz_localize = _tz_localize
+                    elif common_tz_localize != _tz_localize:
+                        raise ValueError("Returned objects have different timezones (tz_localize)")
+                if _tz_convert is not None:
+                    if common_tz_convert is None:
+                        common_tz_convert = _tz_convert
+                    elif common_tz_convert != _tz_convert:
+                        if not silence_warnings:
+                            warnings.warn(
+                                f"Returned objects have different timezones (tz_convert). Setting to UTC.",
+                                stacklevel=2,
+                            )
+                        common_tz_convert = "utc"
+                if _freq is not None:
+                    if common_freq is None:
+                        common_freq = _freq
+                    elif common_freq != _freq:
+                        raise ValueError("Returned objects have different frequencies (freq)")
                 if _data.size == 0:
                     if not silence_warnings:
                         if keys_are_features:
@@ -2965,6 +2981,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 else:
                     data[k] = _data
                     returned_kwargs[k] = _returned_kwargs
+        if tz_localize is None and common_tz_localize is not None:
+            tz_localize = common_tz_localize
+        if tz_convert is None and common_tz_convert is not None:
+            tz_convert = common_tz_convert
+        if wrapper_kwargs.get("freq", None) is None and common_freq is not None:
+            wrapper_kwargs["freq"] = common_freq
 
         if len(data) == 0:
             if keys_are_features:
@@ -3137,7 +3159,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         checks.assert_instance_of(self.last_index, self.dict_type, "last_index")
         checks.assert_instance_of(self.delisted, self.dict_type, "delisted")
 
-        funcs_args = []
+        tasks = []
         key_indices = []
         for i, k in enumerate(self.keys):
             if not self.delisted.get(k, False):
@@ -3149,20 +3171,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     key_update_kwargs = self.select_symbol_kwargs(k, kwargs)
                 if "silence_warnings" in func_arg_names:
                     key_update_kwargs["silence_warnings"] = silence_warnings
-                funcs_args.append(
-                    (
-                        key_update_func,
-                        (k,),
-                        dict(
-                            skip_on_error=skip_on_error,
-                            silence_warnings=silence_warnings,
-                            update_kwargs=key_update_kwargs,
-                        ),
-                    )
-                )
+                tasks.append(Task(
+                    key_update_func,
+                    k,
+                    skip_on_error=skip_on_error,
+                    silence_warnings=silence_warnings,
+                    update_kwargs=key_update_kwargs,
+                ))
                 key_indices.append(i)
 
-        outputs = execute(funcs_args, size=len(self.keys), keys=self.key_index, **execute_kwargs)
+        outputs = execute(tasks, size=len(self.keys), keys=self.key_index, **execute_kwargs)
         if return_raw:
             return outputs
 
@@ -3206,12 +3224,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                             stop=obj.index[-1] + new_obj.shape[0],
                             step=1,
                         )
-                    new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
                     new_obj = self.prepare_tzaware_index(
                         new_obj,
                         tz_localize=self.tz_localize,
                         tz_convert=self.tz_convert,
                     )
+                    if new_obj.index.is_monotonic_decreasing:
+                        new_obj = new_obj.iloc[::-1]
+                    elif not new_obj.index.is_monotonic_increasing:
+                        new_obj = new_obj.sort_index()
+                    if new_obj.index.has_duplicates:
+                        new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
                     new_data[k] = new_obj
                     if len(new_obj.index) > 0:
                         new_last_index[k] = new_obj.index[-1]
@@ -3269,7 +3292,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     obj = obj[0]
             obj = obj.loc[from_index:to_index]
             new_obj = pd.concat((obj, new_obj), axis=0)
-            new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
+            if new_obj.index.has_duplicates:
+                new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
             new_data[k] = new_obj
 
         # Align the index and columns in the new data
@@ -3705,6 +3729,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         silence_warnings: bool = False,
         raise_errors: bool = False,
         execute_kwargs: tp.KwargsLike = None,
+        filter_results: bool = True,
+        raise_no_results: bool = True,
         merge_func: tp.MergeFuncLike = None,
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
@@ -3762,7 +3788,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             _self = _self.select_symbols(on_symbols)
 
         if checks.is_complex_iterable(func):
-            funcs_args = []
+            tasks = []
             keys = []
             for i, f in enumerate(func):
                 _location = location
@@ -3816,33 +3842,31 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     **new_kwargs,
                 }
 
-                funcs_args.append((self.try_run, new_args, new_kwargs))
+                tasks.append(Task(self.try_run, *new_args, **new_kwargs))
                 keys.append(str(func_name))
 
             keys = pd.Index(keys, name="run_func")
-            results = execute(funcs_args, size=len(keys), keys=keys, **execute_kwargs)
-
-            skip_indices = set()
-            for i, result in enumerate(results):
-                if isinstance(result, _NoResult):
-                    skip_indices.add(i)
-            if len(skip_indices) > 0:
-                new_results = []
-                keep_indices = []
-                for i, result in enumerate(results):
-                    if i not in skip_indices:
-                        new_results.append(result)
-                        keep_indices.append(i)
-                results = new_results
-                keys = keys[keep_indices]
-            if len(results) == 0:
-                raise NoResultsException
+            results = execute(tasks, size=len(keys), keys=keys, **execute_kwargs)
+            if filter_results:
+                try:
+                    results, keys = filter_out_no_results(results, keys=keys)
+                except NoResultsException as e:
+                    if raise_no_results:
+                        raise e
+                    return NoResult
+                no_results_filtered = True
+            else:
+                no_results_filtered = False
 
             if merge_func is None and concat:
                 merge_func = "column_stack"
             if merge_func is not None:
                 if is_merge_func_from_config(merge_func):
-                    merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                    merge_kwargs = merge_dicts(dict(
+                        keys=keys,
+                        filter_results=not no_results_filtered,
+                        raise_no_results=raise_no_results,
+                    ), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
                     merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
                 else:
@@ -4708,9 +4732,21 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if connection_config is None:
             connection_config = {}
         if (connection is None or isinstance(connection, (str, Path))) and not self.has_key_dict(connection_config):
-            connection = DuckDBData.resolve_connection(connection=connection, **connection_config)
+            connection_meta = DuckDBData.resolve_connection(
+                connection=connection,
+                read_only=False,
+                return_meta=True,
+                **connection_config,
+            )
+            connection = connection_meta["connection"]
+            if return_meta or return_connection:
+                should_close = False
+            else:
+                should_close = connection_meta["should_close"]
         elif return_connection:
             raise ValueError("Connection can be returned only if URL was provided")
+        else:
+            should_close = False
 
         meta = self.dict_type()
         for k, v in self.data.items():
@@ -4734,7 +4770,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 is_kwargs=True,
             )
             if _connection is None or isinstance(_connection, (str, Path)):
-                _connection = DuckDBData.resolve_connection(connection=_connection, **_connection_config)
+                _connection_meta = DuckDBData.resolve_connection(
+                    connection=_connection,
+                    read_only=False,
+                    return_meta=True,
+                    **_connection_config,
+                )
+                _connection = _connection_meta["connection"]
+                _should_close = _connection_meta["should_close"]
+            else:
+                _should_close = False
             if table is None:
                 _table = k
             else:
@@ -4868,7 +4913,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 else:
                     _connection.sql(f'CREATE TABLE "{_table}" AS SELECT * FROM "_{k}"')
                 meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
+                if _should_close:
+                    _connection.close()
 
+        if should_close:
+            connection.close()
         if return_meta:
             return meta
         if return_connection:

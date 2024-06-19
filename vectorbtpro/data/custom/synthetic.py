@@ -81,8 +81,8 @@ class SyntheticData(CustomData):
         if len(index) == 0:
             raise ValueError("Date range is empty")
         if key_is_feature:
-            return cls.generate_feature(key, index, **kwargs), dict(tz_convert=tz, freq=timeframe)
-        return cls.generate_symbol(key, index, **kwargs), dict(tz_convert=tz, freq=timeframe)
+            return cls.generate_feature(key, index, **kwargs), dict(tz=tz, freq=timeframe)
+        return cls.generate_symbol(key, index, **kwargs), dict(tz=tz, freq=timeframe)
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:

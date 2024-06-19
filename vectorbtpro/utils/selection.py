@@ -8,8 +8,6 @@ from vectorbtpro.utils.attr_ import DefineMixin, define
 __all__ = [
     "PosSel",
     "LabelSel",
-    "NoResult",
-    "NoResultsException",
 ]
 
 
@@ -27,17 +25,3 @@ class LabelSel(DefineMixin):
 
     value: tp.MaybeIterable[tp.Hashable] = define.field()
     """Selection of one or more labels."""
-
-
-class _NoResult:
-    pass
-
-
-NoResult = _NoResult()
-"""Return this object to ignore an iteration."""
-
-
-class NoResultsException(Exception):
-    """Gets raised when there are no results."""
-
-    pass

@@ -2715,10 +2715,14 @@ class IdxRecords(IdxSetterFactory, DefineMixin):
                 if isinstance(field, str) and field.lower() in ("row", "index"):
                     row_fields.add((field, None))
                 if isinstance(field, str) and field.lower() in ("open time", "date", "datetime"):
+                    if (field, None) in row_fields:
+                        row_fields.remove((field, None))
                     row_fields.add((field, "datetime"))
                 if isinstance(field, str) and field.lower() in ("col", "column"):
                     col_fields.add((field, None))
                 if isinstance(field, str) and field.lower() == "symbol":
+                    if (field, None) in col_fields:
+                        col_fields.remove((field, None))
                     col_fields.add((field, "labels"))
             if _row_field in (None, True):
                 if len(row_fields) == 0:

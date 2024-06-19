@@ -132,7 +132,7 @@ from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.execution import Task, execute
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.random_ import set_seed
@@ -1890,7 +1890,7 @@ class PatternRanges(Ranges):
             single_group = False
 
         # Prepare function and arguments
-        funcs_args = []
+        tasks = []
         func = jit_reg.resolve_option(nb.find_pattern_1d_nb, jitted)
         def_func_kwargs = get_func_kwargs(func)
         new_search_configs = []
@@ -1910,7 +1910,7 @@ class PatternRanges(Ranges):
                         func_kwargs[k] = v
                 else:
                     func_kwargs[k] = v
-            funcs_args.append((func, (), func_kwargs))
+            tasks.append(Task(func, **func_kwargs))
             new_search_configs.append(new_search_config)
 
         # Build column hierarchy
@@ -1937,7 +1937,7 @@ class PatternRanges(Ranges):
 
         # Execute each configuration
         execute_kwargs = merge_dicts(dict(show_progress=False if single_group else None), execute_kwargs)
-        result_list = execute(funcs_args, keys=new_columns, **execute_kwargs)
+        result_list = execute(tasks, keys=new_columns, **execute_kwargs)
         records_arr = np.concatenate(result_list)
 
         # Wrap with class

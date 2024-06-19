@@ -52,7 +52,7 @@ def is_from_module(obj: tp.Any, module: ModuleType) -> bool:
 
 
 def list_module_keys(
-    module_name: str,
+    module_or_name: tp.Union[str, ModuleType],
     whitelist: tp.Optional[tp.List[str]] = None,
     blacklist: tp.Optional[tp.List[str]] = None,
 ) -> tp.List[str]:
@@ -63,7 +63,10 @@ def list_module_keys(
         whitelist = []
     if blacklist is None:
         blacklist = []
-    module = sys.modules[module_name]
+    if isinstance(module_or_name, str):
+        module = sys.modules[module_or_name]
+    else:
+        module = module_or_name
     return [
         name
         for name, obj in inspect.getmembers(module)
