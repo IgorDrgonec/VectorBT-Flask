@@ -1137,7 +1137,7 @@ def polyfit_1d_nb(x: tp.Array1d, y: tp.Array1d, deg: int, stabilize: bool = Fals
             col_norm = np.linalg.norm(mat_[:, n])
             scale_vect[n] = col_norm
             mat_[:, n] /= col_norm
-        det_ = np.linalg.lstsq(mat_, y)[0] / scale_vect
+        det_ = np.linalg.lstsq(mat_, y, rcond=-1)[0] / scale_vect
     else:
         mat_ = np.zeros(shape=(x.shape[0], deg + 1))
         const = np.ones_like(x)
@@ -1146,7 +1146,7 @@ def polyfit_1d_nb(x: tp.Array1d, y: tp.Array1d, deg: int, stabilize: bool = Fals
         if deg > 1:
             for n in range(2, deg + 1):
                 mat_[:, n] = x**n
-        det_ = np.linalg.lstsq(mat_, y)[0]
+        det_ = np.linalg.lstsq(mat_, y, rcond=-1)[0]
     return det_[::-1]
 
 

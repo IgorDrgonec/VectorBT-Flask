@@ -83,14 +83,14 @@ class FigureMixin:
             fig = self
         else:
             fig = self.copy()
+        first_index = None
+        last_index = None
         for i, d in enumerate(fig.data):
             range_mask = None
             if "x" in d:
                 d_index = pd.Index(d.x)
                 if start is not None:
                     if checks.is_int(start):
-                        if not pd.api.types.is_integer_dtype(d_index):
-                            raise TypeError(f"fig.data[{i}].x is not integer-like")
                         start_mask = np.full(len(d_index), False)
                         start_mask[start:] = True
                         if range_mask is None:
@@ -108,8 +108,6 @@ class FigureMixin:
                             range_mask &= start_mask
                 if end is not None:
                     if checks.is_int(end):
-                        if not pd.api.types.is_integer_dtype(d_index):
-                            raise TypeError(f"fig.data[{i}].x is not integer-like")
                         end_mask = np.full(len(d_index), False)
                         end_mask[:end] = True
                         if range_mask is None:
@@ -133,6 +131,14 @@ class FigureMixin:
                             if len(v) == len(d.x):
                                 setattr(d, k, v[range_mask])
                 d.x = d.x[range_mask]
+                if first_index is None:
+                    first_index = d.x[0]
+                else:
+                    first_index = min(first_index, d.x[0])
+                if last_index is None:
+                    last_index = d.x[-1]
+                else:
+                    last_index = max(last_index, d.x[-1])
         if "layout" in fig and "shapes" in fig.layout:
             new_shapes = []
             for i, shape in enumerate(fig.layout.shapes):
@@ -141,11 +147,9 @@ class FigureMixin:
                     new_x1 = shape.x1
                     shape_index = pd.Index([shape.x0, shape.x1])
                     if start is not None:
-                        if checks.is_int(start):
-                            if not pd.api.types.is_integer_dtype(shape_index):
-                                raise TypeError(f"fig.layout.shapes[{i}].x is not integer-like")
-                            new_x0 = max(shape_index[0], start)
-                            new_x1 = max(shape_index[1], start)
+                        if first_index is not None:
+                            new_x0 = max(shape.x0, first_index)
+                            new_x1 = max(shape.x1, first_index)
                         else:
                             if not isinstance(shape_index, pd.DatetimeIndex):
                                 raise TypeError(f"fig.layout.shapes[{i}].x is not datetime-like")
@@ -153,11 +157,9 @@ class FigureMixin:
                             new_x0 = max(shape_index[0], start_dt)
                             new_x1 = max(shape_index[1], start_dt)
                     if end is not None:
-                        if checks.is_int(end):
-                            if not pd.api.types.is_integer_dtype(shape_index):
-                                raise TypeError(f"fig.layout.shapes[{i}].x is not integer-like")
-                            new_x0 = min(shape_index[0], end)
-                            new_x1 = min(shape_index[1], end)
+                        if last_index is not None:
+                            new_x0 = min(shape.x0, last_index)
+                            new_x1 = min(shape.x1, last_index)
                         else:
                             if not isinstance(shape_index, pd.DatetimeIndex):
                                 raise TypeError(f"fig.layout.shapes[{i}].x is not datetime-like")

@@ -1874,6 +1874,7 @@ def get_rs_hurst_nb(
     H, c = np.linalg.lstsq(
         a=np.vstack((np.log(chunk_size_list[:k]), np.ones(len(chunk_size_list[:k])))).T,
         b=np.log(rs_values_list[:k]),
+        rcond=-1,
     )[0]
     return H
 
@@ -1911,7 +1912,9 @@ def get_dma_hurst_nb(
     if k == 0:
         return np.nan
     H, const = np.linalg.lstsq(
-        a=np.vstack((np.log10(n_list[:k]), np.ones(len(n_list[:k])))).T, b=np.log10(dma_list[:k])
+        a=np.vstack((np.log10(n_list[:k]), np.ones(len(n_list[:k])))).T,
+        b=np.log10(dma_list[:k]),
+        rcond=-1,
     )[0]
     return H
 
