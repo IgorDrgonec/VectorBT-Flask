@@ -22,7 +22,7 @@ from vectorbtpro.base.reshaping import (
     to_2d_shape,
 )
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.data.base import OHLCDataMixin, Data
+from vectorbtpro.data.base import OHLCDataMixin
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -9115,7 +9115,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         fit_sim_range: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
-        pct_scale: bool = False,
+        pct_scale: bool = True,
         xref: str = "x",
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,

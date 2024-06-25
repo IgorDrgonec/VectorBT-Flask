@@ -108,7 +108,9 @@ class DuckDBData(DBData):
         if connection_config is None:
             connection_config = {}
         has_connection_config = len(connection_config) > 0
+        connection_config["read_only"] = read_only
         connection_config = cls.resolve_custom_setting(connection_config, "connection_config", merge=True)
+        read_only = connection_config.pop("read_only", read_only)
         should_close = False
         if connection is None:
             if len(connection_config) == 0:
