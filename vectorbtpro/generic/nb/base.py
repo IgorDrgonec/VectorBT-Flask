@@ -979,23 +979,23 @@ def nanstd_nb(arr: tp.Array2d, ddof: int = 0) -> tp.Array1d:
 @register_jitted(cache=True)
 def nancov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, ddof: int = 0) -> float:
     """Numba equivalent of `np.cov` that ignores NaN values."""
+    if len(arr1) != len(arr2):
+        raise ValueError("Arrays must have the same length")
     arr1_sum = 0.0
     arr2_sum = 0.0
+    arr12_sumprod = 0.0
     k = 0
     for i in range(arr1.shape[0]):
         if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
             arr1_sum += arr1[i]
             arr2_sum += arr2[i]
+            arr12_sumprod += arr1[i] * arr2[i]
             k += 1
     if k - ddof <= 0:
         return np.nan
     arr1_mean = arr1_sum / k
     arr2_mean = arr2_sum / k
-    num = 0
-    for i in range(arr1.shape[0]):
-        if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
-            num += (arr1[i] - arr1_mean) * (arr2[i] - arr2_mean)
-    return num / (k - ddof)
+    return (arr12_sumprod - k * arr1_mean * arr2_mean) / (k - ddof)
 
 
 @register_chunkable(
@@ -1017,27 +1017,31 @@ def nancorr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
     """Numba equivalent of `np.corrcoef` that ignores NaN values.
 
     Numerically stable."""
+    if len(arr1) != len(arr2):
+        raise ValueError("Arrays must have the same length")
     arr1_sum = 0.0
     arr2_sum = 0.0
+    arr1_sumsq = 0.0
+    arr2_sumsq = 0.0
+    arr12_sumprod = 0.0
     k = 0
     for i in range(arr1.shape[0]):
         if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
             arr1_sum += arr1[i]
             arr2_sum += arr2[i]
+            arr1_sumsq += arr1[i] ** 2
+            arr2_sumsq += arr2[i] ** 2
+            arr12_sumprod += arr1[i] * arr2[i]
             k += 1
     if k == 0:
         return np.nan
     arr1_mean = arr1_sum / k
     arr2_mean = arr2_sum / k
-    num = 0
-    denom1 = 0
-    denom2 = 0
-    for i in range(arr1.shape[0]):
-        if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
-            num += (arr1[i] - arr1_mean) * (arr2[i] - arr2_mean)
-            denom1 += (arr1[i] - arr1_mean) ** 2
-            denom2 += (arr2[i] - arr2_mean) ** 2
-    denom = np.sqrt(denom1 * denom2)
+    arr1_meansq = arr1_sumsq / k
+    arr2_meansq = arr2_sumsq / k
+    arr12_meanprod = arr12_sumprod / k
+    num = arr12_meanprod - arr1_mean * arr2_mean
+    denom = np.sqrt((arr1_meansq - arr1_mean**2) * (arr2_meansq - arr2_mean**2))
     if denom == 0:
         return np.nan
     return num / denom
