@@ -805,12 +805,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             columns_changed = False
             for k, v in data.items():
                 if isinstance(v, (pd.Series, pd.DataFrame)):
-                    if not v.index.equals(new_index):
+                    if not checks.is_index_equal(v.index, new_index):
                         v = v.copy(deep=False)
                         v.index = new_index
                         index_changed = True
                     if isinstance(v, pd.DataFrame):
-                        if not v.columns.equals(new_columns):
+                        if not checks.is_index_equal(v.columns, new_columns):
                             v = v.copy(deep=False)
                             v.columns = new_columns
                             columns_changed = True
@@ -1706,7 +1706,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if index is None:
                 index = obj.index
             else:
-                if not index.equals(obj.index):
+                if not checks.is_index_equal(index, obj.index, check_names=False):
                     if missing == "nan":
                         if not silence_warnings:
                             warnings.warn(
@@ -1764,7 +1764,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if columns is None:
                 columns = obj_columns
             else:
-                if not columns.equals(obj_columns):
+                if not checks.is_index_equal(columns, obj_columns, check_names=False):
                     if missing == "nan":
                         if not silence_warnings:
                             warnings.warn(
