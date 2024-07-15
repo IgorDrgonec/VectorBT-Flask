@@ -18,7 +18,7 @@ dependencies = [
     "numba>=0.57.0; python_version>='3.11'",
     "scipy",
     "scikit-learn",
-    "schedule<=1.2.1",
+    "schedule",
     "requests",
     "tqdm",
     "python-dateutil",

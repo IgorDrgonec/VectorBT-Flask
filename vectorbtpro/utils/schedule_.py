@@ -6,9 +6,10 @@ import asyncio
 import inspect
 import logging
 import time
+import random
 from datetime import datetime, timedelta, time as dt_time
 
-from schedule import Scheduler, Job, CancelJob
+from schedule import Scheduler, Job, CancelJob, ScheduleError
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks, datetime_ as dt
@@ -69,7 +70,14 @@ class CustomJob(Job):
         if self.future_run and self.future_run < self.next_run and self._force_missed_run:
             self.next_run, self.future_run = self.future_run, self.next_run
         else:
-            self.future_run = self.next_run + self.period
+            if self.latest is not None:
+                if not (self.latest >= self.interval):
+                    raise ScheduleError("`latest` is greater than `interval`")
+                interval = random.randint(self.interval, self.latest)
+            else:
+                interval = self.interval
+            period = timedelta(**{self.unit: interval})
+            self.future_run = self.next_run + period
 
 
 class CancelledError(asyncio.CancelledError):
