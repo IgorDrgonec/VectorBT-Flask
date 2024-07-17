@@ -978,7 +978,6 @@ data = frozen_cfg(
                 username=None,
                 password=None,
                 auth_token=None,
-                user_agent=None,
             ),
             exchange=None,
             timeframe="D",

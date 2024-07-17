@@ -32,11 +32,13 @@ SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
 SEARCH_URL = (
     "https://symbol-search.tradingview.com/symbol_search/v3/?"
     "text={text}&"
-    "exchange={exchange}&"
     "start={start}&"
-    "hl=2&"
+    "hl=1&"
+    "exchange={exchange}&"
     "lang=en&"
-    "domain=production"
+    "search_type=undefined&"
+    "domain=production&"
+    "sort_by_country=US"
 )
 """Symbol search URL."""
 
@@ -159,6 +161,9 @@ FIELD_LIST = [
 ]
 """List of fields supported by the market scanner (list may be incomplete)."""
 
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+"""User agent."""
+
 
 class TVClient(Configured):
     """Client for TradingView."""
@@ -167,7 +172,6 @@ class TVClient(Configured):
         "username",
         "password",
         "auth_token",
-        "user_agent",
     }
 
     def __init__(
@@ -175,7 +179,6 @@ class TVClient(Configured):
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
         auth_token: tp.Optional[str] = None,
-        user_agent: tp.Optional[str] = None,
         **kwargs,
     ) -> None:
         """Client for TradingView."""
@@ -184,12 +187,11 @@ class TVClient(Configured):
             username=username,
             password=password,
             auth_token=auth_token,
-            user_agent=user_agent,
             **kwargs,
         )
 
         if auth_token is None:
-            auth_token = self.auth(username, password, user_agent=user_agent)
+            auth_token = self.auth(username, password)
         elif username is not None or password is not None:
             raise ValueError("Must provide either username and password, or auth_token")
 
@@ -223,14 +225,11 @@ class TVClient(Configured):
         cls,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
-        user_agent: tp.Optional[str] = None,
     ) -> str:
         """Authenticate."""
         if username is not None and password is not None:
             data = {"username": username, "password": password, "remember": "on"}
-            headers = {"Referer": REFERER_URL}
-            if user_agent is not None:
-                headers["User-Agent"] = user_agent
+            headers = {"Referer": REFERER_URL, "User-Agent": USER_AGENT}
             response = requests.post(url=SIGNIN_URL, data=data, headers=headers)
             response.raise_for_status()
             json = response.json()
@@ -449,8 +448,9 @@ class TVClient(Configured):
             for i in range(retries):
                 try:
                     url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
-                    resp = requests.get(url)
-                    symbols_data = json.loads(resp.text)
+                    headers = {"Referer": REFERER_URL, "Origin": ORIGIN_URL, "User-Agent": USER_AGENT}
+                    resp = requests.get(url, headers=headers)
+                    symbols_data = json.loads(resp.text.replace("</em>", "").replace("<em>", ""))
                     break
                 except json.JSONDecodeError as e:
                     if i == retries - 1:
@@ -476,6 +476,7 @@ class TVClient(Configured):
                     show_progress=show_progress,
                     **pbar_kwargs,
                 )
+                pbar.enter()
             if pbar is not None:
                 max_symbols = len(symbols_list) + symbols_remaining
                 if pages is not None:
@@ -490,7 +491,7 @@ class TVClient(Configured):
             if delay is not None:
                 time.sleep(delay)
         if pbar is not None:
-            pbar.close()
+            pbar.exit()
 
         return symbols_list
 
@@ -500,7 +501,8 @@ class TVClient(Configured):
         if market is None:
             market = "global"
         url = SCAN_URL.format(market=market.lower())
-        resp = requests.post(url, json.dumps(kwargs))
+        headers = {"Referer": REFERER_URL, "Origin": ORIGIN_URL, "User-Agent": USER_AGENT}
+        resp = requests.post(url, json.dumps(kwargs), headers=headers)
         symbols_list = json.loads(resp.text)["data"]
         return symbols_list
 
@@ -530,7 +532,6 @@ class TVData(RemoteData):
         ...         username="YOUR_USERNAME",
         ...         password="YOUR_PASSWORD",
         ...         auth_token="YOUR_AUTH_TOKEN",  # optional, instead of username and password
-        ...         user_agent="YOUR_USER_AGENT"  # optional, see https://useragentstring.com/
         ...     )
         ... )
         ```
