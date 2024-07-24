@@ -1228,7 +1228,12 @@ def pivot_info_1d_nb(
                 _up_th = 1 + abs(flex_select_1d_nb(up_th_, i))
                 _down_th = 1 - abs(flex_select_1d_nb(down_th_, i))
                 if np.isnan(_up_th) or np.isnan(_down_th):
+                    conf_pivot[i] = _conf_pivot
+                    conf_idx[i] = _conf_idx
+                    last_pivot[i] = _last_pivot
+                    last_idx[i] = _last_idx
                     continue
+
                 first_valid_idx = i
             if _last_idx == -1:
                 _up_th = 1 + abs(flex_select_1d_nb(up_th_, first_valid_idx))
