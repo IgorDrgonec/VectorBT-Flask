@@ -33,6 +33,10 @@ from vectorbtpro.utils.parsing import get_context_vars
 from vectorbtpro.utils.template import substitute_templates
 
 if tp.TYPE_CHECKING:
+    from vectorbtpro.data.base import Data as DataT
+else:
+    DataT = tp.Any
+if tp.TYPE_CHECKING:
     from vectorbtpro.generic.splitting.base import Splitter as SplitterT
 else:
     SplitterT = "Splitter"
@@ -1230,6 +1234,22 @@ class BaseAccessor(Wrapping):
     def to_dict(self, *args, **kwargs) -> tp.Mapping:
         """See `vectorbtpro.base.reshaping.to_dict`."""
         return reshaping.to_dict(self.obj, *args, **kwargs)
+
+    # ############# Conversion ############# #
+
+    def to_data(
+        self,
+        data_cls: tp.Optional[tp.Type[DataT]] = None,
+        columns_are_symbols: bool = True,
+        **kwargs,
+    ) -> DataT:
+        """Convert to a `vectorbtpro.data.base.Data` instance."""
+        if data_cls is None:
+            from vectorbtpro.data.base import Data
+
+            data_cls = Data
+
+        return data_cls.from_data(self.obj, columns_are_symbols=columns_are_symbols, **kwargs)
 
     # ############# Combining ############# #
 
