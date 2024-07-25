@@ -2264,6 +2264,14 @@ class TestPortfolio:
         assert pf.replace(bm_close=None).filled_bm_close is None
         assert not pf.replace(bm_close=False).filled_bm_close
 
+    def test_views(self):
+        assert_records_close(pf.longonly_view.entry_trades.values, pf.entry_trades.longonly_view.values)
+        assert_records_close(pf.shortonly_view.entry_trades.values, pf.entry_trades.shortonly_view.values)
+        assert_records_close(pf.longonly_view.exit_trades.values, pf.exit_trades.longonly_view.values)
+        assert_records_close(pf.shortonly_view.exit_trades.values, pf.exit_trades.shortonly_view.values)
+        assert_records_close(pf.longonly_view.positions.values, pf.positions.longonly_view.values)
+        assert_records_close(pf.shortonly_view.positions.values, pf.positions.shortonly_view.values)
+
     def test_orders(self):
         result = np.array(
             [

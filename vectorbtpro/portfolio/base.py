@@ -175,6 +175,8 @@ shortcut_config = ReadonlyConfig(
     {
         "filled_close": dict(group_by_aware=False, decorator=cached_property),
         "filled_bm_close": dict(group_by_aware=False, decorator=cached_property),
+        "longonly_view": dict(obj_type="portfolio"),
+        "shortonly_view": dict(obj_type="portfolio"),
         "orders": dict(
             obj_type="records",
             field_aliases=("order_records",),
@@ -5066,6 +5068,90 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         func = ch_reg.resolve_option(func, chunked)
         filled_bm_close = func(to_2d_array(bm_close))
         return wrapper.wrap(filled_bm_close, group_by=False, **resolve_dict(wrap_kwargs))
+
+    # ############# Views ############# #
+
+    def get_longonly_view(
+        self,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
+        rec_sim_range: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> PortfolioT:
+        """Get view of portfolio with long positions only."""
+        if orders is None:
+            orders = self.resolve_shortcut_attr(
+                "orders",
+                sim_start=sim_start,
+                sim_end=sim_end,
+                rec_sim_range=rec_sim_range,
+            )
+        if init_position is None:
+            init_position = self._init_position
+        if init_price is None:
+            init_price = self._init_price
+        new_order_records = orders.get_longonly_view(
+            init_position=init_position,
+            init_price=init_price,
+            jitted=jitted,
+            chunked=chunked,
+        ).values
+        init_position = broadcast_array_to(init_position, self.wrapper.shape_2d[1])
+        init_price = broadcast_array_to(init_price, self.wrapper.shape_2d[1])
+        new_init_position = np.where(init_position > 0, init_position, 0)
+        new_init_price = np.where(init_position > 0, init_price, np.nan)
+        return self.replace(
+            order_records=new_order_records,
+            init_position=new_init_position,
+            init_price=new_init_price,
+            **kwargs
+        )
+
+    def get_shortonly_view(
+        self,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
+        rec_sim_range: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> PortfolioT:
+        """Get view of portfolio with short positions only."""
+        if orders is None:
+            orders = self.resolve_shortcut_attr(
+                "orders",
+                sim_start=sim_start,
+                sim_end=sim_end,
+                rec_sim_range=rec_sim_range,
+            )
+        if init_position is None:
+            init_position = self._init_position
+        if init_price is None:
+            init_price = self._init_price
+        new_order_records = orders.get_shortonly_view(
+            init_position=init_position,
+            init_price=init_price,
+            jitted=jitted,
+            chunked=chunked,
+        ).values
+        init_position = broadcast_array_to(init_position, self.wrapper.shape_2d[1])
+        init_price = broadcast_array_to(init_price, self.wrapper.shape_2d[1])
+        new_init_position = np.where(init_position < 0, init_position, 0)
+        new_init_price = np.where(init_position < 0, init_price, np.nan)
+        return self.replace(
+            order_records=new_order_records,
+            init_position=new_init_position,
+            init_price=new_init_price,
+            **kwargs
+        )
 
     # ############# Records ############# #
 
