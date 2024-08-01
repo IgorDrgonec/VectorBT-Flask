@@ -145,11 +145,11 @@ class TestFactory:
         I._rec_id = "123456789"
         vbt.RecInfo(I._rec_id, I).register()
         indicator = I.run(ts, [0, 1], 10, b=100)
-        assert I.loads(indicator.dumps()) == indicator
+        assert I.loads(indicator.dumps()).equals(indicator)
         indicator.save(tmp_path / "indicator")
-        assert I.load(tmp_path / "indicator") == indicator
+        assert I.load(tmp_path / "indicator").equals(indicator)
         indicator.save(tmp_path / "indicator", file_format="ini")
-        assert I.load(tmp_path / "indicator", file_format="ini") == indicator
+        assert I.load(tmp_path / "indicator", file_format="ini").equals(indicator)
 
     def test_with_custom_func(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])

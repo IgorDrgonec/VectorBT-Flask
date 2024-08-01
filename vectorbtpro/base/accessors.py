@@ -1608,6 +1608,8 @@ class BaseAccessor(Wrapping):
             1.02 s ± 2.18 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
             ```
         """
+        from vectorbtpro.indicators.factory import IndicatorBase
+
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -1624,7 +1626,14 @@ class BaseAccessor(Wrapping):
                     concat = True
             else:
                 objs = (obj,)
-        objs = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, objs))
+        new_objs = []
+        for obj in objs:
+            if isinstance(obj, BaseAccessor):
+                obj = obj.obj
+            elif isinstance(obj, IndicatorBase):
+                obj = obj.main_output
+            new_objs.append(obj)
+        objs = tuple(new_objs)
         if not isinstance(cls_or_self, type):
             objs = (cls_or_self.obj,) + objs
         if checks.is_numba_func(combine_func):
