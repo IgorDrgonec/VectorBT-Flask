@@ -22,7 +22,7 @@ from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.orders import FSOrders
 from vectorbtpro.registries.ch_registry import ch_reg
-from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.signals import nb as signals_nb
 from vectorbtpro.utils import checks, chunking as ch
 from vectorbtpro.utils.config import Configured, merge_dicts, ReadonlyConfig
@@ -39,6 +39,22 @@ __all__ = [
 ]
 
 __pdoc__ = {}
+
+
+@register_jitted(cache=True)
+def valid_price_from_ago_1d_nb(price: tp.Array1d) -> tp.Array1d:
+    """Parse from_ago from a valid price."""
+    from_ago = np.empty(price.shape, dtype=np.int_)
+    for i in range(price.shape[0] - 1, -1, -1):
+        if i > 0 and not np.isnan(price[i]):
+            for j in range(i - 1, -1, -1):
+                if not np.isnan(price[j]):
+                    break
+            from_ago[i] = i - j
+        else:
+            from_ago[i] = 1
+    return from_ago
+
 
 PFPrepResultT = tp.TypeVar("PFPrepResultT", bound="PFPrepResult")
 
@@ -759,7 +775,35 @@ class FOPreparer(BasePFPreparer):
             if price.size == 1 or price.shape[0] == 1:
                 next_open_mask = price == enums.PriceType.NextOpen
                 next_close_mask = price == enums.PriceType.NextClose
-                if next_open_mask.any() or next_close_mask.any():
+                next_valid_open_mask = price == enums.PriceType.NextValidOpen
+                next_valid_close_mask = price == enums.PriceType.NextValidClose
+
+                if next_valid_open_mask.any() or next_valid_close_mask.any():
+                    new_price = np.empty(self.wrapper.shape_2d, np.float_)
+                    new_from_ago = np.empty(self.wrapper.shape_2d, np.int_)
+                    if next_valid_open_mask.any():
+                        open = broadcast_array_to(self.open, self.wrapper.shape_2d)
+                    if next_valid_close_mask.any():
+                        close = broadcast_array_to(self.close, self.wrapper.shape_2d)
+
+                    for i in range(price.size):
+                        price_item = price.item(i)
+                        if price_item == enums.PriceType.NextOpen:
+                            new_price[:, i] = enums.PriceType.Open
+                            new_from_ago[:, i] = 1
+                        elif price_item == enums.PriceType.NextClose:
+                            new_price[:, i] = enums.PriceType.Close
+                            new_from_ago[:, i] = 1
+                        elif price_item == enums.PriceType.NextValidOpen:
+                            new_price[:, i] = enums.PriceType.Open
+                            new_from_ago[:, i] = valid_price_from_ago_1d_nb(open[:, i])
+                        elif price_item == enums.PriceType.NextValidClose:
+                            new_price[:, i] = enums.PriceType.Close
+                            new_from_ago[:, i] = valid_price_from_ago_1d_nb(close[:, i])
+                    price = new_price
+                    from_ago = new_from_ago
+
+                elif next_open_mask.any() or next_close_mask.any():
                     price = price.astype(np.float_)
                     price[next_open_mask] = enums.PriceType.Open
                     price[next_close_mask] = enums.PriceType.Close

@@ -108,6 +108,8 @@ class PriceTypeT(tp.NamedTuple):
     Close: int = np.inf
     NextOpen: int = -1
     NextClose: int = -2
+    NextValidOpen: int = -3
+    NextValidClose: int = -4
 
 
 PriceType = PriceTypeT()
@@ -134,6 +136,12 @@ Attributes:
     NextClose: Next closing price. 
     
         Will be substituted by `np.inf` and `from_ago` will be set to 1.
+    NextValidOpen: Next valid (non-NA) opening price. 
+    
+        Will be substituted by `-np.inf` and `from_ago` will be set to the distance to the previous valid value.
+    NextValidClose: Next valid (non-NA) closing price. 
+    
+        Will be substituted by `np.inf` and `from_ago` will be set to the distance to the previous valid value.
 """
 
 
