@@ -89,11 +89,11 @@ class _ADX(ADX):
         if adx_trace_kwargs is None:
             adx_trace_kwargs = {}
         plus_di_trace_kwargs = merge_dicts(
-            dict(name="-DI", line=dict(color=plotting_cfg["color_schema"]["red"], dash="dot")),
+            dict(name="+DI", line=dict(color=plotting_cfg["color_schema"]["green"], dash="dot")),
             plus_di_trace_kwargs,
         )
         minus_di_trace_kwargs = merge_dicts(
-            dict(name="+DI", line=dict(color=plotting_cfg["color_schema"]["green"], dash="dot")),
+            dict(name="-DI", line=dict(color=plotting_cfg["color_schema"]["red"], dash="dot")),
             minus_di_trace_kwargs,
         )
         adx_trace_kwargs = merge_dicts(
