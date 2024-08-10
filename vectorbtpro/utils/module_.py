@@ -158,13 +158,16 @@ def assert_can_import(pkg_name: str) -> None:
     if not check_installed(pkg_name):
         raise ImportError(f"Please install {dist_name}{version_str} - {link}")
     if version != "":
-        actual_version = "(" + get_version(dist_name).replace(".", ",") + ")"
+        actual_version_parts = get_version(dist_name).split(".")
+        actual_version_parts = map(lambda x: x if x.isnumeric() else f"'{x}'", actual_version_parts)
+        actual_version = "(" + ",".join(actual_version_parts) + ")"
         if version[0].isdigit():
             operator = "=="
         else:
             operator = version[:2]
-            version = version[2:]
-            version = "(" + version.replace(".", ",") + ")"
+            version_parts = version[2:].split(".")
+            version_parts = map(lambda x: x if x.isnumeric() else f"'{x}'", version_parts)
+            version = "(" + ",".join(version_parts) + ")"
         if not eval(f"{actual_version} {operator} {version}"):
             raise ImportError(f"Please install {dist_name}{version_str} - {link}")
 
