@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from vectorbtpro.data.custom.duckdb import *
     from vectorbtpro.data.custom.feather import *
     from vectorbtpro.data.custom.file import *
+    from vectorbtpro.data.custom.finpy import *
     from vectorbtpro.data.custom.gbm import *
     from vectorbtpro.data.custom.gbm_ohlc import *
     from vectorbtpro.data.custom.hdf import *

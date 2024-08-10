@@ -242,14 +242,13 @@ class SQLData(DBData):
                     continue
             if schema == "information_schema":
                 continue
-            if schema not in schemas:
-                schemas.append(schema)
+            schemas.append(schema)
 
         if dispose_engine:
             engine.dispose()
         if sort:
-            return sorted(schemas)
-        return schemas
+            return sorted(dict.fromkeys(schemas))
+        return list(dict.fromkeys(schemas))
 
     @classmethod
     def list_tables(
@@ -340,14 +339,13 @@ class SQLData(DBData):
                         continue
                 if prefix_schema and schema is not None:
                     table = str(schema) + ":" + table
-                if table not in tables:
-                    tables.append(table)
+                tables.append(table)
 
         if dispose_engine:
             engine.dispose()
         if sort:
-            return sorted(tables)
-        return tables
+            return sorted(dict.fromkeys(tables))
+        return list(dict.fromkeys(tables))
 
     @classmethod
     def has_schema(

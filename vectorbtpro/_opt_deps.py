@@ -160,7 +160,10 @@ opt_dep_config = HybridConfig(
             link="https://pypi.org/project/databento/",
         ),
         smartmoneyconcepts=dict(
-            link="https://github.com/joshyattridge/smart-money-concepts/",
+            link="https://pypi.org/project/smartmoneyconcepts/",
+        ),
+        findatapy=dict(
+            link="https://pypi.org/project/findatapy/",
         ),
     )
 )

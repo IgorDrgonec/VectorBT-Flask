@@ -1020,6 +1020,17 @@ data = frozen_cfg(
             df_kwargs=flex_cfg(),
             params=flex_cfg(),
         ),
+        finpy=flex_cfg(
+            market=None,
+            market_config=flex_cfg(),
+            config_manager=None,
+            config_manager_config=flex_cfg(),
+            start="one year ago",
+            end="now",
+            timeframe="daily",
+            tz="utc",
+            request_kwargs=flex_cfg(),
+        ),
     ),
     stats=flex_cfg(
         filters=flex_cfg(

@@ -73,6 +73,7 @@ data = [
     "nasdaq-data-link",
     "alpha_vantage",
     "databento",
+    "findatapy",
 ]
 ind-base = ["TA-Lib"]
 ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical", "smartmoneyconcepts"]

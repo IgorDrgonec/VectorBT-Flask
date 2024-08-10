@@ -786,11 +786,14 @@ class TVData(RemoteData):
                 if not cls.key_match(symbol.split(":")[1], symbol_pattern, use_regex=use_regex):
                     continue
             found_symbols.append(item)
+
         if sort:
             if return_field_data:
                 return sorted(found_symbols, key=lambda x: x["symbol"])
-            return sorted(found_symbols)
-        return found_symbols
+            return sorted(dict.fromkeys(found_symbols))
+        if return_field_data:
+            return found_symbols
+        return list(dict.fromkeys(found_symbols))
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:

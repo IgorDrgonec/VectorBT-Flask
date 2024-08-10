@@ -106,9 +106,10 @@ class AVData(RemoteData):
         query["apikey"] = apikey
         url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(query)
         df = pd.read_csv(url)
+
         if sort:
-            return sorted(df["symbol"].tolist())
-        return df["symbol"].tolist()
+            return sorted(dict.fromkeys(df["symbol"].tolist()))
+        return list(dict.fromkeys(df["symbol"].tolist()))
 
     @classmethod
     @lru_cache()

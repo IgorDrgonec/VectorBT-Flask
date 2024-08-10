@@ -142,9 +142,10 @@ class CCXTData(RemoteData):
                 if not cls.key_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
+
         if sort:
-            return sorted(all_symbols)
-        return all_symbols
+            return sorted(dict.fromkeys(all_symbols))
+        return list(dict.fromkeys(all_symbols))
 
     @classmethod
     def resolve_exchange(
