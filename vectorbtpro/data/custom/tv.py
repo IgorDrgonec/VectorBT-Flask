@@ -357,6 +357,11 @@ class TVClient(Configured):
         """Get historical data."""
         symbol = self.format_symbol(symbol=symbol, exchange=exchange, fut_contract=fut_contract)
 
+        backadjustment = False
+        if symbol.endswith("!A"):
+            backadjustment = True
+            symbol = symbol.replace("!A", "!")
+
         self.create_connection(pro_data=pro_data)
         self.send_message("set_auth_token", [self.auth_token])
         self.send_message("chart_create_session", [self.chart_session, ""])
@@ -401,6 +406,7 @@ class TVClient(Configured):
                 + symbol
                 + '","adjustment":"'
                 + adjustment
+                + ('' if not backadjustment else '","backadjustment":"default')
                 + '","session":'
                 + ('"regular"' if not extended_session else '"extended"')
                 + "}",
