@@ -47,6 +47,32 @@ def records_within_sim_range_nb(
 
 
 @register_jitted(cache=True)
+def apply_weights_to_orders_nb(
+    order_records: tp.RecordArray,
+    col_arr: tp.Array1d,
+    weights: tp.Array1d,
+) -> tp.RecordArray:
+    """Apply weights to order records."""
+    order_records = order_records.copy()
+    out = np.empty(len(order_records), dtype=order_records.dtype)
+    k = 0
+
+    for r in range(len(order_records)):
+        order_record = order_records[r]
+        col = col_arr[r]
+        if not np.isnan(weights[col]):
+            order_record["size"] = weights[col] * order_record["size"]
+            order_record["fees"] = weights[col] * order_record["fees"]
+            if order_record["size"] != 0:
+                out[k] = order_record
+                k += 1
+        else:
+            out[k] = order_record
+            k += 1
+    return out[:k]
+
+
+@register_jitted(cache=True)
 def weighted_price_reduce_meta_nb(
     idxs: tp.Array1d,
     col: int,

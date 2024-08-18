@@ -175,6 +175,7 @@ shortcut_config = ReadonlyConfig(
     {
         "filled_close": dict(group_by_aware=False, decorator=cached_property),
         "filled_bm_close": dict(group_by_aware=False, decorator=cached_property),
+        "weights": dict(group_by_aware=False, decorator=cached_property, obj_type="red_array"),
         "longonly_view": dict(obj_type="portfolio"),
         "shortonly_view": dict(obj_type="portfolio"),
         "orders": dict(
@@ -183,10 +184,10 @@ shortcut_config = ReadonlyConfig(
             wrap_func=lambda pf, obj, **kwargs: pf.orders_cls.from_records(
                 fix_wrapper_for_records(pf),
                 obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
+                open=pf.open_flex,
+                high=pf.high_flex,
+                low=pf.low_flex,
+                close=pf.close_flex,
             ),
             indexing_func=partial(records_indexing_func, cls="orders_cls"),
             resample_func=partial(records_resample_func, cls="orders_cls"),
@@ -197,10 +198,10 @@ shortcut_config = ReadonlyConfig(
             wrap_func=lambda pf, obj, **kwargs: pf.logs_cls.from_records(
                 fix_wrapper_for_records(pf),
                 obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
+                open=pf.open_flex,
+                high=pf.high_flex,
+                low=pf.low_flex,
+                close=pf.close_flex,
             ),
             indexing_func=partial(records_indexing_func, cls="logs_cls"),
             resample_func=partial(records_resample_func, cls="logs_cls"),
@@ -209,12 +210,12 @@ shortcut_config = ReadonlyConfig(
             obj_type="records",
             field_aliases=("entry_trade_records",),
             wrap_func=lambda pf, obj, **kwargs: pf.entry_trades_cls.from_records(
-                pf.orders.wrapper,
+                fix_wrapper_for_records(pf),
                 obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
+                open=pf.open_flex,
+                high=pf.high_flex,
+                low=pf.low_flex,
+                close=pf.close_flex,
             ),
             indexing_func=partial(records_indexing_func, cls="entry_trades_cls"),
             resample_func=partial(records_resample_func, cls="entry_trades_cls"),
@@ -223,12 +224,12 @@ shortcut_config = ReadonlyConfig(
             obj_type="records",
             field_aliases=("exit_trade_records",),
             wrap_func=lambda pf, obj, **kwargs: pf.exit_trades_cls.from_records(
-                pf.orders.wrapper,
+                fix_wrapper_for_records(pf),
                 obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
+                open=pf.open_flex,
+                high=pf.high_flex,
+                low=pf.low_flex,
+                close=pf.close_flex,
             ),
             indexing_func=partial(records_indexing_func, cls="exit_trades_cls"),
             resample_func=partial(records_resample_func, cls="exit_trades_cls"),
@@ -237,12 +238,12 @@ shortcut_config = ReadonlyConfig(
             obj_type="records",
             field_aliases=("trade_records",),
             wrap_func=lambda pf, obj, **kwargs: pf.trades_cls.from_records(
-                pf.orders.wrapper,
+                fix_wrapper_for_records(pf),
                 obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
+                open=pf.open_flex,
+                high=pf.high_flex,
+                low=pf.low_flex,
+                close=pf.close_flex,
             ),
             indexing_func=partial(records_indexing_func, cls="trades_cls"),
             resample_func=partial(records_resample_func, cls="trades_cls"),
@@ -252,12 +253,12 @@ shortcut_config = ReadonlyConfig(
             obj_type="records",
             field_aliases=("position_records",),
             wrap_func=lambda pf, obj, **kwargs: pf.positions_cls.from_records(
-                pf.orders.wrapper,
+                fix_wrapper_for_records(pf),
                 obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
+                open=pf.open_flex,
+                high=pf.high_flex,
+                low=pf.low_flex,
+                close=pf.close_flex,
             ),
             indexing_func=partial(records_indexing_func, cls="positions_cls"),
             resample_func=partial(records_resample_func, cls="positions_cls"),
@@ -265,7 +266,10 @@ shortcut_config = ReadonlyConfig(
         "drawdowns": dict(
             obj_type="records",
             field_aliases=("drawdown_records",),
-            wrap_func=lambda pf, obj, **kwargs: pf.drawdowns_cls.from_records(pf.orders.wrapper.resolve(), obj),
+            wrap_func=lambda pf, obj, **kwargs: pf.drawdowns_cls.from_records(
+                fix_wrapper_for_records(pf).resolve(),
+                obj,
+            ),
             indexing_func=partial(records_indexing_func, cls="drawdowns_cls", groups_only=True),
             resample_func=partial(records_resample_func, cls="drawdowns_cls"),
         ),
@@ -490,6 +494,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             Applied after the simulation to avoid NaNs in asset value.
 
             See `Portfolio.get_filled_close`.
+        weights (array_like): Asset weights.
+
+            Applied to the initial position, initial cash, cash deposits, cash earnings, and orders.
         trades_type (str or int): Default `vectorbtpro.portfolio.trades.Trades` to use across `Portfolio`.
 
             See `vectorbtpro.portfolio.enums.TradesType`.
@@ -695,74 +702,74 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         for obj in objs:
             if not checks.is_instance_of(obj, Portfolio):
                 raise TypeError("Each object to be merged must be an instance of Portfolio")
+        _objs = list(map(lambda x: x.disable_weights(), objs))
         if "wrapper" not in kwargs:
             wrapper_kwargs = merge_dicts(dict(group_by=group_by), wrapper_kwargs)
-            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
-
-        for i in range(1, len(objs)):
-            if objs[i].cash_sharing != objs[0].cash_sharing:
+            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in _objs], **wrapper_kwargs)
+        for i in range(1, len(_objs)):
+            if _objs[i].cash_sharing != _objs[0].cash_sharing:
                 raise ValueError("Objects to be merged must have the same 'cash_sharing'")
-        kwargs["cash_sharing"] = objs[0].cash_sharing
+        kwargs["cash_sharing"] = _objs[0].cash_sharing
         cs_group_by = None if kwargs["cash_sharing"] else False
         cs_n_cols = kwargs["wrapper"].get_shape_2d(group_by=cs_group_by)[1]
         n_cols = kwargs["wrapper"].shape_2d[1]
 
         if "close" not in kwargs:
             kwargs["close"] = kwargs["wrapper"].row_stack_arrs(
-                *[obj.close for obj in objs],
+                *[obj.close for obj in _objs],
                 group_by=False,
                 wrap=False,
             )
         if "open" not in kwargs:
             stack_open_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._open is None:
                     stack_open_objs = False
                     break
             if stack_open_objs:
                 kwargs["open"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.open for obj in objs],
+                    *[obj.open for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "high" not in kwargs:
             stack_high_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._high is None:
                     stack_high_objs = False
                     break
             if stack_high_objs:
                 kwargs["high"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.high for obj in objs],
+                    *[obj.high for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "low" not in kwargs:
             stack_low_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._low is None:
                     stack_low_objs = False
                     break
             if stack_low_objs:
                 kwargs["low"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.low for obj in objs],
+                    *[obj.low for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "order_records" not in kwargs:
-            kwargs["order_records"] = Orders.row_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
+            kwargs["order_records"] = Orders.row_stack_records_arrs(*[obj.orders for obj in _objs], **kwargs)
         if "log_records" not in kwargs:
-            kwargs["log_records"] = Logs.row_stack_records_arrs(*[obj.logs for obj in objs], **kwargs)
+            kwargs["log_records"] = Logs.row_stack_records_arrs(*[obj.logs for obj in _objs], **kwargs)
         if "init_cash" not in kwargs:
             stack_init_cash_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if not checks.is_int(obj._init_cash) or obj._init_cash not in enums.InitCashMode:
                     stack_init_cash_objs = True
                     break
             if stack_init_cash_objs:
                 stack_init_cash_objs = False
                 init_cash_objs = []
-                for i, obj in enumerate(objs):
+                for i, obj in enumerate(_objs):
                     init_cash_obj = obj.get_init_cash(group_by=cs_group_by)
                     init_cash_obj = to_1d_array(init_cash_obj)
                     init_cash_obj = broadcast_array_to(init_cash_obj, cs_n_cols)
@@ -772,7 +779,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 if stack_init_cash_objs:
                     if not combine_init_cash:
                         cash_deposits_objs = []
-                        for i, obj in enumerate(objs):
+                        for i, obj in enumerate(_objs):
                             cash_deposits_obj = obj.get_cash_deposits(group_by=cs_group_by)
                             cash_deposits_obj = to_2d_array(cash_deposits_obj)
                             cash_deposits_obj = broadcast_array_to(
@@ -792,7 +799,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         if "init_position" not in kwargs:
             stack_init_position_objs = False
             init_position_objs = []
-            for i, obj in enumerate(objs):
+            for i, obj in enumerate(_objs):
                 init_position_obj = obj.get_init_position()
                 init_position_obj = to_1d_array(init_position_obj)
                 init_position_obj = broadcast_array_to(init_position_obj, n_cols)
@@ -809,7 +816,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             stack_init_price_objs = False
             init_position_objs = []
             init_price_objs = []
-            for i, obj in enumerate(objs):
+            for i, obj in enumerate(_objs):
                 init_position_obj = obj.get_init_position()
                 init_position_obj = to_1d_array(init_position_obj)
                 init_position_obj = broadcast_array_to(init_position_obj, n_cols)
@@ -837,13 +844,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["init_price"] = init_price_objs[0]
         if "cash_deposits" not in kwargs:
             stack_cash_deposits_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if obj._cash_deposits.size > 1 or obj._cash_deposits.item() != 0:
                     stack_cash_deposits_objs = True
                     break
             if stack_cash_deposits_objs:
                 kwargs["cash_deposits"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
+                    *[obj.get_cash_deposits(group_by=cs_group_by) for obj in _objs],
                     group_by=cs_group_by,
                     wrap=False,
                 )
@@ -851,13 +858,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["cash_deposits"] = np.array([[0.0]])
         if "cash_earnings" not in kwargs:
             stack_cash_earnings_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if obj._cash_earnings.size > 1 or obj._cash_earnings.item() != 0:
                     stack_cash_earnings_objs = True
                     break
             if stack_cash_earnings_objs:
                 kwargs["cash_earnings"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.get_cash_earnings(group_by=False) for obj in objs],
+                    *[obj.get_cash_earnings(group_by=False) for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
@@ -865,34 +872,34 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["cash_earnings"] = np.array([[0.0]])
         if "call_seq" not in kwargs:
             stack_call_seq_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj.config["call_seq"] is None:
                     stack_call_seq_objs = False
                     break
             if stack_call_seq_objs:
                 kwargs["call_seq"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.call_seq for obj in objs],
+                    *[obj.call_seq for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "bm_close" not in kwargs:
             stack_bm_close_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._bm_close is None or isinstance(obj._bm_close, bool):
                     stack_bm_close_objs = False
                     break
             if stack_bm_close_objs:
                 kwargs["bm_close"] = kwargs["wrapper"].row_stack_arrs(
-                    *[obj.bm_close for obj in objs],
+                    *[obj.bm_close for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "in_outputs" not in kwargs:
-            kwargs["in_outputs"] = cls.row_stack_in_outputs(*objs, **kwargs)
+            kwargs["in_outputs"] = cls.row_stack_in_outputs(*_objs, **kwargs)
         if "sim_start" not in kwargs:
-            kwargs["sim_start"] = cls.row_stack_sim_start(kwargs["wrapper"], *objs)
+            kwargs["sim_start"] = cls.row_stack_sim_start(kwargs["wrapper"], *_objs)
         if "sim_end" not in kwargs:
-            kwargs["sim_end"] = cls.row_stack_sim_end(kwargs["wrapper"], *objs)
+            kwargs["sim_end"] = cls.row_stack_sim_end(kwargs["wrapper"], *_objs)
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1079,23 +1086,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         for obj in objs:
             if not checks.is_instance_of(obj, Portfolio):
                 raise TypeError("Each object to be merged must be an instance of Portfolio")
+        _objs = list(map(lambda x: x.disable_weights(), objs))
         if "wrapper" not in kwargs:
             wrapper_kwargs = merge_dicts(dict(group_by=group_by), wrapper_kwargs)
             kwargs["wrapper"] = ArrayWrapper.column_stack(
-                *[obj.wrapper for obj in objs],
+                *[obj.wrapper for obj in _objs],
                 **wrapper_kwargs,
             )
-
-        for i in range(1, len(objs)):
-            if objs[i].cash_sharing != objs[0].cash_sharing:
+        for i in range(1, len(_objs)):
+            if _objs[i].cash_sharing != _objs[0].cash_sharing:
                 raise ValueError("Objects to be merged must have the same 'cash_sharing'")
         if "cash_sharing" not in kwargs:
-            kwargs["cash_sharing"] = objs[0].cash_sharing
+            kwargs["cash_sharing"] = _objs[0].cash_sharing
         cs_group_by = None if kwargs["cash_sharing"] else False
 
         if "close" not in kwargs:
             new_close = kwargs["wrapper"].column_stack_arrs(
-                *[obj.close for obj in objs],
+                *[obj.close for obj in _objs],
                 group_by=False,
             )
             if fbfill_close:
@@ -1105,67 +1112,67 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             kwargs["close"] = new_close
         if "open" not in kwargs:
             stack_open_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._open is None:
                     stack_open_objs = False
                     break
             if stack_open_objs:
                 kwargs["open"] = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.open for obj in objs],
+                    *[obj.open for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "high" not in kwargs:
             stack_high_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._high is None:
                     stack_high_objs = False
                     break
             if stack_high_objs:
                 kwargs["high"] = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.high for obj in objs],
+                    *[obj.high for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "low" not in kwargs:
             stack_low_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._low is None:
                     stack_low_objs = False
                     break
             if stack_low_objs:
                 kwargs["low"] = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.low for obj in objs],
+                    *[obj.low for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
         if "order_records" not in kwargs:
-            kwargs["order_records"] = Orders.column_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
+            kwargs["order_records"] = Orders.column_stack_records_arrs(*[obj.orders for obj in _objs], **kwargs)
         if "log_records" not in kwargs:
-            kwargs["log_records"] = Logs.column_stack_records_arrs(*[obj.logs for obj in objs], **kwargs)
+            kwargs["log_records"] = Logs.column_stack_records_arrs(*[obj.logs for obj in _objs], **kwargs)
         if "init_cash" not in kwargs:
             stack_init_cash_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if not checks.is_int(obj._init_cash) or obj._init_cash not in enums.InitCashMode:
                     stack_init_cash_objs = True
                     break
             if stack_init_cash_objs:
                 kwargs["init_cash"] = to_1d_array(
                     kwargs["wrapper"].concat_arrs(
-                        *[obj.get_init_cash(group_by=cs_group_by) for obj in objs],
+                        *[obj.get_init_cash(group_by=cs_group_by) for obj in _objs],
                         group_by=cs_group_by,
                     )
                 )
         if "init_position" not in kwargs:
             stack_init_position_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if (to_1d_array(obj.init_position) != 0).any():
                     stack_init_position_objs = True
                     break
             if stack_init_position_objs:
                 kwargs["init_position"] = to_1d_array(
                     kwargs["wrapper"].concat_arrs(
-                        *[obj.init_position for obj in objs],
+                        *[obj.init_position for obj in _objs],
                         group_by=False,
                     ),
                 )
@@ -1173,14 +1180,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["init_position"] = np.array([0.0])
         if "init_price" not in kwargs:
             stack_init_price_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if not np.isnan(to_1d_array(obj.init_price)).all():
                     stack_init_price_objs = True
                     break
             if stack_init_price_objs:
                 kwargs["init_price"] = to_1d_array(
                     kwargs["wrapper"].concat_arrs(
-                        *[obj.init_price for obj in objs],
+                        *[obj.init_price for obj in _objs],
                         group_by=False,
                     ),
                 )
@@ -1188,13 +1195,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["init_price"] = np.array([np.nan])
         if "cash_deposits" not in kwargs:
             stack_cash_deposits_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if obj._cash_deposits.size > 1 or obj._cash_deposits.item() != 0:
                     stack_cash_deposits_objs = True
                     break
             if stack_cash_deposits_objs:
                 kwargs["cash_deposits"] = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
+                    *[obj.get_cash_deposits(group_by=cs_group_by) for obj in _objs],
                     group_by=cs_group_by,
                     reindex_kwargs=dict(fill_value=0),
                     wrap=False,
@@ -1203,13 +1210,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["cash_deposits"] = np.array([[0.0]])
         if "cash_earnings" not in kwargs:
             stack_cash_earnings_objs = False
-            for obj in objs:
+            for obj in _objs:
                 if obj._cash_earnings.size > 1 or obj._cash_earnings.item() != 0:
                     stack_cash_earnings_objs = True
                     break
             if stack_cash_earnings_objs:
                 kwargs["cash_earnings"] = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.get_cash_earnings(group_by=False) for obj in objs],
+                    *[obj.get_cash_earnings(group_by=False) for obj in _objs],
                     group_by=False,
                     reindex_kwargs=dict(fill_value=0),
                     wrap=False,
@@ -1218,26 +1225,26 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 kwargs["cash_earnings"] = np.array([[0.0]])
         if "call_seq" not in kwargs:
             stack_call_seq_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj.config["call_seq"] is None:
                     stack_call_seq_objs = False
                     break
             if stack_call_seq_objs:
                 kwargs["call_seq"] = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.call_seq for obj in objs],
+                    *[obj.call_seq for obj in _objs],
                     group_by=False,
                     reindex_kwargs=dict(fill_value=0),
                     wrap=False,
                 )
         if "bm_close" not in kwargs:
             stack_bm_close_objs = True
-            for obj in objs:
+            for obj in _objs:
                 if obj._bm_close is None or isinstance(obj._bm_close, bool):
                     stack_bm_close_objs = False
                     break
             if stack_bm_close_objs:
                 new_bm_close = kwargs["wrapper"].column_stack_arrs(
-                    *[obj.bm_close for obj in objs],
+                    *[obj.bm_close for obj in _objs],
                     group_by=False,
                     wrap=False,
                 )
@@ -1247,11 +1254,28 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     new_bm_close = new_bm_close.vbt.ffill()
                 kwargs["bm_close"] = new_bm_close
         if "in_outputs" not in kwargs:
-            kwargs["in_outputs"] = cls.column_stack_in_outputs(*objs, **kwargs)
+            kwargs["in_outputs"] = cls.column_stack_in_outputs(*_objs, **kwargs)
         if "sim_start" not in kwargs:
-            kwargs["sim_start"] = cls.column_stack_sim_start(kwargs["wrapper"], *objs)
+            kwargs["sim_start"] = cls.column_stack_sim_start(kwargs["wrapper"], *_objs)
         if "sim_end" not in kwargs:
-            kwargs["sim_end"] = cls.column_stack_sim_end(kwargs["wrapper"], *objs)
+            kwargs["sim_end"] = cls.column_stack_sim_end(kwargs["wrapper"], *_objs)
+
+        if "weights" not in kwargs:
+            stack_weights_objs = False
+            obj_weights = []
+            for obj in objs:
+                if obj.weights is not None:
+                    stack_weights_objs = True
+                    obj_weights.append(obj.weights)
+                else:
+                    obj_weights.append([np.nan] * obj.wrapper.shape_2d[1])
+            if stack_weights_objs:
+                kwargs["weights"] = to_1d_array(
+                    kwargs["wrapper"].concat_arrs(
+                        *obj_weights,
+                        group_by=False,
+                    ),
+                )
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1288,6 +1312,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         "exit_trades_cls",
         "positions_cls",
         "drawdowns_cls",
+        "weights",
     }
 
     def __init__(
@@ -1307,8 +1332,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         cash_deposits: tp.ArrayLike = 0.0,
         cash_deposits_as_input: tp.Optional[bool] = None,
         cash_earnings: tp.ArrayLike = 0.0,
-        sim_start: tp.Optional[tp.Array1d] = None,
-        sim_end: tp.Optional[tp.Array1d] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.Array2d] = None,
         in_outputs: tp.Optional[tp.NamedTuple] = None,
         use_in_outputs: tp.Optional[bool] = None,
@@ -1324,6 +1349,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         exit_trades_cls: tp.Optional[type] = None,
         positions_cls: tp.Optional[type] = None,
         drawdowns_cls: tp.Optional[type] = None,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
@@ -1343,6 +1369,38 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             sim_end = sim_out.sim_end
             call_seq = sim_out.call_seq
             in_outputs = sim_out.in_outputs
+        close = to_2d_array(close)
+        if open is not None:
+            open = to_2d_array(open)
+        if high is not None:
+            high = to_2d_array(high)
+        if low is not None:
+            low = to_2d_array(low)
+        if isinstance(init_cash, str):
+            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
+        if not checks.is_int(init_cash) or init_cash not in enums.InitCashMode:
+            init_cash = to_1d_array(init_cash)
+        init_position = to_1d_array(init_position)
+        init_price = to_1d_array(init_price)
+        cash_deposits = to_2d_array(cash_deposits)
+        cash_earnings = to_2d_array(cash_earnings)
+        if cash_deposits_as_input is None:
+            cash_deposits_as_input = portfolio_cfg["cash_deposits_as_input"]
+        if bm_close is not None and not isinstance(bm_close, bool):
+            bm_close = to_2d_array(bm_close)
+        if log_records is None:
+            log_records = np.array([], dtype=enums.log_dt)
+        if use_in_outputs is None:
+            use_in_outputs = portfolio_cfg["use_in_outputs"]
+        if fillna_close is None:
+            fillna_close = portfolio_cfg["fillna_close"]
+        if weights is None:
+            weights = portfolio_cfg["weights"]
+        if trades_type is None:
+            trades_type = portfolio_cfg["trades_type"]
+        if isinstance(trades_type, str):
+            trades_type = map_enum_fields(trades_type, enums.TradesType)
+
         Analyzable.__init__(
             self,
             wrapper,
@@ -1376,39 +1434,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             exit_trades_cls=exit_trades_cls,
             positions_cls=positions_cls,
             drawdowns_cls=drawdowns_cls,
+            weights=weights,
             **kwargs,
         )
         SimRangeMixin.__init__(self, sim_start=sim_start, sim_end=sim_end)
-
-        close = to_2d_array(close)
-        if open is not None:
-            open = to_2d_array(open)
-        if high is not None:
-            high = to_2d_array(high)
-        if low is not None:
-            low = to_2d_array(low)
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
-        if not checks.is_int(init_cash) or init_cash not in enums.InitCashMode:
-            init_cash = to_1d_array(init_cash)
-        init_position = to_1d_array(init_position)
-        init_price = to_1d_array(init_price)
-        cash_deposits = to_2d_array(cash_deposits)
-        cash_earnings = to_2d_array(cash_earnings)
-        if cash_deposits_as_input is None:
-            cash_deposits_as_input = portfolio_cfg["cash_deposits_as_input"]
-        if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = to_2d_array(bm_close)
-        if log_records is None:
-            log_records = np.array([], dtype=enums.log_dt)
-        if use_in_outputs is None:
-            use_in_outputs = portfolio_cfg["use_in_outputs"]
-        if fillna_close is None:
-            fillna_close = portfolio_cfg["fillna_close"]
-        if trades_type is None:
-            trades_type = portfolio_cfg["trades_type"]
-        if isinstance(trades_type, str):
-            trades_type = map_enum_fields(trades_type, enums.TradesType)
 
         self._open = open
         self._high = high
@@ -1438,6 +1467,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         self._exit_trades_cls = exit_trades_cls
         self._positions_cls = positions_cls
         self._drawdowns_cls = drawdowns_cls
+        self._weights = weights
 
         # Only slices of rows can be selected
         self._range_only_select = True
@@ -1988,12 +2018,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         """Perform indexing on `Portfolio`.
 
         In-outputs are indexed using `Portfolio.in_outputs_indexing_func`."""
+        _self = self.disable_weights()
+
         if wrapper_meta is None:
-            wrapper_meta = self.wrapper.indexing_func_meta(
+            wrapper_meta = _self.wrapper.indexing_func_meta(
                 *args,
-                column_only_select=self.column_only_select,
-                range_only_select=self.range_only_select,
-                group_select=self.group_select,
+                column_only_select=_self.column_only_select,
+                range_only_select=_self.range_only_select,
+                group_select=_self.group_select,
                 **kwargs,
             )
         new_wrapper = wrapper_meta["new_wrapper"]
@@ -2004,85 +2036,85 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         group_idxs = wrapper_meta["group_idxs"]
 
         new_close = ArrayWrapper.select_from_flex_array(
-            self._close,
+            _self._close,
             row_idxs=row_idxs,
             col_idxs=col_idxs,
             rows_changed=rows_changed,
             columns_changed=columns_changed,
         )
-        if self._open is not None:
+        if _self._open is not None:
             new_open = ArrayWrapper.select_from_flex_array(
-                self._open,
+                _self._open,
                 row_idxs=row_idxs,
                 col_idxs=col_idxs,
                 rows_changed=rows_changed,
                 columns_changed=columns_changed,
             )
         else:
-            new_open = self._open
-        if self._high is not None:
+            new_open = _self._open
+        if _self._high is not None:
             new_high = ArrayWrapper.select_from_flex_array(
-                self._high,
+                _self._high,
                 row_idxs=row_idxs,
                 col_idxs=col_idxs,
                 rows_changed=rows_changed,
                 columns_changed=columns_changed,
             )
         else:
-            new_high = self._high
-        if self._low is not None:
+            new_high = _self._high
+        if _self._low is not None:
             new_low = ArrayWrapper.select_from_flex_array(
-                self._low,
+                _self._low,
                 row_idxs=row_idxs,
                 col_idxs=col_idxs,
                 rows_changed=rows_changed,
                 columns_changed=columns_changed,
             )
         else:
-            new_low = self._low
-        new_order_records = self.orders.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
-        new_log_records = self.logs.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
-        new_init_cash = self._init_cash
+            new_low = _self._low
+        new_order_records = _self.orders.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
+        new_log_records = _self.logs.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
+        new_init_cash = _self._init_cash
         if not checks.is_int(new_init_cash):
             new_init_cash = to_1d_array(new_init_cash)
             if rows_changed and row_idxs.start > 0:
-                if self.wrapper.grouper.is_grouped() and not self.cash_sharing:
-                    cash = self.get_cash(group_by=False)
+                if _self.wrapper.grouper.is_grouped() and not _self.cash_sharing:
+                    cash = _self.get_cash(group_by=False)
                 else:
-                    cash = self.cash
+                    cash = _self.cash
                 new_init_cash = to_1d_array(cash.iloc[row_idxs.start - 1])
             if columns_changed and new_init_cash.shape[0] > 1:
-                if self.cash_sharing:
+                if _self.cash_sharing:
                     new_init_cash = new_init_cash[group_idxs]
                 else:
                     new_init_cash = new_init_cash[col_idxs]
-        new_init_position = to_1d_array(self._init_position)
+        new_init_position = to_1d_array(_self._init_position)
         if rows_changed and row_idxs.start > 0:
-            new_init_position = to_1d_array(self.assets.iloc[row_idxs.start - 1])
+            new_init_position = to_1d_array(_self.assets.iloc[row_idxs.start - 1])
         if columns_changed and new_init_position.shape[0] > 1:
             new_init_position = new_init_position[col_idxs]
-        new_init_price = to_1d_array(self._init_price)
+        new_init_price = to_1d_array(_self._init_price)
         if rows_changed and row_idxs.start > 0:
-            new_init_price = to_1d_array(self.close.iloc[: row_idxs.start].ffill().iloc[-1])
+            new_init_price = to_1d_array(_self.close.iloc[: row_idxs.start].ffill().iloc[-1])
         if columns_changed and new_init_price.shape[0] > 1:
             new_init_price = new_init_price[col_idxs]
         new_cash_deposits = ArrayWrapper.select_from_flex_array(
-            self._cash_deposits,
+            _self._cash_deposits,
             row_idxs=row_idxs,
-            col_idxs=group_idxs if self.cash_sharing else col_idxs,
+            col_idxs=group_idxs if _self.cash_sharing else col_idxs,
             rows_changed=rows_changed,
             columns_changed=columns_changed,
         )
         new_cash_earnings = ArrayWrapper.select_from_flex_array(
-            self._cash_earnings,
+            _self._cash_earnings,
             row_idxs=row_idxs,
             col_idxs=col_idxs,
             rows_changed=rows_changed,
             columns_changed=columns_changed,
         )
-        if self._call_seq is not None:
+        if _self._call_seq is not None:
             new_call_seq = ArrayWrapper.select_from_flex_array(
-                self._call_seq,
+                _self._call_seq,
                 row_idxs=row_idxs,
                 col_idxs=col_idxs,
                 rows_changed=rows_changed,
@@ -2090,19 +2122,26 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             )
         else:
             new_call_seq = None
-        if self._bm_close is not None and not isinstance(self._bm_close, bool):
+        if _self._bm_close is not None and not isinstance(_self._bm_close, bool):
             new_bm_close = ArrayWrapper.select_from_flex_array(
-                self._bm_close,
+                _self._bm_close,
                 row_idxs=row_idxs,
                 col_idxs=col_idxs,
                 rows_changed=rows_changed,
                 columns_changed=columns_changed,
             )
         else:
-            new_bm_close = self._bm_close
-        new_in_outputs = self.in_outputs_indexing_func(wrapper_meta, **resolve_dict(in_output_kwargs))
-        new_sim_start = self.sim_start_indexing_func(wrapper_meta)
-        new_sim_end = self.sim_end_indexing_func(wrapper_meta)
+            new_bm_close = _self._bm_close
+        new_in_outputs = _self.in_outputs_indexing_func(wrapper_meta, **resolve_dict(in_output_kwargs))
+        new_sim_start = _self.sim_start_indexing_func(wrapper_meta)
+        new_sim_end = _self.sim_end_indexing_func(wrapper_meta)
+
+        if self.weights is not None:
+            new_weights = to_1d_array(self.weights)
+            if columns_changed and new_weights.shape[0] > 1:
+                new_weights = new_weights[col_idxs]
+        else:
+            new_weights = self._weights
 
         return self.replace(
             wrapper=new_wrapper,
@@ -2122,6 +2161,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             bm_close=new_bm_close,
             sim_start=new_sim_start,
             sim_end=new_sim_end,
+            weights=new_weights,
         )
 
     # ############# Resampling ############# #
@@ -2272,62 +2312,64 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 certainly produce a different market value and returns. To mitigate this, make sure
                 to downsample to an index with the first bar containing only the first bar from the
                 origin timeframe."""
-        if self._call_seq is not None:
+        _self = self.disable_weights()
+
+        if _self._call_seq is not None:
             raise ValueError("Cannot resample call_seq")
         if wrapper_meta is None:
-            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
+            wrapper_meta = _self.wrapper.resample_meta(*args, **kwargs)
         resampler = wrapper_meta["resampler"]
         new_wrapper = wrapper_meta["new_wrapper"]
 
-        new_close = self.close.vbt.resample_apply(resampler, "last")
+        new_close = _self.close.vbt.resample_apply(resampler, "last")
         if fbfill_close:
             new_close = new_close.vbt.fbfill()
         elif ffill_close:
             new_close = new_close.vbt.ffill()
         new_close = new_close.values
-        if self._open is not None:
-            new_open = self.open.vbt.resample_apply(resampler, "first").values
+        if _self._open is not None:
+            new_open = _self.open.vbt.resample_apply(resampler, "first").values
         else:
-            new_open = self._open
-        if self._high is not None:
-            new_high = self.high.vbt.resample_apply(resampler, "max").values
+            new_open = _self._open
+        if _self._high is not None:
+            new_high = _self.high.vbt.resample_apply(resampler, "max").values
         else:
-            new_high = self._high
-        if self._low is not None:
-            new_low = self.low.vbt.resample_apply(resampler, "min").values
+            new_high = _self._high
+        if _self._low is not None:
+            new_low = _self.low.vbt.resample_apply(resampler, "min").values
         else:
-            new_low = self._low
-        new_order_records = self.orders.resample_records_arr(resampler)
-        new_log_records = self.logs.resample_records_arr(resampler)
-        if self._cash_deposits.size > 1 or self._cash_deposits.item() != 0:
-            new_cash_deposits = self.get_cash_deposits(group_by=None if self.cash_sharing else False)
+            new_low = _self._low
+        new_order_records = _self.orders.resample_records_arr(resampler)
+        new_log_records = _self.logs.resample_records_arr(resampler)
+        if _self._cash_deposits.size > 1 or _self._cash_deposits.item() != 0:
+            new_cash_deposits = _self.get_cash_deposits(group_by=None if _self.cash_sharing else False)
             new_cash_deposits = new_cash_deposits.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
             new_cash_deposits = new_cash_deposits.fillna(0.0)
             new_cash_deposits = new_cash_deposits.values
         else:
-            new_cash_deposits = self._cash_deposits
-        if self._cash_earnings.size > 1 or self._cash_earnings.item() != 0:
-            new_cash_earnings = self.get_cash_earnings(group_by=False)
+            new_cash_deposits = _self._cash_deposits
+        if _self._cash_earnings.size > 1 or _self._cash_earnings.item() != 0:
+            new_cash_earnings = _self.get_cash_earnings(group_by=False)
             new_cash_earnings = new_cash_earnings.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
             new_cash_earnings = new_cash_earnings.fillna(0.0)
             new_cash_earnings = new_cash_earnings.values
         else:
-            new_cash_earnings = self._cash_earnings
-        if self._bm_close is not None and not isinstance(self._bm_close, bool):
-            new_bm_close = self.bm_close.vbt.resample_apply(resampler, "last")
+            new_cash_earnings = _self._cash_earnings
+        if _self._bm_close is not None and not isinstance(_self._bm_close, bool):
+            new_bm_close = _self.bm_close.vbt.resample_apply(resampler, "last")
             if fbfill_close:
                 new_bm_close = new_bm_close.vbt.fbfill()
             elif ffill_close:
                 new_bm_close = new_bm_close.vbt.ffill()
             new_bm_close = new_bm_close.values
         else:
-            new_bm_close = self._bm_close
-        if self._in_outputs is not None:
-            new_in_outputs = self.resample_in_outputs(resampler, **resolve_dict(in_output_kwargs))
+            new_bm_close = _self._bm_close
+        if _self._in_outputs is not None:
+            new_in_outputs = _self.resample_in_outputs(resampler, **resolve_dict(in_output_kwargs))
         else:
             new_in_outputs = None
-        new_sim_start = self.resample_sim_start(new_wrapper)
-        new_sim_end = self.resample_sim_end(new_wrapper)
+        new_sim_start = _self.resample_sim_start(new_wrapper)
+        new_sim_end = _self.resample_sim_end(new_wrapper)
 
         return self.replace(
             wrapper=new_wrapper,
@@ -4957,51 +4999,67 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
 
     # ############# Price ############# #
 
-    @custom_property(group_by_aware=False, resample_func="first")
-    def open(self) -> tp.Optional[tp.SeriesFrame]:
-        """Open price of each bar."""
+    @property
+    def open_flex(self) -> tp.Optional[tp.ArrayLike]:
+        """`Portfolio.open` in a format suitable for flexible indexing."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "open"):
             open = self.in_outputs.open
         else:
             open = self._open
+        return open
 
-        if open is None:
-            return None
-        return self.wrapper.wrap(open, group_by=False)
-
-    @custom_property(group_by_aware=False, resample_func="max")
-    def high(self) -> tp.Optional[tp.SeriesFrame]:
-        """High price of each bar."""
+    @property
+    def high_flex(self) -> tp.Optional[tp.ArrayLike]:
+        """`Portfolio.high` in a format suitable for flexible indexing."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "high"):
             high = self.in_outputs.high
         else:
             high = self._high
+        return high
 
-        if high is None:
-            return None
-        return self.wrapper.wrap(high, group_by=False)
-
-    @custom_property(group_by_aware=False, resample_func="min")
-    def low(self) -> tp.Optional[tp.SeriesFrame]:
-        """Low price of each bar."""
+    @property
+    def low_flex(self) -> tp.Optional[tp.ArrayLike]:
+        """`Portfolio.low` in a format suitable for flexible indexing."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "low"):
             low = self.in_outputs.low
         else:
             low = self._low
+        return low
 
-        if low is None:
-            return None
-        return self.wrapper.wrap(low, group_by=False)
-
-    @custom_property(group_by_aware=False, resample_func="last")
-    def close(self) -> tp.SeriesFrame:
-        """Last asset price at each time step."""
+    @property
+    def close_flex(self) -> tp.ArrayLike:
+        """`Portfolio.close` in a format suitable for flexible indexing."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "close"):
             close = self.in_outputs.close
         else:
             close = self._close
+        return close
 
-        return self.wrapper.wrap(close, group_by=False)
+    @custom_property(group_by_aware=False, resample_func="first")
+    def open(self) -> tp.Optional[tp.SeriesFrame]:
+        """Open price of each bar."""
+        if self.open_flex is None:
+            return None
+        return self.wrapper.wrap(self.open_flex, group_by=False)
+
+    @custom_property(group_by_aware=False, resample_func="max")
+    def high(self) -> tp.Optional[tp.SeriesFrame]:
+        """High price of each bar."""
+        if self.high_flex is None:
+            return None
+        return self.wrapper.wrap(self.high_flex, group_by=False)
+
+    @custom_property(group_by_aware=False, resample_func="min")
+    def low(self) -> tp.Optional[tp.SeriesFrame]:
+        """Low price of each bar."""
+        if self.low_flex is None:
+            return None
+        return self.wrapper.wrap(self.low_flex, group_by=False)
+
+    @custom_property(group_by_aware=False, resample_func="last")
+    def close(self) -> tp.SeriesFrame:
+        """Last asset price at each time step."""
+        return self.wrapper.wrap(self.close_flex, group_by=False)
 
     @class_or_instancemethod
     def get_filled_close(
@@ -5069,10 +5127,66 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         filled_bm_close = func(to_2d_array(bm_close))
         return wrapper.wrap(filled_bm_close, group_by=False, **resolve_dict(wrap_kwargs))
 
+    @class_or_instancemethod
+    def get_weights(
+        cls_or_self,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        keep_flex: bool = False,
+    ) -> tp.Union[None, tp.ArrayLike, tp.Series]:
+        """Get asset weights."""
+        if not isinstance(cls_or_self, type):
+            if weights is None:
+                weights = cls_or_self._weights
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(wrapper, arg_name="wrapper")
+
+        if weights is None or weights is False:
+            return None
+        if keep_flex:
+            return weights
+        weights = broadcast_array_to(weights, wrapper.shape_2d[1])
+        if keep_flex:
+            return weights
+        return wrapper.wrap_reduced(weights, group_by=False)
+
     # ############# Views ############# #
 
+    def apply_weights(
+        self: PortfolioT,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
+        rescale: bool = False,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> PortfolioT:
+        """Get view of portfolio with asset weights applied and optionally rescaled.
+
+        If `rescale` is True, weights are rescaled in respect to other weights in the same group.
+        For example, weights 0.5 and 0.5 are rescaled to 1.0 and 1.0 respectively, while
+        weights 0.7 and 0.3 are rescaled to 1.4 (1.4 * 0.5 = 0.7) and 0.6 (0.6 * 0.5 = 0.3) respectively."""
+        weights = self.get_weights(weights=weights)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            new_weights = np.empty(len(weights), dtype=np.float_)
+            for group_idxs in self.wrapper.grouper.iter_group_idxs():
+                group_weights = weights[group_idxs]
+                new_weights[group_idxs] = group_weights * len(group_weights) / group_weights.sum()
+            weights = new_weights
+        else:
+            weights = weights * len(weights) / weights.sum()
+        if group_by is not None:
+            _self = self.regroup(group_by=group_by)
+        else:
+            _self = self
+        return _self.replace(weights=weights, **kwargs)
+
+    def disable_weights(self: PortfolioT, **kwargs) -> PortfolioT:
+        """Get view of portfolio with asset weights disabled."""
+        return self.replace(weights=False, **kwargs)
+
     def get_longonly_view(
-        self,
+        self: PortfolioT,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
@@ -5090,6 +5204,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 sim_start=sim_start,
                 sim_end=sim_end,
                 rec_sim_range=rec_sim_range,
+                weights=False,
             )
         if init_position is None:
             init_position = self._init_position
@@ -5109,11 +5224,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             order_records=new_order_records,
             init_position=new_init_position,
             init_price=new_init_price,
-            **kwargs
+            **kwargs,
         )
 
     def get_shortonly_view(
-        self,
+        self: PortfolioT,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
@@ -5131,6 +5246,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 sim_start=sim_start,
                 sim_end=sim_end,
                 rec_sim_range=rec_sim_range,
+                weights=False,
             )
         if init_position is None:
             init_position = self._init_position
@@ -5150,7 +5266,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             order_records=new_order_records,
             init_position=new_init_position,
             init_price=new_init_price,
-            **kwargs
+            **kwargs,
         )
 
     # ############# Records ############# #
@@ -5172,6 +5288,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
+        jitted: tp.JittedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
@@ -5183,15 +5301,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if order_records is None:
                 order_records = cls_or_self.order_records
             if open is None:
-                open = cls_or_self._open
+                open = cls_or_self.open_flex
             if high is None:
-                high = cls_or_self._high
+                high = cls_or_self.high_flex
             if low is None:
-                low = cls_or_self._low
+                low = cls_or_self.low_flex
             if close is None:
-                close = cls_or_self._close
+                close = cls_or_self.close_flex
             if orders_cls is None:
                 orders_cls = cls_or_self.orders_cls
+            if weights is None:
+                weights = cls_or_self.resolve_shortcut_attr(
+                    "weights",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
         else:
@@ -5201,15 +5325,26 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(wrapper, arg_name="wrapper")
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        if weights is False:
+            weights = None
 
         if sim_start is not None or sim_end is not None:
-            order_records = nb.records_within_sim_range_nb(
+            func = jit_reg.resolve_option(nb.records_within_sim_range_nb, jitted)
+            order_records = func(
                 wrapper.shape_2d,
                 order_records,
                 order_records["col"],
                 order_records["idx"],
                 sim_start=sim_start,
                 sim_end=sim_end,
+            )
+        if weights is not None:
+            weights = broadcast_array_to(weights, wrapper.shape_2d[1])
+            func = jit_reg.resolve_option(nb.apply_weights_to_orders_nb, jitted)
+            order_records = func(
+                order_records,
+                order_records["col"],
+                weights,
             )
         return orders_cls(
             wrapper,
@@ -5238,6 +5373,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        jitted: tp.JittedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
@@ -5249,13 +5385,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if log_records is None:
                 log_records = cls_or_self.log_records
             if open is None:
-                open = cls_or_self._open
+                open = cls_or_self.open_flex
             if high is None:
-                high = cls_or_self._high
+                high = cls_or_self.high_flex
             if low is None:
-                low = cls_or_self._low
+                low = cls_or_self.low_flex
             if close is None:
-                close = cls_or_self._close
+                close = cls_or_self.close_flex
             if logs_cls is None:
                 logs_cls = cls_or_self.logs_cls
             if wrapper is None:
@@ -5269,7 +5405,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
 
         if sim_start is not None or sim_end is not None:
-            log_records = nb.records_within_sim_range_nb(
+            func = jit_reg.resolve_option(nb.records_within_sim_range_nb, jitted)
+            log_records = func(
                 wrapper.shape_2d,
                 log_records,
                 log_records["col"],
@@ -5315,9 +5452,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     group_by=group_by,
                 )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if init_price is None:
-                init_price = cls_or_self._init_price
+                init_price = cls_or_self.resolve_shortcut_attr(
+                    "init_price",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if entry_trades_cls is None:
                 entry_trades_cls = cls_or_self.entry_trades_cls
         else:
@@ -5366,9 +5511,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     group_by=group_by,
                 )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if init_price is None:
-                init_price = cls_or_self._init_price
+                init_price = cls_or_self.resolve_shortcut_attr(
+                    "init_price",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if exit_trades_cls is None:
                 exit_trades_cls = cls_or_self.exit_trades_cls
         else:
@@ -5617,20 +5770,38 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
     def get_init_position(
         cls_or_self,
         init_position_raw: tp.Optional[tp.ArrayLike] = None,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
+        group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
-    ) -> tp.MaybeSeries:
+        keep_flex: bool = False,
+    ) -> tp.Union[tp.ArrayLike, tp.MaybeSeries]:
         """Get initial position per column."""
         if not isinstance(cls_or_self, type):
             if init_position_raw is None:
                 init_position_raw = cls_or_self._init_position
+            if weights is None:
+                weights = cls_or_self.resolve_shortcut_attr(
+                    "weights",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(init_position_raw, arg_name="init_position_raw")
             checks.assert_not_none(wrapper, arg_name="wrapper")
+        if weights is False:
+            weights = None
 
+        if keep_flex and weights is None:
+            return init_position_raw
         init_position = broadcast_array_to(init_position_raw, wrapper.shape_2d[1])
+        if weights is not None:
+            weights = broadcast_array_to(weights, wrapper.shape_2d[1])
+            init_position = np.where(np.isnan(weights), init_position, weights * init_position)
+        if keep_flex:
+            return init_position
         wrap_kwargs = merge_dicts(dict(name_or_index="init_position"), wrap_kwargs)
         return wrapper.wrap_reduced(init_position, group_by=False, **wrap_kwargs)
 
@@ -5662,7 +5833,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     group_by=None,
                 )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -5719,7 +5894,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     wrapper=wrapper,
                 )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -5887,9 +6066,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         group_by=None,
                     )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if init_price is None:
-                init_price = cls_or_self._init_price
+                init_price = cls_or_self.resolve_shortcut_attr(
+                    "init_price",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -5947,9 +6134,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         group_by=None,
                     )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if init_price is None:
-                init_price = cls_or_self._init_price
+                init_price = cls_or_self.resolve_shortcut_attr(
+                    "init_price",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -5990,13 +6185,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         keep_flex: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
-    ) -> tp.ArrayLike:
+    ) -> tp.Union[tp.ArrayLike, tp.MaybeSeries]:
         """Get cash deposit series per column or group.
 
         Set `keep_flex` to True to keep format suitable for flexible indexing.
@@ -6006,6 +6202,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_deposits_raw = cls_or_self._cash_deposits
             if cash_sharing is None:
                 cash_sharing = cls_or_self.cash_sharing
+            if weights is None:
+                weights = cls_or_self.resolve_shortcut_attr(
+                    "weights",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -6015,13 +6217,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(wrapper, arg_name="wrapper")
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        if weights is False:
+            weights = None
 
         cash_deposits_arr = to_2d_array(cash_deposits_raw)
         if keep_flex and not cash_deposits_arr.any():
             return cash_deposits_raw
 
         if wrapper.grouper.is_grouped(group_by=group_by):
-            if keep_flex and cash_sharing and sim_start is None and sim_end is None:
+            if keep_flex and cash_sharing and weights is None and sim_start is None and sim_end is None:
                 return cash_deposits_raw
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.cash_deposits_grouped_nb, jitted)
@@ -6031,11 +6235,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 group_lens,
                 cash_sharing,
                 cash_deposits_raw=cash_deposits_arr,
+                weights=to_1d_array(weights) if weights is not None else None,
                 sim_start=sim_start,
                 sim_end=sim_end,
             )
         else:
-            if keep_flex and not cash_sharing and sim_start is None and sim_end is None:
+            if keep_flex and not cash_sharing and weights is None and sim_start is None and sim_end is None:
                 return cash_deposits_raw
             group_lens = wrapper.grouper.get_group_lens()
             func = jit_reg.resolve_option(nb.cash_deposits_nb, jitted)
@@ -6046,6 +6251,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_sharing,
                 cash_deposits_raw=cash_deposits_arr,
                 split_shared=split_shared,
+                weights=to_1d_array(weights) if weights is not None else None,
                 sim_start=sim_start,
                 sim_end=sim_end,
             )
@@ -6062,6 +6268,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -6081,6 +6288,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             sim_start=sim_start,
             sim_end=sim_end,
             rec_sim_range=rec_sim_range,
+            weights=weights,
             keep_flex=True,
             jitted=jitted,
             chunked=chunked,
@@ -6098,13 +6306,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         keep_flex: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
-    ) -> tp.ArrayLike:
+    ) -> tp.Union[tp.ArrayLike, tp.MaybeSeries]:
         """Get earnings in cash series per column or group.
 
         Set `keep_flex` to True to keep format suitable for flexible indexing.
@@ -6112,6 +6321,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         if not isinstance(cls_or_self, type):
             if cash_earnings_raw is None:
                 cash_earnings_raw = cls_or_self._cash_earnings
+            if weights is None:
+                weights = cls_or_self.resolve_shortcut_attr(
+                    "weights",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -6120,6 +6335,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(wrapper, arg_name="wrapper")
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
+        if weights is False:
+            weights = None
 
         cash_earnings_arr = to_2d_array(cash_earnings_raw)
         if keep_flex and not cash_earnings_arr.any():
@@ -6133,17 +6350,19 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 wrapper.shape_2d,
                 group_lens,
                 cash_earnings_raw=cash_earnings_arr,
+                weights=to_1d_array(weights) if weights is not None else None,
                 sim_start=sim_start,
                 sim_end=sim_end,
             )
         else:
-            if keep_flex and sim_start is None and sim_end is None:
+            if keep_flex and weights is None and sim_start is None and sim_end is None:
                 return cash_earnings_raw
             func = jit_reg.resolve_option(nb.cash_earnings_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             cash_earnings = func(
                 wrapper.shape_2d,
                 cash_earnings_raw=cash_earnings_arr,
+                weights=to_1d_array(weights) if weights is not None else None,
                 sim_start=sim_start,
                 sim_end=sim_end,
             )
@@ -6158,6 +6377,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -6175,6 +6395,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             sim_start=sim_start,
             sim_end=sim_end,
             rec_sim_range=rec_sim_range,
+            weights=weights,
             keep_flex=True,
             jitted=jitted,
             chunked=chunked,
@@ -6190,10 +6411,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         cls_or_self,
         free: bool = False,
         orders: tp.Optional[Orders] = None,
-        cash_earnings_raw: tp.Optional[tp.ArrayLike] = None,
+        cash_earnings: tp.Optional[tp.ArrayLike] = None,
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -6218,17 +6440,29 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         sim_start=sim_start if rec_sim_range else None,
                         sim_end=sim_end if rec_sim_range else None,
                         rec_sim_range=rec_sim_range,
+                        weights=weights,
                         wrapper=wrapper,
                         group_by=None,
                     )
-            if cash_earnings_raw is None:
-                cash_earnings_raw = cls_or_self._cash_earnings
+            if cash_earnings is None:
+                cash_earnings = cls_or_self.resolve_shortcut_attr(
+                    "cash_earnings",
+                    sim_start=sim_start if rec_sim_range else None,
+                    sim_end=sim_end if rec_sim_range else None,
+                    rec_sim_range=rec_sim_range,
+                    weights=weights,
+                    keep_flex=True,
+                    jitted=jitted,
+                    chunked=chunked,
+                    wrapper=wrapper,
+                    group_by=False,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(orders, arg_name="orders")
-            if cash_earnings_raw is None:
-                cash_earnings_raw = 0.0
+            if cash_earnings is None:
+                cash_earnings = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
@@ -6241,7 +6475,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             orders.values,
             orders.col_mapper.col_map,
             free=free,
-            cash_earnings_raw=to_2d_array(cash_earnings_raw),
+            cash_earnings=to_2d_array(cash_earnings),
             sim_start=sim_start,
             sim_end=sim_end,
         )
@@ -6268,6 +6502,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
+        weights: tp.Union[None, bool, tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -6285,6 +6520,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         sim_start=sim_start if rec_sim_range else None,
                         sim_end=sim_end if rec_sim_range else None,
                         rec_sim_range=rec_sim_range,
+                        weights=weights,
                         keep_flex=True,
                         jitted=jitted,
                         chunked=chunked,
@@ -6297,6 +6533,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         sim_start=sim_start if rec_sim_range else None,
                         sim_end=sim_end if rec_sim_range else None,
                         rec_sim_range=rec_sim_range,
+                        weights=weights,
                         free=True,
                         jitted=jitted,
                         chunked=chunked,
@@ -6305,6 +6542,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     )
             if cash_sharing is None:
                 cash_sharing = cls_or_self.cash_sharing
+            if weights is None:
+                weights = cls_or_self.resolve_shortcut_attr(
+                    "weights",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -6317,6 +6560,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(wrapper, arg_name="wrapper")
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
+        if weights is False:
+            weights = None
 
         if checks.is_int(init_cash_raw) and init_cash_raw in enums.InitCashMode:
             func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
@@ -6333,11 +6578,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if wrapper.grouper.is_grouped(group_by=group_by):
                 group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
                 func = jit_reg.resolve_option(nb.init_cash_grouped_nb, jitted)
-                init_cash = func(init_cash_raw, group_lens, cash_sharing)
+                init_cash = func(
+                    init_cash_raw,
+                    group_lens,
+                    cash_sharing,
+                    weights=to_1d_array(weights) if weights is not None else None,
+                )
             else:
                 group_lens = wrapper.grouper.get_group_lens()
                 func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
-                init_cash = func(init_cash_raw, group_lens, cash_sharing, split_shared=split_shared)
+                init_cash = func(
+                    init_cash_raw,
+                    group_lens,
+                    cash_sharing,
+                    split_shared=split_shared,
+                    weights=to_1d_array(weights) if weights is not None else None,
+                )
         wrap_kwargs = merge_dicts(dict(name_or_index="init_cash"), wrap_kwargs)
         return wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
@@ -6426,7 +6682,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         init_price_raw: tp.Optional[tp.ArrayLike] = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
-    ) -> tp.MaybeSeries:
+        keep_flex: bool = False,
+    ) -> tp.Union[tp.ArrayLike, tp.MaybeSeries]:
         """Get initial price per column."""
         if not isinstance(cls_or_self, type):
             if init_price_raw is None:
@@ -6437,7 +6694,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             checks.assert_not_none(init_price_raw, arg_name="init_price_raw")
             checks.assert_not_none(wrapper, arg_name="wrapper")
 
+        if keep_flex:
+            return init_price_raw
         init_price = broadcast_array_to(init_price_raw, wrapper.shape_2d[1])
+        if keep_flex:
+            return init_price
         wrap_kwargs = merge_dicts(dict(name_or_index="init_price"), wrap_kwargs)
         return wrapper.wrap_reduced(init_price, group_by=False, **wrap_kwargs)
 
@@ -6454,9 +6715,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         """Get initial position value per column."""
         if not isinstance(cls_or_self, type):
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if init_price is None:
-                init_price = cls_or_self._init_price
+                init_price = cls_or_self.resolve_shortcut_attr(
+                    "init_price",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -6955,11 +7224,29 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                         group_by=None,
                     )
             if init_position is None:
-                init_position = cls_or_self._init_position
+                init_position = cls_or_self.resolve_shortcut_attr(
+                    "init_position",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if init_price is None:
-                init_price = cls_or_self._init_price
+                init_price = cls_or_self.resolve_shortcut_attr(
+                    "init_price",
+                    wrapper=wrapper,
+                    keep_flex=True,
+                )
             if cash_earnings is None:
-                cash_earnings = cls_or_self._cash_earnings
+                cash_earnings = cls_or_self.resolve_shortcut_attr(
+                    "cash_earnings",
+                    sim_start=sim_start if rec_sim_range else None,
+                    sim_end=sim_end if rec_sim_range else None,
+                    rec_sim_range=rec_sim_range,
+                    keep_flex=True,
+                    jitted=jitted,
+                    chunked=chunked,
+                    wrapper=wrapper,
+                    group_by=False,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:

@@ -1703,6 +1703,7 @@ portfolio = frozen_cfg(
     year_freq=None,
     use_in_outputs=True,
     fillna_close=True,
+    weights=None,
     trades_type="exittrades",
     stats=flex_cfg(
         filters=flex_cfg(
