@@ -5167,14 +5167,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         For example, weights 0.5 and 0.5 are rescaled to 1.0 and 1.0 respectively, while
         weights 0.7 and 0.3 are rescaled to 1.4 (1.4 * 0.5 = 0.7) and 0.6 (0.6 * 0.5 = 0.3) respectively."""
         weights = self.get_weights(weights=weights)
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            new_weights = np.empty(len(weights), dtype=np.float_)
-            for group_idxs in self.wrapper.grouper.iter_group_idxs():
-                group_weights = weights[group_idxs]
-                new_weights[group_idxs] = group_weights * len(group_weights) / group_weights.sum()
-            weights = new_weights
-        else:
-            weights = weights * len(weights) / weights.sum()
+        if rescale:
+            if self.wrapper.grouper.is_grouped(group_by=group_by):
+                new_weights = np.empty(len(weights), dtype=np.float_)
+                for group_idxs in self.wrapper.grouper.iter_group_idxs():
+                    group_weights = weights[group_idxs]
+                    new_weights[group_idxs] = group_weights * len(group_weights) / group_weights.sum()
+                weights = new_weights
+            else:
+                weights = weights * len(weights) / weights.sum()
         if group_by is not None:
             _self = self.regroup(group_by=group_by)
         else:
