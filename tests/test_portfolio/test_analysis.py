@@ -2271,6 +2271,14 @@ class TestPortfolio:
         assert_records_close(pf.shortonly_view.exit_trades.values, pf.exit_trades.shortonly_view.values)
         assert_records_close(pf.longonly_view.positions.values, pf.positions.longonly_view.values)
         assert_records_close(pf.shortonly_view.positions.values, pf.positions.shortonly_view.values)
+        np.testing.assert_allclose(
+            [pf.order_records["size"].sum()],
+            [pf.longonly_view.order_records["size"].sum() + pf.shortonly_view.order_records["size"].sum()],
+        )
+        np.testing.assert_allclose(
+            [pf.order_records["fees"].sum()],
+            [pf.longonly_view.order_records["fees"].sum() + pf.shortonly_view.order_records["fees"].sum()],
+        )
 
     def test_orders(self):
         result = np.array(

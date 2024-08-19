@@ -1131,13 +1131,13 @@ def get_longonly_view_orders_nb(
                     exit_gross_sum = 0.0
                     if direction == TradeDirection.Long:
                         out[r] = order_record
-                        out["size"][r] = entry_size_sum
-                        out["fees"][r] = entry_size_sum / order_size * order_fees
+                        out["size"][r] = remaining_size
+                        out["fees"][r] = remaining_size / order_size * order_fees
                         r += 1
                     else:
                         out[r] = order_record
-                        out["size"][r] = remaining_size
-                        out["fees"][r] = remaining_size / order_size * order_fees
+                        out["size"][r] = entry_size_sum
+                        out["fees"][r] = entry_size_sum / order_size * order_fees
                         r += 1
                     if order_side == OrderSide.Buy:
                         direction = TradeDirection.Long
@@ -1283,13 +1283,13 @@ def get_shortonly_view_orders_nb(
                     exit_gross_sum = 0.0
                     if direction == TradeDirection.Short:
                         out[r] = order_record
-                        out["size"][r] = entry_size_sum
-                        out["fees"][r] = entry_size_sum / order_size * order_fees
+                        out["size"][r] = remaining_size
+                        out["fees"][r] = remaining_size / order_size * order_fees
                         r += 1
                     else:
                         out[r] = order_record
-                        out["size"][r] = remaining_size
-                        out["fees"][r] = remaining_size / order_size * order_fees
+                        out["size"][r] = entry_size_sum
+                        out["fees"][r] = entry_size_sum / order_size * order_fees
                         r += 1
                     if order_side == OrderSide.Buy:
                         direction = TradeDirection.Long
