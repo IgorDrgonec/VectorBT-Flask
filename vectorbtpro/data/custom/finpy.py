@@ -52,12 +52,10 @@ class FinPyData(RemoteData):
         * Pull data (string format):
 
         ```pycon
-        >>> symbols = vbt.FinPyData.list_symbols(data_source="dukascopy")
         >>> data = vbt.FinPyData.pull(
-        ...     symbols[0],
+        ...     "fx.dukascopy.tick.NYC.EURUSD.bid,ask",
         ...     start="14 June 2016",
         ...     end="15 June 2016",
-        ...     fields=["bid", "ask"],
         ... )
         ```
     """
@@ -131,7 +129,7 @@ class FinPyData(RemoteData):
         tickers: tp.Optional[tp.MaybeList[str]] = None,
         dict_filter: tp.DictLike = None,
         smart_group: bool = False,
-        ret_fields: tp.Optional[tp.MaybeList[str]] = None,
+        return_fields: tp.Optional[tp.MaybeList[str]] = None,
         combine_parts: bool = True,
     ) -> tp.List[str]:
         """List all symbols.
@@ -144,10 +142,17 @@ class FinPyData(RemoteData):
         config_manager = cls.resolve_config_manager(config_manager=config_manager, **config_manager_config)
         if dict_filter is None:
             dict_filter = {}
-        if ret_fields is None:
-            ret_fields = ["category", "data_source", "freq", "cut", "tickers"]
-        elif isinstance(ret_fields, str):
-            ret_fields = [ret_fields]
+        def_ret_fields = ["category", "data_source", "freq", "cut", "tickers"]
+        if return_fields is None:
+            ret_fields = def_ret_fields
+        elif isinstance(return_fields, str):
+            if return_fields.lower() == "all":
+                ret_fields = def_ret_fields + ["fields"]
+            else:
+                ret_fields = [return_fields]
+        else:
+            ret_fields = return_fields
+
         df = config_manager.free_form_tickers_regex_query(
             category=category,
             data_source=data_source,
@@ -284,13 +289,38 @@ class FinPyData(RemoteData):
         if end is not None:
             end = dt.to_naive_datetime(dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
 
-        if (
-            "md_request" in request_kwargs
-            or "md_request_df" in request_kwargs
-            or "md_request_str" in request_kwargs
-            or "md_request_dict" in request_kwargs
-        ):
-            df = market.fetch_market(
+        if "md_request" in request_kwargs:
+            md_request = request_kwargs["md_request"]
+        elif "md_request_df" in request_kwargs:
+            md_request = market.create_md_request_from_dataframe(
+                md_request_df=request_kwargs["md_request_df"],
+                start_date=start,
+                finish_date=end,
+                freq_mult=multiplier,
+                freq=unit,
+                **request_kwargs,
+            )
+        elif "md_request_str" in request_kwargs:
+            md_request = market.create_md_request_from_str(
+                md_request_str=request_kwargs["md_request_str"],
+                start_date=start,
+                finish_date=end,
+                freq_mult=multiplier,
+                freq=unit,
+                **request_kwargs,
+            )
+        elif "md_request_dict" in request_kwargs:
+            md_request = market.create_md_request_from_dict(
+                md_request_dict=request_kwargs["md_request_dict"],
+                start_date=start,
+                finish_date=end,
+                freq_mult=multiplier,
+                freq=unit,
+                **request_kwargs,
+            )
+        elif symbol.count(".") >= 2:
+            md_request = market.create_md_request_from_str(
+                md_request_str=symbol,
                 start_date=start,
                 finish_date=end,
                 freq_mult=multiplier,
@@ -298,28 +328,26 @@ class FinPyData(RemoteData):
                 **request_kwargs,
             )
         else:
-            if symbol.count(".") >= 2:
-                df = market.fetch_market(
-                    md_request_str=symbol,
-                    start_date=start,
-                    finish_date=end,
-                    freq_mult=multiplier,
-                    freq=unit,
-                    **request_kwargs,
-                )
-            else:
-                md_request = MarketDataRequest(
-                    tickers=symbol,
-                    start_date=start,
-                    finish_date=end,
-                    freq_mult=multiplier,
-                    freq=unit,
-                    **request_kwargs,
-                )
-                df = market.fetch_market(md_request=md_request)
+            md_request = MarketDataRequest(
+                tickers=symbol,
+                start_date=start,
+                finish_date=end,
+                freq_mult=multiplier,
+                freq=unit,
+                **request_kwargs,
+            )
 
+        df = market.fetch_market(md_request=md_request)
         if df is None:
             return None
+        if isinstance(md_request.tickers, str):
+            ticker = md_request.tickers
+        elif len(md_request.tickers) == 1:
+            ticker = md_request.tickers[0]
+        else:
+            ticker = None
+        if ticker is not None:
+            df.columns = df.columns.map(lambda x: x.replace(ticker + ".", ""))
         if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
             df = df.tz_localize("utc")
         return df, dict(tz=tz, freq=freq)
