@@ -9359,6 +9359,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         cls_or_self,
         column: tp.Optional[tp.Label] = None,
         returns_acc: tp.Optional[ReturnsAccessor] = None,
+        use_asset_returns: bool = False,
+        bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
         sim_start: tp.Optional[tp.ArrayLike] = None,
         sim_end: tp.Optional[tp.ArrayLike] = None,
         rec_sim_range: bool = False,
@@ -9381,6 +9383,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if returns_acc is None:
                 returns_acc = cls_or_self.resolve_shortcut_attr(
                     "returns_acc",
+                    use_asset_returns=use_asset_returns,
+                    bm_returns=bm_returns,
                     sim_start=sim_start,
                     sim_end=sim_end,
                     rec_sim_range=rec_sim_range,
