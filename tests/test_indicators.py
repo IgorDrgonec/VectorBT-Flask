@@ -2498,6 +2498,7 @@ class TestFactory:
             "load",
             "loads",
             "loc",
+            "main_output",
             "metrics",
             "modify_state",
             "o1",
@@ -2558,6 +2559,7 @@ class TestFactory:
             "set_settings",
             "short_name",
             "split",
+            "split_apply",
             "stats",
             "stats_defaults",
             "subplots",
@@ -4649,5 +4651,5 @@ class TestBasic:
             pd.Series(
                 [0.4764129065260935, 0.6132611955700931, 0.6145327842667652, 0.3569452731447068, 0.47570178547480757],
                 index=pd.Index(["standard", "logrs", "rs", "dma", "dsod"], name="hurst_method"),
-            )
+            ),
         )

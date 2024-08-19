@@ -2265,19 +2265,19 @@ class TestPortfolio:
         assert not pf.replace(bm_close=False).filled_bm_close
 
     def test_views(self):
-        assert_records_close(pf.longonly_view.entry_trades.values, pf.entry_trades.longonly_view.values)
-        assert_records_close(pf.shortonly_view.entry_trades.values, pf.entry_trades.shortonly_view.values)
-        assert_records_close(pf.longonly_view.exit_trades.values, pf.exit_trades.longonly_view.values)
-        assert_records_close(pf.shortonly_view.exit_trades.values, pf.exit_trades.shortonly_view.values)
-        assert_records_close(pf.longonly_view.positions.values, pf.positions.longonly_view.values)
-        assert_records_close(pf.shortonly_view.positions.values, pf.positions.shortonly_view.values)
+        assert_records_close(pf.long_view.entry_trades.values, pf.entry_trades.long_view.values)
+        assert_records_close(pf.short_view.entry_trades.values, pf.entry_trades.short_view.values)
+        assert_records_close(pf.long_view.exit_trades.values, pf.exit_trades.long_view.values)
+        assert_records_close(pf.short_view.exit_trades.values, pf.exit_trades.short_view.values)
+        assert_records_close(pf.long_view.positions.values, pf.positions.long_view.values)
+        assert_records_close(pf.short_view.positions.values, pf.positions.short_view.values)
         np.testing.assert_allclose(
             [pf.order_records["size"].sum()],
-            [pf.longonly_view.order_records["size"].sum() + pf.shortonly_view.order_records["size"].sum()],
+            [pf.long_view.order_records["size"].sum() + pf.short_view.order_records["size"].sum()],
         )
         np.testing.assert_allclose(
             [pf.order_records["fees"].sum()],
-            [pf.longonly_view.order_records["fees"].sum() + pf.shortonly_view.order_records["fees"].sum()],
+            [pf.long_view.order_records["fees"].sum() + pf.short_view.order_records["fees"].sum()],
         )
 
     def test_orders(self):

@@ -161,8 +161,8 @@ __pdoc__[
 
 orders_shortcut_config = ReadonlyConfig(
     dict(
-        longonly_view=dict(),
-        shortonly_view=dict(),
+        long_view=dict(),
+        short_view=dict(),
         signed_size=dict(obj_type="mapped"),
         value=dict(obj_type="mapped"),
         weighted_price=dict(obj_type="red_array"),
@@ -195,15 +195,15 @@ class Orders(PriceRecords):
 
     # ############# Views ############# #
 
-    def get_longonly_view(
+    def get_long_view(
         self: OrdersT,
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
     ) -> OrdersT:
-        """See `vectorbtpro.portfolio.nb.records.get_longonly_view_orders_nb`."""
-        func = jit_reg.resolve_option(nb.get_longonly_view_orders_nb, jitted)
+        """See `vectorbtpro.portfolio.nb.records.get_long_view_orders_nb`."""
+        func = jit_reg.resolve_option(nb.get_long_view_orders_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         new_records_arr = func(
             self.records_arr,
@@ -214,7 +214,7 @@ class Orders(PriceRecords):
         )
         return self.replace(records_arr=new_records_arr)
 
-    def get_shortonly_view(
+    def get_short_view(
         self: OrdersT,
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
@@ -222,7 +222,7 @@ class Orders(PriceRecords):
         chunked: tp.ChunkedOption = None,
     ) -> OrdersT:
         """See `vectorbtpro.portfolio.nb.records.get_short_view_orders_nb`."""
-        func = jit_reg.resolve_option(nb.get_shortonly_view_orders_nb, jitted)
+        func = jit_reg.resolve_option(nb.get_short_view_orders_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         new_records_arr = func(
             self.records_arr,

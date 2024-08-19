@@ -176,8 +176,8 @@ shortcut_config = ReadonlyConfig(
         "filled_close": dict(group_by_aware=False, decorator=cached_property),
         "filled_bm_close": dict(group_by_aware=False, decorator=cached_property),
         "weights": dict(group_by_aware=False, decorator=cached_property, obj_type="red_array"),
-        "longonly_view": dict(obj_type="portfolio"),
-        "shortonly_view": dict(obj_type="portfolio"),
+        "long_view": dict(obj_type="portfolio"),
+        "short_view": dict(obj_type="portfolio"),
         "orders": dict(
             obj_type="records",
             field_aliases=("order_records",),
@@ -5186,7 +5186,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         """Get view of portfolio with asset weights disabled."""
         return self.replace(weights=False, **kwargs)
 
-    def get_longonly_view(
+    def get_long_view(
         self: PortfolioT,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -5211,7 +5211,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             init_position = self._init_position
         if init_price is None:
             init_price = self._init_price
-        new_order_records = orders.get_longonly_view(
+        new_order_records = orders.get_long_view(
             init_position=init_position,
             init_price=init_price,
             jitted=jitted,
@@ -5228,7 +5228,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             **kwargs,
         )
 
-    def get_shortonly_view(
+    def get_short_view(
         self: PortfolioT,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -5253,7 +5253,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             init_position = self._init_position
         if init_price is None:
             init_price = self._init_price
-        new_order_records = orders.get_shortonly_view(
+        new_order_records = orders.get_short_view(
             init_position=init_position,
             init_price=init_price,
             jitted=jitted,

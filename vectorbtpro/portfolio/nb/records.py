@@ -1009,7 +1009,7 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def get_longonly_view_orders_nb(
+def get_long_view_orders_nb(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.GroupMap,
@@ -1161,7 +1161,7 @@ def get_longonly_view_orders_nb(
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def get_shortonly_view_orders_nb(
+def get_short_view_orders_nb(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.GroupMap,

@@ -884,7 +884,7 @@ TradeDirection = TradeDirectionT()
 
 __pdoc__[
     "TradeDirection"
-] = f"""Event direction.
+] = f"""Trade direction.
 
 ```python
 {prettify(TradeDirection)}
