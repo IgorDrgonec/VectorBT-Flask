@@ -2287,7 +2287,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def add_feature(
         self: DataT,
         feature: tp.Feature,
-        data: tp.Union[None, tp.SeriesFrame, DataT, CustomTemplate] = None,
+        data: tp.Union[None, tp.SeriesFrame, CustomTemplate] = None,
         pull_feature: bool = False,
         pull_kwargs: tp.KwargsLike = None,
         reuse_fetch_kwargs: bool = True,
@@ -2307,7 +2307,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if pull_feature:
                 if isinstance(self.fetch_kwargs, feature_dict) and reuse_fetch_kwargs:
                     pull_kwargs = merge_dicts(self.get_intersection_dict(self.fetch_kwargs), pull_kwargs)
-                data = type(self).pull(features=feature, **pull_kwargs)
+                data = type(self).pull(features=feature, **pull_kwargs).get(feature=feature)
             else:
                 data = self.run(feature, **run_kwargs, unpack=True)
                 data = self.symbol_wrapper.wrap(data, **wrap_kwargs)
@@ -2320,17 +2320,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if attr in kwargs:
                 checks.assert_not_instance_of(kwargs[attr], key_dict, arg_name=attr)
                 kwargs[attr] = feature_dict({feature: kwargs[attr]})
-        if not isinstance(data, Data):
-            data = type(self).from_data(
-                feature_dict({feature: data}),
-                invert_data=not self.feature_oriented,
-                **kwargs,
-            )
-        else:
-            if self.feature_oriented is not data.feature_oriented:
-                data = data.invert()
-            if len(kwargs) > 0:
-                data = data.replace(**kwargs)
+        data = type(self).from_data(
+            feature_dict({feature: data}),
+            invert_data=not self.feature_oriented,
+            **kwargs,
+        )
         on_merge_conflict = {k: "error" for k in kwargs if k not in self._key_dict_attrs}
         on_merge_conflict["_def"] = "first"
         if merge_kwargs is None:
@@ -2340,7 +2334,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def add_symbol(
         self: DataT,
         symbol: tp.Symbol,
-        data: tp.Union[None, tp.SeriesFrame, DataT, CustomTemplate] = None,
+        data: tp.Union[None, tp.SeriesFrame, CustomTemplate] = None,
         pull_kwargs: tp.KwargsLike = None,
         reuse_fetch_kwargs: bool = True,
         merge_kwargs: tp.KwargsLike = None,
@@ -2354,7 +2348,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if data is None:
             if isinstance(self.fetch_kwargs, symbol_dict) and reuse_fetch_kwargs:
                 pull_kwargs = merge_dicts(self.get_intersection_dict(self.fetch_kwargs), pull_kwargs)
-            data = type(self).pull(symbols=symbol, **pull_kwargs)
+            data = type(self).pull(symbols=symbol, **pull_kwargs).get(symbol=symbol)
         if isinstance(data, CustomTemplate):
             data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.feature_wrapper.ndim == 1:
@@ -2364,17 +2358,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if attr in kwargs:
                 checks.assert_not_instance_of(kwargs[attr], key_dict, arg_name=attr)
                 kwargs[attr] = symbol_dict({symbol: kwargs[attr]})
-        if not isinstance(data, Data):
-            data = type(self).from_data(
-                symbol_dict({symbol: data}),
-                invert_data=not self.symbol_oriented,
-                **kwargs,
-            )
-        else:
-            if self.symbol_oriented is not data.symbol_oriented:
-                data = data.invert()
-            if len(kwargs) > 0:
-                data = data.replace(**kwargs)
+        data = type(self).from_data(
+            symbol_dict({symbol: data}),
+            invert_data=not self.symbol_oriented,
+            **kwargs,
+        )
         on_merge_conflict = {k: "error" for k in kwargs if k not in self._key_dict_attrs}
         on_merge_conflict["_def"] = "first"
         if merge_kwargs is None:
