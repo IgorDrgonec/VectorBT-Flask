@@ -2196,6 +2196,23 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return type(dct)({k: dct[k] for k in keys})
         return type(dct)({k: dct[k] for k in keys if k in dct})
 
+    @classmethod
+    def get_intersection_dict(cls, dct: dict) -> dict:
+        """Get sub-keys and corresponding sub-values that are the same for all keys."""
+        dct_values = list(dct.values())
+        overlapping_keys = set(dct_values[0].keys())
+        for d in dct_values[1:]:
+            overlapping_keys.intersection_update(d.keys())
+        new_dct = dict()
+        for i, k in enumerate(dct.keys()):
+            for k2 in overlapping_keys:
+                v2 = dct[k][k2]
+                if i == 0 and k2 not in new_dct:
+                    new_dct[k2] = v2
+                elif k2 in new_dct and new_dct[k2] is not v2:
+                    del new_dct[k2]
+        return new_dct
+
     def select_keys(self: DataT, keys: tp.MaybeKeys, **kwargs) -> DataT:
         """Create a new `Data` instance with one or more keys selected from this instance."""
         keys = self.resolve_keys(keys)
@@ -2270,31 +2287,50 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def add_feature(
         self: DataT,
         feature: tp.Feature,
-        data: tp.Union[None, tp.SeriesFrame, CustomTemplate] = None,
+        data: tp.Union[None, tp.SeriesFrame, DataT, CustomTemplate] = None,
+        pull_feature: bool = False,
+        pull_kwargs: tp.KwargsLike = None,
+        reuse_fetch_kwargs: bool = True,
         run_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         merge_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> DataT:
-        """Create a new `Data` instance with a new feature added to this instance."""
+        """Create a new `Data` instance with a new feature added to this instance.
+
+        If `data` is None, uses `Data.run`. If in addition `pull_feature` is True, uses `Data.pull` instead."""
         if run_kwargs is None:
             run_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if data is None:
-            data = self.run(feature, **run_kwargs, unpack=True)
-            data = self.symbol_wrapper.wrap(data, **wrap_kwargs)
+            if pull_feature:
+                if isinstance(self.fetch_kwargs, feature_dict) and reuse_fetch_kwargs:
+                    pull_kwargs = merge_dicts(self.get_intersection_dict(self.fetch_kwargs), pull_kwargs)
+                data = type(self).pull(features=feature, **pull_kwargs)
+            else:
+                data = self.run(feature, **run_kwargs, unpack=True)
+                data = self.symbol_wrapper.wrap(data, **wrap_kwargs)
         if isinstance(data, CustomTemplate):
             data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.symbol_wrapper.ndim == 1:
             data = data.copy(deep=False)
             data.name = self.symbols[0]
-        data = feature_dict({feature: data})
         for attr in self._key_dict_attrs:
             if attr in kwargs:
                 checks.assert_not_instance_of(kwargs[attr], key_dict, arg_name=attr)
                 kwargs[attr] = feature_dict({feature: kwargs[attr]})
-        data = type(self).from_data(data, invert_data=not self.feature_oriented, **kwargs)
+        if not isinstance(data, Data):
+            data = type(self).from_data(
+                feature_dict({feature: data}),
+                invert_data=not self.feature_oriented,
+                **kwargs,
+            )
+        else:
+            if self.feature_oriented is not data.feature_oriented:
+                data = data.invert()
+            if len(kwargs) > 0:
+                data = data.replace(**kwargs)
         on_merge_conflict = {k: "error" for k in kwargs if k not in self._key_dict_attrs}
         on_merge_conflict["_def"] = "first"
         if merge_kwargs is None:
@@ -2304,30 +2340,41 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def add_symbol(
         self: DataT,
         symbol: tp.Symbol,
-        data: tp.Union[None, tp.SeriesFrame, CustomTemplate] = None,
+        data: tp.Union[None, tp.SeriesFrame, DataT, CustomTemplate] = None,
         pull_kwargs: tp.KwargsLike = None,
-        get_kwargs: tp.KwargsLike = None,
+        reuse_fetch_kwargs: bool = True,
         merge_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> DataT:
-        """Create a new `Data` instance with a new symbol added to this instance."""
+        """Create a new `Data` instance with a new symbol added to this instance.
+
+        If `data` is None, uses `Data.pull`."""
         if pull_kwargs is None:
             pull_kwargs = {}
-        if get_kwargs is None:
-            get_kwargs = {}
         if data is None:
-            data = type(self).pull(symbol, **pull_kwargs).get(**get_kwargs)
+            if isinstance(self.fetch_kwargs, symbol_dict) and reuse_fetch_kwargs:
+                pull_kwargs = merge_dicts(self.get_intersection_dict(self.fetch_kwargs), pull_kwargs)
+            data = type(self).pull(symbols=symbol, **pull_kwargs)
         if isinstance(data, CustomTemplate):
             data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.feature_wrapper.ndim == 1:
             data = data.copy(deep=False)
             data.name = self.features[0]
-        data = symbol_dict({symbol: data})
         for attr in self._key_dict_attrs:
             if attr in kwargs:
                 checks.assert_not_instance_of(kwargs[attr], key_dict, arg_name=attr)
                 kwargs[attr] = symbol_dict({symbol: kwargs[attr]})
-        data = type(self).from_data(data, invert_data=not self.symbol_oriented, **kwargs)
+        if not isinstance(data, Data):
+            data = type(self).from_data(
+                symbol_dict({symbol: data}),
+                invert_data=not self.symbol_oriented,
+                **kwargs,
+            )
+        else:
+            if self.symbol_oriented is not data.symbol_oriented:
+                data = data.invert()
+            if len(kwargs) > 0:
+                data = data.replace(**kwargs)
         on_merge_conflict = {k: "error" for k in kwargs if k not in self._key_dict_attrs}
         on_merge_conflict["_def"] = "first"
         if merge_kwargs is None:
