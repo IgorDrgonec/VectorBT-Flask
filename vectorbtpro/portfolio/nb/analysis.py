@@ -377,6 +377,7 @@ def position_coverage_grouped_nb(
         cash_sharing=None,
         cash_deposits_raw=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         split_shared=None,
+        weights=base_ch.flex_1d_array_gl_slicer,
         sim_start=base_ch.flex_1d_array_gl_slicer,
         sim_end=base_ch.flex_1d_array_gl_slicer,
     ),
@@ -389,11 +390,16 @@ def cash_deposits_nb(
     cash_sharing: bool,
     cash_deposits_raw: tp.FlexArray2dLike = 0.0,
     split_shared: bool = False,
+    weights: tp.Optional[tp.FlexArray1dLike] = None,
     sim_start: tp.Optional[tp.FlexArray1dLike] = None,
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get cash deposit series per column."""
     cash_deposits_raw_ = to_2d_array_nb(np.asarray(cash_deposits_raw))
+    if weights is None:
+        weights_ = np.full(target_shape[1], np.nan, dtype=np.float_)
+    else:
+        weights_ = to_1d_array_nb(np.asarray(weights).astype(np.float_))
 
     out = np.full(target_shape, np.nan, dtype=np.float_)
 
@@ -408,9 +414,14 @@ def cash_deposits_nb(
             _sim_end = sim_end_[col]
             if _sim_start >= _sim_end:
                 continue
+            _weights = flex_select_1d_pc_nb(weights_, col)
 
             for i in range(_sim_start, _sim_end):
-                out[i, col] = flex_select_nb(cash_deposits_raw_, i, col)
+                _cash_deposits = flex_select_nb(cash_deposits_raw_, i, col)
+                if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                    out[i, col] = _weights * _cash_deposits
+                else:
+                    out[i, col] = _cash_deposits
     else:
         group_end_idxs = np.cumsum(group_lens)
         group_start_idxs = group_end_idxs - group_lens
@@ -428,13 +439,20 @@ def cash_deposits_nb(
                 _sim_end = sim_end_[col]
                 if _sim_start >= _sim_end:
                     continue
+                _weights = flex_select_1d_pc_nb(weights_, col)
 
                 for i in range(_sim_start, _sim_end):
                     _cash_deposits = flex_select_nb(cash_deposits_raw_, i, group)
                     if split_shared:
-                        out[i, col] = _cash_deposits / (to_col - from_col)
+                        if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                            out[i, col] = _weights * _cash_deposits / (to_col - from_col)
+                        else:
+                            out[i, col] = _cash_deposits / (to_col - from_col)
                     else:
-                        out[i, col] = _cash_deposits
+                        if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                            out[i, col] = _weights * _cash_deposits
+                        else:
+                            out[i, col] = _cash_deposits
     return out
 
 
@@ -445,6 +463,7 @@ def cash_deposits_nb(
         group_lens=ch.ArraySlicer(axis=0),
         cash_sharing=None,
         cash_deposits_raw=RepFunc(portfolio_ch.get_cash_deposits_slicer),
+        weights=base_ch.flex_1d_array_gl_slicer,
         sim_start=base_ch.flex_1d_array_gl_slicer,
         sim_end=base_ch.flex_1d_array_gl_slicer,
     ),
@@ -456,15 +475,22 @@ def cash_deposits_grouped_nb(
     group_lens: tp.GroupLens,
     cash_sharing: bool,
     cash_deposits_raw: tp.FlexArray2dLike = 0.0,
+    weights: tp.Optional[tp.FlexArray1dLike] = None,
     sim_start: tp.Optional[tp.FlexArray1dLike] = None,
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get cash deposit series per group."""
     cash_deposits_raw_ = to_2d_array_nb(np.asarray(cash_deposits_raw))
+    if weights is None:
+        weights_ = np.full(target_shape[1], np.nan, dtype=np.float_)
+    else:
+        weights_ = to_1d_array_nb(np.asarray(weights).astype(np.float_))
 
     out = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
 
     if cash_sharing:
+        group_end_idxs = np.cumsum(group_lens)
+        group_start_idxs = group_end_idxs - group_lens
         sim_start_, sim_end_ = generic_nb.prepare_grouped_sim_range_nb(
             target_shape=target_shape,
             group_lens=group_lens,
@@ -476,9 +502,28 @@ def cash_deposits_grouped_nb(
             _sim_end = sim_end_[group]
             if _sim_start >= _sim_end:
                 continue
+            from_col = group_start_idxs[group]
+            to_col = group_end_idxs[group]
 
             for i in range(_sim_start, _sim_end):
-                out[i, group] = flex_select_nb(cash_deposits_raw_, i, group)
+                _cash_deposits = flex_select_nb(cash_deposits_raw_, i, group)
+                if np.isnan(_cash_deposits) or _cash_deposits == 0:
+                    out[i, group] = _cash_deposits
+                    continue
+                group_weight = 0.0
+                for col in range(from_col, to_col):
+                    _weights = flex_select_1d_pc_nb(weights_, col)
+                    if not np.isnan(group_weight) and not np.isnan(_weights):
+                        group_weight += _weights
+                    else:
+                        group_weight = np.nan
+                        break
+                if not np.isnan(group_weight):
+                    group_weight /= group_lens[group]
+                if not np.isnan(group_weight) and not is_close_nb(group_weight, 1.0):
+                    out[i, group] = group_weight * _cash_deposits
+                else:
+                    out[i, group] = _cash_deposits
     else:
         group_end_idxs = np.cumsum(group_lens)
         group_start_idxs = group_end_idxs - group_lens
@@ -496,11 +541,16 @@ def cash_deposits_grouped_nb(
                 _sim_end = sim_end_[col]
                 if _sim_start >= _sim_end:
                     continue
+                _weights = flex_select_1d_pc_nb(weights_, col)
 
                 for i in range(_sim_start, _sim_end):
+                    _cash_deposits = flex_select_nb(cash_deposits_raw_, i, col)
                     if np.isnan(out[i, group]):
                         out[i, group] = 0.0
-                    out[i, group] += flex_select_nb(cash_deposits_raw_, i, col)
+                    if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                        out[i, group] += _weights * _cash_deposits
+                    else:
+                        out[i, group] += _cash_deposits
     return out
 
 
@@ -509,6 +559,7 @@ def cash_deposits_grouped_nb(
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         cash_earnings_raw=base_ch.FlexArraySlicer(axis=1),
+        weights=base_ch.FlexArraySlicer(),
         sim_start=base_ch.FlexArraySlicer(),
         sim_end=base_ch.FlexArraySlicer(),
     ),
@@ -518,11 +569,16 @@ def cash_deposits_grouped_nb(
 def cash_earnings_nb(
     target_shape: tp.Shape,
     cash_earnings_raw: tp.FlexArray2dLike = 0.0,
+    weights: tp.Optional[tp.FlexArray1dLike] = None,
     sim_start: tp.Optional[tp.FlexArray1dLike] = None,
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get cash earning series per column."""
     cash_earnings_raw_ = to_2d_array_nb(np.asarray(cash_earnings_raw))
+    if weights is None:
+        weights_ = np.full(target_shape[1], np.nan, dtype=np.float_)
+    else:
+        weights_ = to_1d_array_nb(np.asarray(weights).astype(np.float_))
 
     out = np.full(target_shape, np.nan, dtype=np.float_)
 
@@ -536,9 +592,14 @@ def cash_earnings_nb(
         _sim_end = sim_end_[col]
         if _sim_start >= _sim_end:
             continue
+        _weights = flex_select_1d_pc_nb(weights_, col)
 
         for i in range(_sim_start, _sim_end):
-            out[i, col] = flex_select_nb(cash_earnings_raw_, i, col)
+            _cash_earnings = flex_select_nb(cash_earnings_raw_, i, col)
+            if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                out[i, col] = _weights * _cash_earnings
+            else:
+                out[i, col] = _cash_earnings
     return out
 
 
@@ -548,6 +609,7 @@ def cash_earnings_nb(
         target_shape=base_ch.shape_gl_slicer,
         group_lens=ch.ArraySlicer(axis=0),
         cash_earnings_raw=base_ch.flex_array_gl_slicer,
+        weights=base_ch.flex_1d_array_gl_slicer,
         sim_start=base_ch.flex_1d_array_gl_slicer,
         sim_end=base_ch.flex_1d_array_gl_slicer,
     ),
@@ -558,11 +620,16 @@ def cash_earnings_grouped_nb(
     target_shape: tp.Shape,
     group_lens: tp.GroupLens,
     cash_earnings_raw: tp.FlexArray2dLike = 0.0,
+    weights: tp.Optional[tp.FlexArray1dLike] = None,
     sim_start: tp.Optional[tp.FlexArray1dLike] = None,
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get cash earning series per group."""
     cash_earnings_raw_ = to_2d_array_nb(np.asarray(cash_earnings_raw))
+    if weights is None:
+        weights_ = np.full(target_shape[1], np.nan, dtype=np.float_)
+    else:
+        weights_ = to_1d_array_nb(np.asarray(weights).astype(np.float_))
 
     out = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
 
@@ -582,11 +649,16 @@ def cash_earnings_grouped_nb(
             _sim_end = sim_end_[col]
             if _sim_start >= _sim_end:
                 continue
+            _weights = flex_select_1d_pc_nb(weights_, col)
 
             for i in range(_sim_start, _sim_end):
+                _cash_earnings = flex_select_nb(cash_earnings_raw_, i, col)
                 if np.isnan(out[i, group]):
                     out[i, group] = 0.0
-                out[i, group] += flex_select_nb(cash_earnings_raw_, i, col)
+                if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                    out[i, group] += _weights * _cash_earnings
+                else:
+                    out[i, group] += _cash_earnings
     return out
 
 
@@ -639,7 +711,7 @@ def get_free_cash_diff_nb(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         col_map=base_ch.GroupMapSlicer(),
         free=None,
-        cash_earnings_raw=base_ch.FlexArraySlicer(axis=1),
+        cash_earnings=base_ch.FlexArraySlicer(axis=1),
         sim_start=base_ch.FlexArraySlicer(),
         sim_end=base_ch.FlexArraySlicer(),
     ),
@@ -651,25 +723,30 @@ def cash_flow_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     free: bool = False,
-    cash_earnings_raw: tp.FlexArray2dLike = 0.0,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
     sim_start: tp.Optional[tp.FlexArray1dLike] = None,
     sim_end: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array2d:
     """Get (free) cash flow series per column."""
-    out = cash_earnings_nb(
-        target_shape,
-        cash_earnings_raw=cash_earnings_raw,
-        sim_start=sim_start,
-        sim_end=sim_end,
-    )
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
 
-    col_idxs, col_lens = col_map
-    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(target_shape, np.nan, dtype=np.float_)
     sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
         sim_shape=target_shape,
         sim_start=sim_start,
         sim_end=sim_end,
     )
+    for col in range(target_shape[1]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        for i in range(_sim_start, _sim_end):
+            out[i, col] = flex_select_nb(cash_earnings_, i, col)
+
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
     for col in prange(col_lens.shape[0]):
         _sim_start = sim_start_[col]
         _sim_end = sim_end_[col]
@@ -819,13 +896,23 @@ def init_cash_nb(
     group_lens: tp.GroupLens,
     cash_sharing: bool,
     split_shared: bool = False,
+    weights: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """Get initial cash per column."""
     out = np.empty(np.sum(group_lens), dtype=np.float_)
+    if weights is None:
+        weights_ = np.full(group_lens.sum(), np.nan, dtype=np.float_)
+    else:
+        weights_ = to_1d_array_nb(np.asarray(weights).astype(np.float_))
 
     if not cash_sharing:
         for col in range(out.shape[0]):
-            out[col] = flex_select_1d_pc_nb(init_cash_raw, col)
+            _init_cash = flex_select_1d_pc_nb(init_cash_raw, col)
+            _weights = flex_select_1d_pc_nb(weights_, col)
+            if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                out[col] = _weights * _init_cash
+            else:
+                out[col] = _init_cash
     else:
         from_col = 0
         for group in range(len(group_lens)):
@@ -833,10 +920,17 @@ def init_cash_nb(
             group_len = to_col - from_col
             _init_cash = flex_select_1d_pc_nb(init_cash_raw, group)
             for col in range(from_col, to_col):
+                _weights = flex_select_1d_pc_nb(weights_, col)
                 if split_shared:
-                    out[col] = _init_cash / group_len
+                    if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                        out[col] = _weights * _init_cash / group_len
+                    else:
+                        out[col] = _init_cash / group_len
                 else:
-                    out[col] = _init_cash
+                    if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                        out[col] = _weights * _init_cash
+                    else:
+                        out[col] = _init_cash
             from_col = to_col
     return out
 
@@ -846,20 +940,47 @@ def init_cash_grouped_nb(
     init_cash_raw: tp.FlexArray1d,
     group_lens: tp.GroupLens,
     cash_sharing: bool,
+    weights: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.Array1d:
     """Get initial cash per group."""
     out = np.empty(group_lens.shape, dtype=np.float_)
+    if weights is None:
+        weights_ = np.full(group_lens.sum(), np.nan, dtype=np.float_)
+    else:
+        weights_ = to_1d_array_nb(np.asarray(weights).astype(np.float_))
 
     if cash_sharing:
+        from_col = 0
         for group in range(len(group_lens)):
-            out[group] = flex_select_1d_pc_nb(init_cash_raw, group)
+            to_col = from_col + group_lens[group]
+            _init_cash = flex_select_1d_pc_nb(init_cash_raw, group)
+            group_weight = 0.0
+            for col in range(from_col, to_col):
+                _weights = flex_select_1d_pc_nb(weights_, col)
+                if not np.isnan(group_weight) and not np.isnan(_weights):
+                    group_weight += _weights
+                else:
+                    group_weight = np.nan
+                    break
+            if not np.isnan(group_weight):
+                group_weight /= group_lens[group]
+            if not np.isnan(group_weight) and not is_close_nb(group_weight, 1.0):
+                out[group] = group_weight * _init_cash
+            else:
+                out[group] = _init_cash
+            from_col = to_col
     else:
         from_col = 0
         for group in range(len(group_lens)):
             to_col = from_col + group_lens[group]
             cash_sum = 0.0
             for col in range(from_col, to_col):
-                cash_sum += flex_select_1d_pc_nb(init_cash_raw, col)
+                _init_cash = flex_select_1d_pc_nb(init_cash_raw, col)
+                _weights = flex_select_1d_pc_nb(weights_, col)
+                if not np.isnan(_weights) and not is_close_nb(_weights, 1.0):
+                    cash_sum += _weights * _init_cash
+                else:
+                    cash_sum += _init_cash
             out[group] = cash_sum
             from_col = to_col
     return out

@@ -2264,6 +2264,22 @@ class TestPortfolio:
         assert pf.replace(bm_close=None).filled_bm_close is None
         assert not pf.replace(bm_close=False).filled_bm_close
 
+    def test_views(self):
+        assert_records_close(pf.long_view.entry_trades.values, pf.entry_trades.long_view.values)
+        assert_records_close(pf.short_view.entry_trades.values, pf.entry_trades.short_view.values)
+        assert_records_close(pf.long_view.exit_trades.values, pf.exit_trades.long_view.values)
+        assert_records_close(pf.short_view.exit_trades.values, pf.exit_trades.short_view.values)
+        assert_records_close(pf.long_view.positions.values, pf.positions.long_view.values)
+        assert_records_close(pf.short_view.positions.values, pf.positions.short_view.values)
+        np.testing.assert_allclose(
+            [pf.order_records["size"].sum()],
+            [pf.long_view.order_records["size"].sum() + pf.short_view.order_records["size"].sum()],
+        )
+        np.testing.assert_allclose(
+            [pf.order_records["fees"].sum()],
+            [pf.long_view.order_records["fees"].sum() + pf.short_view.order_records["fees"].sum()],
+        )
+
     def test_orders(self):
         result = np.array(
             [
@@ -2320,6 +2336,34 @@ class TestPortfolio:
         assert_records_close(
             pf_shared.get_orders(sim_start=1, sim_end=4, rec_sim_range=True).values,
             pf_shared.replace(sim_start=1, sim_end=4).orders.values,
+        )
+        result = np.array(
+            [
+                (0, 0, 1, 0.05, 2.02, 0.05101, 0),
+                (1, 0, 2, 0.5, 2.9699999999999998, 0.06485, 1),
+                (2, 0, 3, 0.05, 3.96, 0.051980000000000005, 1),
+                (3, 0, 4, 0.5, 5.05, 0.07525, 0),
+                (0, 1, 1, 0.1, 1.98, 0.10198, 1),
+                (1, 1, 3, 0.1, 4.04, 0.10404000000000001, 0),
+                (2, 1, 4, 1.0, 4.95, 0.14950000000000002, 1),
+                (0, 2, 0, 1.5, 1.01, 0.16515000000000002, 0),
+                (1, 2, 1, 0.15000000000000002, 2.02, 0.15303, 0),
+                (2, 2, 2, 1.5, 2.9699999999999998, 0.19455, 1),
+                (3, 2, 3, 0.15000000000000002, 3.96, 0.15594000000000002, 1),
+            ],
+            dtype=order_dt,
+        )
+        assert_records_close(
+            pf.get_orders(weights=[0.5, 1.0, 1.5]).values,
+            result,
+        )
+        assert_records_close(
+            pf_grouped.get_orders(weights=[0.5, 1.0, 1.5]).values,
+            result,
+        )
+        assert_records_close(
+            pf_shared.get_orders(weights=[0.5, 1.0, 1.5]).values,
+            result,
         )
 
     def test_logs(self):
@@ -5027,6 +5071,10 @@ class TestPortfolio:
         assert_series_equal(pf.init_position, result)
         assert_series_equal(pf_grouped.init_position, result)
         assert_series_equal(pf_shared.init_position, result)
+        result = pd.Series(np.array([0.5, -1.0, 0.0]), index=close_na.columns).rename("init_position")
+        assert_series_equal(pf.get_init_position(weights=[0.5, 1.0, 1.5]), result)
+        assert_series_equal(pf_grouped.get_init_position(weights=[0.5, 1.0, 1.5]), result)
+        assert_series_equal(pf_shared.get_init_position(weights=[0.5, 1.0, 1.5]), result)
 
     def test_asset_flow(self):
         assert_frame_equal(
@@ -5674,6 +5722,29 @@ class TestPortfolio:
             vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(chunked=True),
             vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(chunked=False),
         )
+        assert_series_equal(
+            pf.get_init_cash(weights=[0.5, 1.0, 1.5]),
+            pd.Series(np.array([50.0, 100.0, 150.0]), index=close_na.columns).rename("init_cash"),
+        )
+        assert_series_equal(
+            pf_grouped.get_init_cash(weights=[0.5, 1.0, 1.5], group_by=False),
+            pd.Series(np.array([50.0, 100.0, 150.0]), index=close_na.columns).rename("init_cash"),
+        )
+        assert_series_equal(
+            pf_shared.get_init_cash(weights=[0.5, 1.0, 1.5], group_by=False),
+            pd.Series(np.array([100.0, 200.0, 150.0]), index=close_na.columns).rename("init_cash"),
+        )
+        assert_series_equal(
+            pf_shared.get_init_cash(weights=[0.5, 1.0, 1.5], group_by=False, split_shared=True),
+            pd.Series(np.array([50.0, 100.0, 150.0]), index=close_na.columns).rename("init_cash"),
+        )
+        result = pd.Series(
+            np.array([150.0, 150.0]),
+            group_columns,
+        ).rename("init_cash")
+        assert_series_equal(pf.get_init_cash(weights=[0.5, 1.0, 1.5], group_by=group_by), result)
+        assert_series_equal(pf_grouped.get_init_cash(weights=[0.5, 1.0, 1.5]), result)
+        assert_series_equal(pf_shared.get_init_cash(weights=[0.5, 1.0, 1.5]), result)
 
     def test_cash_deposits(self):
         assert_frame_equal(
@@ -5822,6 +5893,46 @@ class TestPortfolio:
             pf_shared.get_cash_deposits(sim_start=1, sim_end=4, rec_sim_range=True),
             pf_shared.replace(sim_start=1, sim_end=4).cash_deposits,
         )
+        assert_frame_equal(
+            pf.get_cash_deposits(weights=[0.5, 1.0, 1.5]),
+            pd.DataFrame(
+                np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [50.0, 100.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+                index=close_na.index,
+                columns=close_na.columns,
+            ),
+        )
+        assert_frame_equal(
+            pf_grouped.get_cash_deposits(weights=[0.5, 1.0, 1.5], group_by=False),
+            pd.DataFrame(
+                np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [50.0, 100.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+                index=close_na.index,
+                columns=close_na.columns,
+            ),
+        )
+        assert_frame_equal(
+            pf_shared.get_cash_deposits(weights=[0.5, 1.0, 1.5], group_by=False),
+            pd.DataFrame(
+                np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [100.0, 200.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+                index=close_na.index,
+                columns=close_na.columns,
+            ),
+        )
+        assert_frame_equal(
+            pf_shared.get_cash_deposits(weights=[0.5, 1.0, 1.5], group_by=False, split_shared=True),
+            pd.DataFrame(
+                np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [50.0, 100.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+                index=close_na.index,
+                columns=close_na.columns,
+            ),
+        )
+        result = pd.DataFrame(
+            np.array([[0.0, 0.0], [0.0, 0.0], [150.0, 0.0], [0.0, 0.0], [0.0, 0.0]]),
+            index=close_na.index,
+            columns=group_columns,
+        )
+        assert_frame_equal(pf.get_cash_deposits(weights=[0.5, 1.0, 1.5], group_by=group_by), result)
+        assert_frame_equal(pf_grouped.get_cash_deposits(weights=[0.5, 1.0, 1.5]), result)
+        assert_frame_equal(pf_shared.get_cash_deposits(weights=[0.5, 1.0, 1.5]), result)
 
     def test_cash_earnings(self):
         result = pd.DataFrame(
@@ -5916,6 +6027,40 @@ class TestPortfolio:
         assert_frame_equal(
             new_pf_shared.get_cash_earnings(sim_start=1, sim_end=4, rec_sim_range=True),
             new_pf_shared.replace(sim_start=1, sim_end=4).cash_earnings,
+        )
+        result = pd.DataFrame(
+            np.array([[0.5, 1.0, 1.5], [0.5, 1.0, 1.5], [0.5, 1.0, 1.5], [0.5, 1.0, 1.5], [0.5, 1.0, 1.5]]),
+            index=close_na.index,
+            columns=close_na.columns,
+        )
+        assert_frame_equal(
+            pf.get_cash_earnings(cash_earnings_raw=1, weights=[0.5, 1.0, 1.5]),
+            result,
+        )
+        assert_frame_equal(
+            pf_grouped.get_cash_earnings(cash_earnings_raw=1, weights=[0.5, 1.0, 1.5], group_by=False),
+            result,
+        )
+        assert_frame_equal(
+            pf_shared.get_cash_earnings(cash_earnings_raw=1, weights=[0.5, 1.0, 1.5], group_by=False),
+            result,
+        )
+        result = pd.DataFrame(
+            np.array([[1.5, 1.5], [1.5, 1.5], [1.5, 1.5], [1.5, 1.5], [1.5, 1.5]]),
+            index=close_na.index,
+            columns=group_columns,
+        )
+        assert_frame_equal(
+            pf.get_cash_earnings(cash_earnings_raw=1, weights=[0.5, 1.0, 1.5], group_by=group_by),
+            result,
+        )
+        assert_frame_equal(
+            pf_grouped.get_cash_earnings(cash_earnings_raw=1, weights=[0.5, 1.0, 1.5]),
+            result,
+        )
+        assert_frame_equal(
+            pf_shared.get_cash_earnings(cash_earnings_raw=1, weights=[0.5, 1.0, 1.5]),
+            result,
         )
 
     def test_cash(self):

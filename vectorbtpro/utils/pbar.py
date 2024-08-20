@@ -480,13 +480,21 @@ class ProgressBar:
         else:
             self.set_prefix_str(desc, refresh=refresh)
 
-    def __enter__(self: ProgressBarT) -> ProgressBarT:
+    def enter(self: ProgressBarT, **kwargs) -> ProgressBarT:
+        """Enter the bar."""
         if self.show_progress or self.force_open_bar:
-            self.open()
+            self.open(**kwargs)
         return self
 
+    def __enter__(self: ProgressBarT) -> ProgressBarT:
+        return self.enter()
+
+    def exit(self, **kwargs) -> None:
+        """Exit the bar."""
+        self.close(**kwargs)
+
     def __exit__(self, *args) -> None:
-        self.close()
+        self.exit()
 
     def __len__(self) -> int:
         return self.bar.__len__()

@@ -53,6 +53,7 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.execution import Task
 from vectorbtpro.utils.formatting import camel_to_snake_case, prettify
+from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.module_ import search_package_for_funcs
 from vectorbtpro.utils.params import (
@@ -219,6 +220,7 @@ def build_columns(
     rep_param_indexes = []
     vis_param_indexes = []
     vis_rep_param_indexes = []
+    has_per_column = False
     for i in range(len(params)):
         param_values = params[i]
         level_name = None
@@ -241,6 +243,7 @@ def build_columns(
         if per_column:
             param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
             repeat_index = False
+            has_per_column = True
         elif _per_column:
             param_index = None
             for p in param_values:
@@ -253,6 +256,7 @@ def build_columns(
             if len(param_index) == 1 and len(input_columns) > 1:
                 param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
             repeat_index = False
+            has_per_column = True
         else:
             param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
             repeat_index = True
@@ -273,7 +277,10 @@ def build_columns(
         n_param_values = len(params[0]) if len(params) > 0 else 1
         input_columns = indexes.tile_index(input_columns, n_param_values, ignore_ranges=ignore_ranges)
     if len(vis_param_indexes) > 0:
-        param_index = indexes.stack_indexes(vis_param_indexes, **kwargs)
+        if has_per_column:
+            param_index = None
+        else:
+            param_index = indexes.stack_indexes(vis_param_indexes, **kwargs)
         final_index = indexes.stack_indexes([*vis_rep_param_indexes, input_columns], **kwargs)
     else:
         param_index = None
@@ -340,6 +347,19 @@ RunOutputT = tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOu
 RunCombsOutputT = tp.Tuple[IndicatorBaseT, ...]
 
 
+def combine_indicator_with_other(
+    self: IndicatorBaseT,
+    other: tp.Union["IndicatorBase", tp.ArrayLike],
+    np_func: tp.Callable[[tp.ArrayLike, tp.ArrayLike], tp.Array1d],
+) -> tp.SeriesFrame:
+    """Combine `IndicatorBase` with other compatible object."""
+    if isinstance(other, IndicatorBase):
+        other = other.main_output
+    return np_func(self.main_output, other)
+
+
+@attach_binary_magic_methods(combine_indicator_with_other)
+@attach_unary_magic_methods(lambda self, np_func: np_func(self.main_output))
 class IndicatorBase(Analyzable):
     """Indicator base class.
 
@@ -355,6 +375,13 @@ class IndicatorBase(Analyzable):
 
     def __getattr__(self, k: str) -> tp.Any:
         """Redirect queries targeted at a generic output name by "output" or the short name of the indicator."""
+        try:
+            return object.__getattribute__(self, k)
+        except AttributeError:
+            pass
+        if k == "vbt":
+            return self.main_output.vbt
+
         short_name = object.__getattribute__(self, "short_name")
         output_names = object.__getattribute__(self, "output_names")
         if len(output_names) == 1:
@@ -383,7 +410,30 @@ class IndicatorBase(Analyzable):
                 return object.__getattribute__(self, output_names[0] + "_" + k)
             except AttributeError:
                 pass
+        elif short_name in output_names:
+            try:
+                return object.__getattribute__(self, short_name + "_" + k)
+            except AttributeError:
+                pass
+        elif short_name.lower() in output_names:
+            try:
+                return object.__getattribute__(self, short_name.lower() + "_" + k)
+            except AttributeError:
+                pass
         return object.__getattribute__(self, k)
+
+    @property
+    def main_output(self) -> tp.Optional[tp.SeriesFrame]:
+        """Get main output.
+
+        It's either the only output or an output that matches the short name of the indicator."""
+        if len(self.output_names) == 1:
+            return getattr(self, self.output_names[0])
+        if self.short_name in self.output_names:
+            return getattr(self, self.short_name)
+        if self.short_name.lower() in self.output_names:
+            return getattr(self, self.short_name.lower())
+        raise ValueError(f"Indicator {self} has no main output")
 
     @classmethod
     def run_pipeline(

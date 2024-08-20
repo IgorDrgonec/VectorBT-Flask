@@ -33,6 +33,10 @@ from vectorbtpro.utils.parsing import get_context_vars
 from vectorbtpro.utils.template import substitute_templates
 
 if tp.TYPE_CHECKING:
+    from vectorbtpro.data.base import Data as DataT
+else:
+    DataT = tp.Any
+if tp.TYPE_CHECKING:
     from vectorbtpro.generic.splitting.base import Splitter as SplitterT
 else:
     SplitterT = "Splitter"
@@ -1231,6 +1235,22 @@ class BaseAccessor(Wrapping):
         """See `vectorbtpro.base.reshaping.to_dict`."""
         return reshaping.to_dict(self.obj, *args, **kwargs)
 
+    # ############# Conversion ############# #
+
+    def to_data(
+        self,
+        data_cls: tp.Optional[tp.Type[DataT]] = None,
+        columns_are_symbols: bool = True,
+        **kwargs,
+    ) -> DataT:
+        """Convert to a `vectorbtpro.data.base.Data` instance."""
+        if data_cls is None:
+            from vectorbtpro.data.base import Data
+
+            data_cls = Data
+
+        return data_cls.from_data(self.obj, columns_are_symbols=columns_are_symbols, **kwargs)
+
     # ############# Combining ############# #
 
     def apply(
@@ -1588,6 +1608,8 @@ class BaseAccessor(Wrapping):
             1.02 s ± 2.18 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
             ```
         """
+        from vectorbtpro.indicators.factory import IndicatorBase
+
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -1604,7 +1626,14 @@ class BaseAccessor(Wrapping):
                     concat = True
             else:
                 objs = (obj,)
-        objs = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, objs))
+        new_objs = []
+        for obj in objs:
+            if isinstance(obj, BaseAccessor):
+                obj = obj.obj
+            elif isinstance(obj, IndicatorBase):
+                obj = obj.main_output
+            new_objs.append(obj)
+        objs = tuple(new_objs)
         if not isinstance(cls_or_self, type):
             objs = (cls_or_self.obj,) + objs
         if checks.is_numba_func(combine_func):

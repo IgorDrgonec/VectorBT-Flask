@@ -978,7 +978,6 @@ data = frozen_cfg(
                 username=None,
                 password=None,
                 auth_token=None,
-                user_agent=None,
             ),
             exchange=None,
             timeframe="D",
@@ -1020,6 +1019,17 @@ data = frozen_cfg(
             schema=None,
             df_kwargs=flex_cfg(),
             params=flex_cfg(),
+        ),
+        finpy=flex_cfg(
+            market=None,
+            market_config=flex_cfg(),
+            config_manager=None,
+            config_manager_config=flex_cfg(),
+            start="one year ago",
+            end="now",
+            timeframe="daily",
+            tz="utc",
+            request_kwargs=flex_cfg(),
         ),
     ),
     stats=flex_cfg(
@@ -1693,6 +1703,7 @@ portfolio = frozen_cfg(
     year_freq=None,
     use_in_outputs=True,
     fillna_close=True,
+    weights=None,
     trades_type="exittrades",
     stats=flex_cfg(
         filters=flex_cfg(

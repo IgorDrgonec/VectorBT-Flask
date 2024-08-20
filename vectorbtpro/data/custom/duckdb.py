@@ -108,7 +108,9 @@ class DuckDBData(DBData):
         if connection_config is None:
             connection_config = {}
         has_connection_config = len(connection_config) > 0
+        connection_config["read_only"] = read_only
         connection_config = cls.resolve_custom_setting(connection_config, "connection_config", merge=True)
+        read_only = connection_config.pop("read_only", read_only)
         should_close = False
         if connection is None:
             if len(connection_config) == 0:
@@ -165,14 +167,13 @@ class DuckDBData(DBData):
                 continue
             if not incl_system and catalog == "temp":
                 continue
-            if catalog not in catalogs:
-                catalogs.append(catalog)
+            catalogs.append(catalog)
 
         if should_close:
             connection.close()
         if sort:
-            return sorted(catalogs)
-        return catalogs
+            return sorted(dict.fromkeys(catalogs))
+        return list(dict.fromkeys(catalogs))
 
     @classmethod
     def list_schemas(
@@ -229,14 +230,13 @@ class DuckDBData(DBData):
                     continue
                 if prefix_catalog:
                     schema = catalog + ":" + schema
-                if schema not in schemas:
-                    schemas.append(schema)
+                schemas.append(schema)
 
         if should_close:
             connection.close()
         if sort:
-            return sorted(schemas)
-        return schemas
+            return sorted(dict.fromkeys(schemas))
+        return list(dict.fromkeys(schemas))
 
     @classmethod
     def get_current_schema(
@@ -367,14 +367,13 @@ class DuckDBData(DBData):
                     table = schema + ":" + table
                 elif prefix_catalog or prefix_schema:
                     table = catalog + ":" + schema + ":" + table
-                if table not in tables:
-                    tables.append(table)
+                tables.append(table)
 
         if should_close:
             connection.close()
         if sort:
-            return sorted(tables)
-        return tables
+            return sorted(dict.fromkeys(tables))
+        return list(dict.fromkeys(tables))
 
     @classmethod
     def resolve_keys_meta(

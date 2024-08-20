@@ -205,8 +205,14 @@ class BentoData(RemoteData):
                 freq = None
         if resolve_dates:
             dataset_range = client.metadata.get_dataset_range(dataset)
-            start_date = dt.to_tzaware_timestamp(dataset_range["start_date"], naive_tz="utc", tz="utc")
-            end_date = dt.to_tzaware_timestamp(dataset_range["end_date"], naive_tz="utc", tz="utc")
+            if "start_date" in dataset_range:
+                start_date = dt.to_tzaware_timestamp(dataset_range["start_date"], naive_tz="utc", tz="utc")
+            else:
+                start_date = dt.to_tzaware_timestamp(dataset_range["start"], naive_tz="utc", tz="utc")
+            if "end_date" in dataset_range:
+                end_date = dt.to_tzaware_timestamp(dataset_range["end_date"], naive_tz="utc", tz="utc")
+            else:
+                end_date = dt.to_tzaware_timestamp(dataset_range["end"], naive_tz="utc", tz="utc")
             if start is not None:
                 start = dt.to_tzaware_timestamp(start, naive_tz=tz, tz="utc")
                 if start < start_date:

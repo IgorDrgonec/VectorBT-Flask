@@ -95,6 +95,11 @@ from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instanceproperty
 
+if tp.TYPE_CHECKING:
+    from vectorbtpro.data.base import Data as DataT
+else:
+    DataT = tp.Any
+
 __all__ = [
     "OHLCVDFAccessor",
 ]
@@ -178,6 +183,17 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         else:
             feature_idxs = self.get_feature_idx(features, raise_error=True)
         return self.obj.iloc[:, feature_idxs]
+
+    # ############# Conversion ############# #
+
+    def to_data(self, data_cls: tp.Optional[tp.Type[DataT]] = None, **kwargs) -> DataT:
+        """Convert to a `vectorbtpro.data.base.Data` instance."""
+        if data_cls is None:
+            from vectorbtpro.data.base import Data
+
+            data_cls = Data
+
+        return data_cls.from_data(self.obj, columns_are_symbols=False, **kwargs)
 
     # ############# Resampling ############# #
 

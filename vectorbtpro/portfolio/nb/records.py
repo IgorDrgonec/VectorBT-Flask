@@ -47,6 +47,32 @@ def records_within_sim_range_nb(
 
 
 @register_jitted(cache=True)
+def apply_weights_to_orders_nb(
+    order_records: tp.RecordArray,
+    col_arr: tp.Array1d,
+    weights: tp.Array1d,
+) -> tp.RecordArray:
+    """Apply weights to order records."""
+    order_records = order_records.copy()
+    out = np.empty(len(order_records), dtype=order_records.dtype)
+    k = 0
+
+    for r in range(len(order_records)):
+        order_record = order_records[r]
+        col = col_arr[r]
+        if not np.isnan(weights[col]):
+            order_record["size"] = weights[col] * order_record["size"]
+            order_record["fees"] = weights[col] * order_record["fees"]
+            if order_record["size"] != 0:
+                out[k] = order_record
+                k += 1
+        else:
+            out[k] = order_record
+            k += 1
+    return out[:k]
+
+
+@register_jitted(cache=True)
 def weighted_price_reduce_meta_nb(
     idxs: tp.Array1d,
     col: int,
@@ -967,6 +993,310 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
         counts[col] += 1
 
     return generic_nb.repartition_nb(new_records, counts)
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        close=ch.ArraySlicer(axis=1),
+        col_map=base_ch.GroupMapSlicer(),
+        init_position=base_ch.FlexArraySlicer(),
+        init_price=base_ch.FlexArraySlicer(),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def get_long_view_orders_nb(
+    order_records: tp.RecordArray,
+    close: tp.Array2d,
+    col_map: tp.GroupMap,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.RecordArray:
+    """Get view of orders in long positions only."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
+    order_records = order_records.copy()
+    out = np.empty(order_records.shape, dtype=order_records.dtype)
+    r = 0
+
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(close.shape[0], col_lens.shape[0]),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+
+        if _init_position != 0:
+            # Prepare initial position
+            in_position = True
+            if _init_position >= 0:
+                direction = TradeDirection.Long
+            else:
+                direction = TradeDirection.Short
+            entry_size_sum = abs(_init_position)
+            entry_gross_sum = abs(_init_position) * _init_price
+            exit_size_sum = 0.0
+            exit_gross_sum = 0.0
+        else:
+            in_position = False
+
+        col_len = col_lens[col]
+        if col_len == 0 and not in_position:
+            continue
+        last_id = -1
+
+        for c in range(col_len):
+            order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
+
+            if order_record["id"] < last_id:
+                raise ValueError("Ids must come in ascending order per column")
+            last_id = order_record["id"]
+
+            order_size = order_record["size"]
+            order_price = order_record["price"]
+            order_side = order_record["side"]
+            order_fees = order_record["fees"]
+
+            if order_size <= 0.0:
+                raise ValueError(invalid_size_msg)
+            if order_price < 0.0:
+                raise ValueError(invalid_price_msg)
+
+            if not in_position:
+                # New position opened
+                in_position = True
+                if order_side == OrderSide.Buy:
+                    direction = TradeDirection.Long
+                else:
+                    direction = TradeDirection.Short
+                entry_size_sum = 0.0
+                entry_gross_sum = 0.0
+                exit_size_sum = 0.0
+                exit_gross_sum = 0.0
+
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Sell
+            ):
+                # Position increased
+                entry_size_sum += order_size
+                entry_gross_sum += order_size * order_price
+                if direction == TradeDirection.Long:
+                    out[r] = order_record
+                    r += 1
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Buy
+            ):
+                if is_close_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position closed
+                    in_position = False
+                    exit_size_sum = entry_size_sum
+                    exit_gross_sum += order_size * order_price
+                    if direction == TradeDirection.Long:
+                        out[r] = order_record
+                        r += 1
+                elif is_less_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position decreased
+                    exit_size_sum += order_size
+                    exit_gross_sum += order_size * order_price
+                    if direction == TradeDirection.Long:
+                        out[r] = order_record
+                        r += 1
+                else:
+                    # Position closed
+                    remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+
+                    # New position opened
+                    entry_size_sum = add_nb(order_size, -remaining_size)
+                    entry_gross_sum = entry_size_sum * order_price
+                    exit_size_sum = 0.0
+                    exit_gross_sum = 0.0
+                    if direction == TradeDirection.Long:
+                        out[r] = order_record
+                        out["size"][r] = remaining_size
+                        out["fees"][r] = remaining_size / order_size * order_fees
+                        r += 1
+                    else:
+                        out[r] = order_record
+                        out["size"][r] = entry_size_sum
+                        out["fees"][r] = entry_size_sum / order_size * order_fees
+                        r += 1
+                    if order_side == OrderSide.Buy:
+                        direction = TradeDirection.Long
+                    else:
+                        direction = TradeDirection.Short
+
+    return out[:r]
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        close=ch.ArraySlicer(axis=1),
+        col_map=base_ch.GroupMapSlicer(),
+        init_position=base_ch.FlexArraySlicer(),
+        init_price=base_ch.FlexArraySlicer(),
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def get_short_view_orders_nb(
+    order_records: tp.RecordArray,
+    close: tp.Array2d,
+    col_map: tp.GroupMap,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
+) -> tp.RecordArray:
+    """Get view of orders in short positions only."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
+    order_records = order_records.copy()
+    out = np.empty(order_records.shape, dtype=order_records.dtype)
+    r = 0
+
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+
+    sim_start_, sim_end_ = generic_nb.prepare_sim_range_nb(
+        sim_shape=(close.shape[0], col_lens.shape[0]),
+        sim_start=sim_start,
+        sim_end=sim_end,
+    )
+    for col in prange(col_lens.shape[0]):
+        _sim_start = sim_start_[col]
+        _sim_end = sim_end_[col]
+        if _sim_start >= _sim_end:
+            continue
+
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+
+        if _init_position != 0:
+            # Prepare initial position
+            in_position = True
+            if _init_position >= 0:
+                direction = TradeDirection.Long
+            else:
+                direction = TradeDirection.Short
+            entry_size_sum = abs(_init_position)
+            entry_gross_sum = abs(_init_position) * _init_price
+            exit_size_sum = 0.0
+            exit_gross_sum = 0.0
+        else:
+            in_position = False
+
+        col_len = col_lens[col]
+        if col_len == 0 and not in_position:
+            continue
+        last_id = -1
+
+        for c in range(col_len):
+            order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+            if order_record["idx"] < _sim_start or order_record["idx"] >= _sim_end:
+                continue
+
+            if order_record["id"] < last_id:
+                raise ValueError("Ids must come in ascending order per column")
+            last_id = order_record["id"]
+
+            order_size = order_record["size"]
+            order_price = order_record["price"]
+            order_side = order_record["side"]
+            order_fees = order_record["fees"]
+
+            if order_size <= 0.0:
+                raise ValueError(invalid_size_msg)
+            if order_price < 0.0:
+                raise ValueError(invalid_price_msg)
+
+            if not in_position:
+                # New position opened
+                in_position = True
+                if order_side == OrderSide.Buy:
+                    direction = TradeDirection.Long
+                else:
+                    direction = TradeDirection.Short
+                entry_size_sum = 0.0
+                entry_gross_sum = 0.0
+                exit_size_sum = 0.0
+                exit_gross_sum = 0.0
+
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Sell
+            ):
+                # Position increased
+                entry_size_sum += order_size
+                entry_gross_sum += order_size * order_price
+                if direction == TradeDirection.Short:
+                    out[r] = order_record
+                    r += 1
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Buy
+            ):
+                if is_close_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position closed
+                    in_position = False
+                    exit_size_sum = entry_size_sum
+                    exit_gross_sum += order_size * order_price
+                    if direction == TradeDirection.Short:
+                        out[r] = order_record
+                        r += 1
+                elif is_less_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position decreased
+                    exit_size_sum += order_size
+                    exit_gross_sum += order_size * order_price
+                    if direction == TradeDirection.Short:
+                        out[r] = order_record
+                        r += 1
+                else:
+                    # Position closed
+                    remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+
+                    # New position opened
+                    entry_size_sum = add_nb(order_size, -remaining_size)
+                    entry_gross_sum = entry_size_sum * order_price
+                    exit_size_sum = 0.0
+                    exit_gross_sum = 0.0
+                    if direction == TradeDirection.Short:
+                        out[r] = order_record
+                        out["size"][r] = remaining_size
+                        out["fees"][r] = remaining_size / order_size * order_fees
+                        r += 1
+                    else:
+                        out[r] = order_record
+                        out["size"][r] = entry_size_sum
+                        out["fees"][r] = entry_size_sum / order_size * order_fees
+                        r += 1
+                    if order_side == OrderSide.Buy:
+                        direction = TradeDirection.Long
+                    else:
+                        direction = TradeDirection.Short
+
+    return out[:r]
 
 
 @register_chunkable(

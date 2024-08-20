@@ -61,6 +61,8 @@ def approx_long_buy_value_nb(val_price: float, size: float) -> float:
 @register_jitted(cache=True)
 def adj_size_granularity_nb(size: float, size_granularity: float) -> bool:
     """Whether to adjust the size with the size granularity."""
+    if size_granularity % 1 == 0:
+        return True
     adj_size = size // size_granularity * size_granularity
     return not is_close_nb(size, adj_size) and not is_close_nb(size, adj_size + size_granularity)
 

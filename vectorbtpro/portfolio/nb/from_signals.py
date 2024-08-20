@@ -567,12 +567,14 @@ def from_basic_signals_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    track_cash_deposits = cash_deposits_.size > 1
+    track_cash_deposits = (cash_deposits_.size == 1 and cash_deposits_[0, 0] != 0) or cash_deposits_.size > 1
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = cash_earnings_.size > 1 or cash_dividends_.size > 1
+    track_cash_earnings = (cash_earnings_.size == 1 and cash_earnings_[0, 0] != 0) or cash_earnings_.size > 1
+    track_cash_dividends = (cash_dividends_.size == 1 and cash_dividends_[0, 0] != 0) or cash_dividends_.size > 1
+    track_cash_earnings = track_cash_earnings or track_cash_dividends
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
@@ -1364,12 +1366,14 @@ def from_signals_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    track_cash_deposits = cash_deposits_.size > 1
+    track_cash_deposits = (cash_deposits_.size == 1 and cash_deposits_[0, 0] != 0) or cash_deposits_.size > 1
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = cash_earnings_.size > 1 or cash_dividends_.size > 1
+    track_cash_earnings = (cash_earnings_.size == 1 and cash_earnings_[0, 0] != 0) or cash_earnings_.size > 1
+    track_cash_dividends = (cash_dividends_.size == 1 and cash_dividends_[0, 0] != 0) or cash_dividends_.size > 1
+    track_cash_earnings = track_cash_earnings or track_cash_dividends
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
@@ -3825,12 +3829,14 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    track_cash_deposits = cash_deposits_.size > 1
+    track_cash_deposits = (cash_deposits_.size == 1 and cash_deposits_[0, 0] != 0) or cash_deposits_.size > 1
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = cash_earnings_.size > 1 or cash_dividends_.size > 1
+    track_cash_earnings = (cash_earnings_.size == 1 and cash_earnings_[0, 0] != 0) or cash_earnings_.size > 1
+    track_cash_dividends = (cash_dividends_.size == 1 and cash_dividends_[0, 0] != 0) or cash_dividends_.size > 1
+    track_cash_earnings = track_cash_earnings or track_cash_dividends
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:

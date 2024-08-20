@@ -102,7 +102,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_dict
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_dict
 from vectorbtpro.generic.enums import RangeStatus, range_dt
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.generic.ranges import Ranges
@@ -111,6 +111,8 @@ from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderT
 from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.signals.enums import StopType
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -159,6 +161,8 @@ __pdoc__[
 
 orders_shortcut_config = ReadonlyConfig(
     dict(
+        long_view=dict(),
+        short_view=dict(),
         signed_size=dict(obj_type="mapped"),
         value=dict(obj_type="mapped"),
         weighted_price=dict(obj_type="red_array"),
@@ -188,6 +192,46 @@ class Orders(PriceRecords):
     @property
     def field_config(self) -> Config:
         return self._field_config
+
+    # ############# Views ############# #
+
+    def get_long_view(
+        self: OrdersT,
+        init_position: tp.ArrayLike = 0.0,
+        init_price: tp.ArrayLike = np.nan,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+    ) -> OrdersT:
+        """See `vectorbtpro.portfolio.nb.records.get_long_view_orders_nb`."""
+        func = jit_reg.resolve_option(nb.get_long_view_orders_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        new_records_arr = func(
+            self.records_arr,
+            to_2d_array(self.close),
+            self.col_mapper.col_map,
+            init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
+        )
+        return self.replace(records_arr=new_records_arr)
+
+    def get_short_view(
+        self: OrdersT,
+        init_position: tp.ArrayLike = 0.0,
+        init_price: tp.ArrayLike = np.nan,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+    ) -> OrdersT:
+        """See `vectorbtpro.portfolio.nb.records.get_short_view_orders_nb`."""
+        func = jit_reg.resolve_option(nb.get_short_view_orders_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        new_records_arr = func(
+            self.records_arr,
+            to_2d_array(self.close),
+            self.col_mapper.col_map,
+            init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
+        )
+        return self.replace(records_arr=new_records_arr)
 
     # ############# Stats ############# #
 

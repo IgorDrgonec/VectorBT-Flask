@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vectorbtpro"
-version = "2024.6.19"
+version = "2024.8.20"
 description = "Next-Generation Quantitative Analysis Tool"
 license = { file = "LICENSE" }
 authors = [{ name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro" }]
 readme = "README.md"
 requires-python = "~=3.8"
 dependencies = [
-    "numpy>=1.20.0",
+    "numpy>=1.20.0, <2.0.0",
     "pandas>=1.5.0",
     "numba>=0.53.1, <0.57.0; python_version<'3.10'",
     "numba>=0.56.0, <0.57.0; python_version>='3.10' and python_version<'3.11'",
@@ -73,6 +73,7 @@ data = [
     "nasdaq-data-link",
     "alpha_vantage",
     "databento",
+    "findatapy",
 ]
 ind-base = ["TA-Lib"]
 ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical", "smartmoneyconcepts"]

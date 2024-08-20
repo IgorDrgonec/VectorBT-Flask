@@ -575,6 +575,8 @@ __pdoc__[
 trades_shortcut_config = ReadonlyConfig(
     dict(
         ranges=dict(),
+        long_view=dict(),
+        short_view=dict(),
         winning=dict(),
         losing=dict(),
         winning_streak=dict(obj_type="mapped_array"),
@@ -674,6 +676,16 @@ class Trades(Ranges):
             close=self._close,
             **kwargs,
         )
+
+    # ############# Views ############# #
+
+    def get_long_view(self: TradesT, **kwargs) -> TradesT:
+        filter_mask = self.get_field_arr("direction") == TradeDirection.Long
+        return self.apply_mask(filter_mask, **kwargs)
+
+    def get_short_view(self: TradesT, **kwargs) -> TradesT:
+        filter_mask = self.get_field_arr("direction") == TradeDirection.Short
+        return self.apply_mask(filter_mask, **kwargs)
 
     # ############# Stats ############# #
 
