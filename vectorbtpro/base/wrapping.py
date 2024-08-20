@@ -1229,6 +1229,11 @@ class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramab
         def _wrap_reduced(arr):
             nonlocal name_or_index
 
+            if isinstance(arr, dict):
+                arr = reshaping.to_pd_array(arr)
+            if isinstance(arr, pd.Series):
+                if not checks.is_index_equal(arr.index, columns):
+                    arr = arr.iloc[indexes.align_indexes(arr.index, columns)[0]]
             arr = np.asarray(arr)
             if force_1d and arr.ndim == 0:
                 arr = arr[None]

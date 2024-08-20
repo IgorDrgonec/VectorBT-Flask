@@ -5132,7 +5132,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         cls_or_self,
         weights: tp.Union[None, bool, tp.ArrayLike] = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
-        keep_flex: bool = False,
     ) -> tp.Union[None, tp.ArrayLike, tp.Series]:
         """Get asset weights."""
         if not isinstance(cls_or_self, type):
@@ -5145,11 +5144,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
 
         if weights is None or weights is False:
             return None
-        if keep_flex:
-            return weights
-        weights = broadcast_array_to(weights, wrapper.shape_2d[1])
-        if keep_flex:
-            return weights
         return wrapper.wrap_reduced(weights, group_by=False)
 
     # ############# Views ############# #
@@ -5159,6 +5153,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         weights: tp.Union[None, bool, tp.ArrayLike] = None,
         rescale: bool = False,
         group_by: tp.GroupByLike = None,
+        apply_group_by: bool = False,
         **kwargs,
     ) -> PortfolioT:
         """Get view of portfolio with asset weights applied and optionally rescaled.
@@ -5166,17 +5161,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
         If `rescale` is True, weights are rescaled in respect to other weights in the same group.
         For example, weights 0.5 and 0.5 are rescaled to 1.0 and 1.0 respectively, while
         weights 0.7 and 0.3 are rescaled to 1.4 (1.4 * 0.5 = 0.7) and 0.6 (0.6 * 0.5 = 0.3) respectively."""
-        weights = self.get_weights(weights=weights)
-        if rescale:
-            if self.wrapper.grouper.is_grouped(group_by=group_by):
-                new_weights = np.empty(len(weights), dtype=np.float_)
-                for group_idxs in self.wrapper.grouper.iter_group_idxs():
-                    group_weights = weights[group_idxs]
-                    new_weights[group_idxs] = group_weights * len(group_weights) / group_weights.sum()
-                weights = new_weights
-            else:
-                weights = weights * len(weights) / weights.sum()
-        if group_by is not None:
+        if weights is not None and weights is not False:
+            weights = to_1d_array(self.get_weights(weights=weights))
+            if rescale:
+                if self.wrapper.grouper.is_grouped(group_by=group_by):
+                    new_weights = np.empty(len(weights), dtype=np.float_)
+                    for group_idxs in self.wrapper.grouper.iter_group_idxs(group_by=group_by):
+                        group_weights = weights[group_idxs]
+                        new_weights[group_idxs] = group_weights * len(group_weights) / group_weights.sum()
+                    weights = new_weights
+                else:
+                    weights = weights * len(weights) / weights.sum()
+        if group_by is not None and apply_group_by:
             _self = self.regroup(group_by=group_by)
         else:
             _self = self
@@ -5312,11 +5308,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if orders_cls is None:
                 orders_cls = cls_or_self.orders_cls
             if weights is None:
-                weights = cls_or_self.resolve_shortcut_attr(
-                    "weights",
-                    wrapper=wrapper,
-                    keep_flex=True,
-                )
+                weights = cls_or_self.resolve_shortcut_attr("weights", wrapper=wrapper)
+            elif weights is False:
+                weights = None
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
         else:
@@ -5324,10 +5318,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if orders_cls is None:
                 orders_cls = Orders
             checks.assert_not_none(wrapper, arg_name="wrapper")
+            weights = cls_or_self.get_weights(weights=weights, wrapper=wrapper)
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
-        if weights is False:
-            weights = None
 
         if sim_start is not None or sim_end is not None:
             func = jit_reg.resolve_option(nb.records_within_sim_range_nb, jitted)
@@ -5340,12 +5333,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 sim_end=sim_end,
             )
         if weights is not None:
-            weights = broadcast_array_to(weights, wrapper.shape_2d[1])
             func = jit_reg.resolve_option(nb.apply_weights_to_orders_nb, jitted)
             order_records = func(
                 order_records,
                 order_records["col"],
-                weights,
+                to_1d_array(weights),
             )
         return orders_cls(
             wrapper,
@@ -5782,24 +5774,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if init_position_raw is None:
                 init_position_raw = cls_or_self._init_position
             if weights is None:
-                weights = cls_or_self.resolve_shortcut_attr(
-                    "weights",
-                    wrapper=wrapper,
-                    keep_flex=True,
-                )
+                weights = cls_or_self.resolve_shortcut_attr("weights", wrapper=wrapper)
+            elif weights is False:
+                weights = None
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(init_position_raw, arg_name="init_position_raw")
             checks.assert_not_none(wrapper, arg_name="wrapper")
-        if weights is False:
-            weights = None
+            weights = cls_or_self.get_weights(weights=weights, wrapper=wrapper)
 
         if keep_flex and weights is None:
             return init_position_raw
         init_position = broadcast_array_to(init_position_raw, wrapper.shape_2d[1])
         if weights is not None:
-            weights = broadcast_array_to(weights, wrapper.shape_2d[1])
+            weights = to_1d_array(weights)
             init_position = np.where(np.isnan(weights), init_position, weights * init_position)
         if keep_flex:
             return init_position
@@ -6204,11 +6193,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if cash_sharing is None:
                 cash_sharing = cls_or_self.cash_sharing
             if weights is None:
-                weights = cls_or_self.resolve_shortcut_attr(
-                    "weights",
-                    wrapper=wrapper,
-                    keep_flex=True,
-                )
+                weights = cls_or_self.resolve_shortcut_attr("weights", wrapper=wrapper)
+            elif weights is False:
+                weights = None
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -6216,10 +6203,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                 cash_deposits_raw = 0.0
             checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
             checks.assert_not_none(wrapper, arg_name="wrapper")
+            weights = cls_or_self.get_weights(weights=weights, wrapper=wrapper)
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
-        if weights is False:
-            weights = None
 
         cash_deposits_arr = to_2d_array(cash_deposits_raw)
         if keep_flex and not cash_deposits_arr.any():
@@ -6323,21 +6309,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if cash_earnings_raw is None:
                 cash_earnings_raw = cls_or_self._cash_earnings
             if weights is None:
-                weights = cls_or_self.resolve_shortcut_attr(
-                    "weights",
-                    wrapper=wrapper,
-                    keep_flex=True,
-                )
+                weights = cls_or_self.resolve_shortcut_attr("weights", wrapper=wrapper)
+            elif weights is False:
+                weights = None
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             if cash_earnings_raw is None:
                 cash_earnings_raw = 0.0
             checks.assert_not_none(wrapper, arg_name="wrapper")
+            weights = cls_or_self.get_weights(weights=weights, wrapper=wrapper)
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=False)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=False)
-        if weights is False:
-            weights = None
 
         cash_earnings_arr = to_2d_array(cash_earnings_raw)
         if keep_flex and not cash_earnings_arr.any():
@@ -6544,11 +6527,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
             if cash_sharing is None:
                 cash_sharing = cls_or_self.cash_sharing
             if weights is None:
-                weights = cls_or_self.resolve_shortcut_attr(
-                    "weights",
-                    wrapper=wrapper,
-                    keep_flex=True,
-                )
+                weights = cls_or_self.resolve_shortcut_attr("weights", wrapper=wrapper)
+            elif weights is False:
+                weights = None
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -6559,10 +6540,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, SimRangeMixin, metaclass=Met
                     cash_deposits = 0.0
             checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
             checks.assert_not_none(wrapper, arg_name="wrapper")
+            weights = cls_or_self.get_weights(weights=weights, wrapper=wrapper)
         sim_start = cls_or_self.resolve_sim_start(sim_start=sim_start, wrapper=wrapper, group_by=group_by)
         sim_end = cls_or_self.resolve_sim_end(sim_end=sim_end, wrapper=wrapper, group_by=group_by)
-        if weights is False:
-            weights = None
 
         if checks.is_int(init_cash_raw) and init_cash_raw in enums.InitCashMode:
             func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
