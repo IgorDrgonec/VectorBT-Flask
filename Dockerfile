@@ -90,3 +90,9 @@ ADD README.md ./
 RUN pip install --quiet --no-cache-dir --no-deps .
 
 WORKDIR "$HOME/work"
+
+RUN pip install --quiet --no-cache-dir flask
+
+EXPOSE 8080
+
+CMD ["python", "app.py"]
