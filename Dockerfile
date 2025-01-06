@@ -89,11 +89,11 @@ ADD LICENSE ./
 ADD README.md ./
 RUN pip install --quiet --no-cache-dir --no-deps .
 
-WORKDIR /root/helloWorld/vectorbtpro
+WORKDIR /usr/src/app
 
 RUN pip install --quiet --no-cache-dir flask
 
-COPY app.py /root/helloWorld/vectorbtpro/app.py
+COPY app.py .
 
 EXPOSE 8080
 
