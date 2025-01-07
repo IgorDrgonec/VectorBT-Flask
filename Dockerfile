@@ -92,6 +92,7 @@ RUN pip install --quiet --no-cache-dir --no-deps .
 WORKDIR /usr/src/app
 
 RUN pip install --quiet --no-cache-dir flask
+RUN pip install --quiet --no-cache-dir python-binance
 
 COPY app.py .
 
