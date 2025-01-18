@@ -62,7 +62,7 @@ RUN pip install --quiet --no-cache-dir \
     'ta' \
     'pandas_ta' \
     'technical' \
-    'numexpr' \
+    'numexpr>=2.8.4' \
     'hyperopt' \
     'optuna' \
     'pathos' \
@@ -91,13 +91,14 @@ RUN pip install --quiet --no-cache-dir --no-deps .
 
 WORKDIR /usr/src/app
 
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
-# If you are using nest_asyncio (in case you want to fix the event loop issue)
-RUN pip install --no-cache-dir nest_asyncio
+RUN pip install --no-cache-dir gunicron
 
 COPY app.py .
 
 EXPOSE 8080
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "main:app"]
+#CMD ["python", "app.py"]
