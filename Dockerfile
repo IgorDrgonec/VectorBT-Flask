@@ -93,6 +93,8 @@ WORKDIR /usr/src/app
 
 RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
+# If you are using nest_asyncio (in case you want to fix the event loop issue)
+RUN pip install --no-cache-dir nest_asyncio
 
 COPY app.py .
 

@@ -5,8 +5,12 @@ from binance.client import Client
 from datetime import datetime, timedelta
 import os
 import time
+import asyncio
+import nest_asyncio
+nest_asyncio.apply()
 
-vbt.settings.data['binance']['use_async'] = False
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 app = Flask(__name__)
 
