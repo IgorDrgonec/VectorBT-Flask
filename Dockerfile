@@ -94,7 +94,7 @@ WORKDIR /usr/src/app
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
-RUN pip install --no-cache-dir gunicron
+RUN pip install --no-cache-dir gunicorn
 
 COPY app.py .
 
