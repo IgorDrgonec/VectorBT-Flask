@@ -48,7 +48,7 @@ RUN pip install --quiet --no-cache-dir \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \
-    'tables' \
+    'tables>=3.8.0' \
     'SQLAlchemy>=2.0.0' \
     'duckdb' \
     'duckdb-engine' \
