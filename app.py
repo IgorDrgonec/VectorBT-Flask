@@ -31,7 +31,7 @@ def refresh_price():
 
     data.to_hdf('chart_data.h5')
     data = vbt.HDFData.pull('chart_data.h5')
-    return data.get('Close')
+    return data.get('Close').to_html()
 
 #if __name__ == "__main__":
     # On Render, the environment variable PORT is typically set (e.g. 10000).
