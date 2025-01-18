@@ -93,9 +93,11 @@ WORKDIR /usr/src/app
 
 RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
+RUN pip install --quiet --no-cache-dir gunicorn
+RUN pip install --no-cache-dir nest_asyncio
 
 COPY app.py .
 
 EXPOSE 8080
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
