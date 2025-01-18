@@ -31,7 +31,15 @@ def refresh_price():
 
     data.to_hdf('chart_data.h5')
     data = vbt.HDFData.pull('chart_data.h5')
-    return data.get('Close').to_html()
+    
+    # 4. Convert to Pandas DataFrame
+    df = data.get()
+
+    # 5. Extract the Close column as a single-column DataFrame
+    close_df = df[['Close']]
+
+    # 6. Return as an HTML table
+    return close_df.to_html()
 
 #if __name__ == "__main__":
     # On Render, the environment variable PORT is typically set (e.g. 10000).
