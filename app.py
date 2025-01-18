@@ -3,7 +3,7 @@ from flask import Flask
 from vectorbtpro import *
 from binance.client import Client
 from datetime import datetime, timedelta
-#import os
+import os
 import time
 
 app = Flask(__name__)
@@ -41,7 +41,7 @@ def refresh_price():
     # 6. Return as an HTML table
     return close_df.to_html()
 
-#if __name__ == "__main__":
+if __name__ == "__main__":
     # On Render, the environment variable PORT is typically set (e.g. 10000).
-    #port = int(os.environ.get("PORT", 8080))
-    #app.run(host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
