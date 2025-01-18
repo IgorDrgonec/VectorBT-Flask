@@ -35,11 +35,13 @@ def refresh_price():
     # 4. Convert to Pandas DataFrame
     df = data.get()
 
-    # 5. Extract the Close column as a single-column DataFrame
-    close_df = df[['Close']]
+     # 5. Plot as a candlestick chart using vectorbt's built-in ohlcv plotting
+    fig = df.vbt.ohlcv.plot()
 
-    # 6. Return as an HTML table
-    return close_df.to_html()
+    # 6. Convert the Plotly figure to HTML so Flask can return it
+    html_chart = fig.to_html(full_html=False, include_plotlyjs='cdn')
+
+    return html_chart
 
 if __name__ == "__main__":
     # On Render, the environment variable PORT is typically set (e.g. 10000).
