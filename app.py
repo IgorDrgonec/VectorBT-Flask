@@ -49,7 +49,7 @@ vbt.BinanceData.set_custom_settings(
 symbol = 'BTCUSDT'
 kwargs = dict(
     start=datetime.now() - timedelta(days=1),
-    timeframe='15m',
+    timeframe='1m',
     klines_type=2,
 )
 
@@ -274,7 +274,7 @@ def start_binance_socket():
     print("[INFO] Starting Binance WebSocket...")
 
     async def handle_socket():
-        async with bsm.kline_socket(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
+        async with bsm.kline_socket(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_1MINUTE) as stream:
             while True:
                 msg = await stream.recv()  # Receive messages asynchronously
                 handle_socket_message(msg)  # Process each message
@@ -284,9 +284,13 @@ def start_binance_socket():
     asyncio.set_event_loop(loop)
     loop.run_until_complete(handle_socket())
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
     # Manually start WebSocket before running Flask
-    threading.Thread(target=start_binance_socket, daemon=True).start()
+    #threading.Thread(target=start_binance_socket, daemon=True).start()
+
+if __name__ != "__main__":
+    # Start the WebSocket thread when running with Gunicorn
+    threading.Thread(target=start_binance_socket, daemon=True).start()    
 
     port = int(os.environ.get("PORT", 8080))
-    socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
+    #socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
