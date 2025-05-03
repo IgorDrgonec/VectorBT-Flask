@@ -77,13 +77,16 @@ RUN pip install --quiet --no-cache-dir \
     'dill' \
     'lz4' \
     'blosc2' \
-    'tabulate'
+    'tabulate' \
+    'universal-portfolios' \
+    'pandas_datareader' \
+    --upgrade bottleneck
 
 
-RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
-RUN pip install --quiet --no-cache-dir 'pandas_datareader'
+#RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
+#RUN pip install --quiet --no-cache-dir 'pandas_datareader'
 RUN conda install --quiet --yes -c conda-forge cvxopt
-RUN pip install --quiet --no-cache-dir --upgrade bottleneck
+#RUN pip install --quiet --no-cache-dir --upgrade bottleneck
 
 ADD ./vectorbtpro ./vectorbtpro
 ADD pyproject.toml ./
@@ -104,5 +107,6 @@ COPY app.py .
 
 EXPOSE 8080
 
-CMD ["python", "--bind", "0.0.0.0:8080", "app:app"]
+
 #CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+CMD ["python", "app.py"]
