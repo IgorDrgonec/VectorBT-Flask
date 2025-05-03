@@ -97,8 +97,10 @@ RUN pip install --quiet --no-cache-dir \
     'flask' \
     'Flask-SocketIO' \
     'gunicorn' \
-    'python-binance>=1.0.19' \
+    'python-binance \
     --upgrade pip
+
+RUN pip install --quiet --no-cache-dir --upgrade python-binance
 
 
 COPY app.py .
