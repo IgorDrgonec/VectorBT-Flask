@@ -96,7 +96,7 @@ RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
 RUN pip install --no-cache-dir gunicorn
 
-COPY app.py .
+COPY EMA_MACD_WebSocket.py .
 
 EXPOSE 8080
 
