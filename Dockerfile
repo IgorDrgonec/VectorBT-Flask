@@ -77,16 +77,13 @@ RUN pip install --quiet --no-cache-dir \
     'dill' \
     'lz4' \
     'blosc2' \
-    'tabulate' \
-    'universal-portfolios' \
-    'pandas_datareader' \
-    --upgrade bottleneck
+    'tabulate'
 
 
-#RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
-#RUN pip install --quiet --no-cache-dir 'pandas_datareader'
+RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
+RUN pip install --quiet --no-cache-dir 'pandas_datareader'
 RUN conda install --quiet --yes -c conda-forge cvxopt
-#RUN pip install --quiet --no-cache-dir --upgrade bottleneck
+RUN pip install --quiet --no-cache-dir --upgrade bottleneck
 
 ADD ./vectorbtpro ./vectorbtpro
 ADD pyproject.toml ./
