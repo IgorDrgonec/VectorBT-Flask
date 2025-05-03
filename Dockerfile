@@ -91,11 +91,11 @@ RUN pip install --quiet --no-cache-dir --no-deps .
 
 WORKDIR /usr/src/app
 
-RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
 RUN pip install --no-cache-dir gunicorn
 RUN pip install --quiet --no-cache-dir Flask-SocketIO
+RUN pip install --no-cache-dir --upgrade pip
 
 
 COPY app.py .

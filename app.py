@@ -11,7 +11,7 @@ from binance.enums import *
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from vectorbtpro import vbt
-from binance.streams import BinanceSocketManager
+from binance import BinanceSocketManager
 from datetime import datetime, timedelta
 from vectorbtpro import *
 from binance.client import Client
