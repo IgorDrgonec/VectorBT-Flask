@@ -79,6 +79,8 @@ RUN pip install --quiet --no-cache-dir \
     'blosc2' \
     'tabulate'
 
+
+RUN pip install --quiet --no-cache-dir --upgrade bottleneck
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'
 RUN conda install --quiet --yes -c conda-forge cvxopt
