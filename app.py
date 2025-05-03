@@ -1,49 +1,292 @@
-# app.py
-from flask import Flask
+import numpy as np
+import pandas as pd
+import time
+import talib
+import scipy
+import os
+import threading
+import asyncio
+import json
+from binance.enums import *
+from flask import Flask, request, jsonify
+from flask_socketio import SocketIO
+from vectorbtpro import vbt
+from binance.streams import BinanceSocketManager
+from datetime import datetime, timedelta
 from vectorbtpro import *
 from binance.client import Client
 from datetime import datetime, timedelta
-import os
-import time
+from decimal import Decimal
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key'
+socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time updates
 
+is_test=True
+# Binance API Keys
+BINANCE_API_KEY = "SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej"
+BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
+#Testnet Futures Binance
+API_KEY_TEST = "c0bf32af094d1b6f97e53d79e2d585003754d12fbe53a65f383d71e769d5b943"
+API_SECRET_TEST = "cf01902200ac97101266ec6247c80a6bcb2d005286e34b6684ea30cf6d88e20a"
+
+api_key =  API_KEY_TEST if is_test else  BINANCE_API_KEY
+api_secret = API_SECRET_TEST if is_test else BINANCE_SECRET_KEY
+
+client = Client(api_key, api_secret)
+client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "https://fapi.binance.com/fapi"
+bsm = BinanceSocketManager(client)
+
+# Configure Vectorbt with Binance API
 vbt.BinanceData.set_custom_settings(
     client_config=dict(
-        api_key="SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej",
-        api_secret="XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
+        api_key=api_key,
+        api_secret=api_secret
     )
 )
 
+# Parameters for historical data retrieval
+symbol = 'BTCUSDT'
 kwargs = dict(
-    start=datetime.now() - timedelta(days=1), 
-    timeframe='1m',
-    klines_type = 2,
-    #delay = 2
- )
+    start=datetime.now() - timedelta(days=1),
+    timeframe='15m',
+    klines_type=2,
+)
 
-@app.route("/")
-def refresh_price():
-    data = vbt.BinanceData.pull(
-        'BTCUSDT',
-        **kwargs
-    )
+# Strategy Parameters
+ATR_MULTIPLIER = 2
+RR = 1.5
+ATR_PERIOD = 14
+EMA_WINDOW = 200
 
-    data.to_hdf('chart_data.h5')
-    data = vbt.HDFData.pull('chart_data.h5')
-    
-    # 4. Convert to Pandas DataFrame
+#Order Parameters
+risk_percent = 0.01
+#qty_precision = 2
+leverage = 25
+
+def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
+    acc_balance = client.futures_account_balance()
+    for check_balance in acc_balance:
+        if check_balance["asset"] == "USDT":
+            usdt_balance = round(float(check_balance["balance"]),3)
+            print(usdt_balance) # Prints 0.0000  
+    symbol_info = client.futures_exchange_info()
+    for entry in symbol_info["symbols"]:
+        if entry["symbol"] == symbol:
+            qty_precision = 1 #int(entry["quantityPrecision"])
+            for filter in entry["filters"]:
+                cancel_quantity = (int(entry["filters"][2]["maxQty"]))*0.95
+    order_price = order_price
+    position_size = order_price
+    side = side
+    stopPrice = round(stopPrice,qty_precision)
+    targetPrice = round(targetPrice,qty_precision)
+    quantity = round((usdt_balance*risk_percent)/(abs(order_price-stopPrice)),qty_precision)
+    print(f"{quantity} = ({usdt_balance} * {risk_percent}) / ({order_price} - {stopPrice})")
+    print(f"Variables: side={side}, order_price={order_price}, stopPrice={stopPrice}, targetPrice={targetPrice}, risk_percent={risk_percent}, leverage={leverage}, quantity={quantity}, position_size={position_size}, cancel_quantity={cancel_quantity}")
+    order(side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage)
+
+# Function to execute strategy on new candle close
+def execute_strategy():
+    print("[INFO] Fetching latest data and executing strategy...")
+
+    # Save latest data to HDF
+    data = vbt.BinanceData.pull(symbol, **kwargs)
+    #data.to_hdf('ema_macd_data.h5')
     df = data.get()
+    
+    # Extract OHLCV values
+    high = df['High'].values
+    low = df['Low'].values
+    close = df['Close'].values
 
-     # 5. Plot as a candlestick chart using vectorbt's built-in ohlcv plotting
-    fig = df.vbt.ohlcv.plot()
+    # Compute indicators using VectorbtPro
+    atr = talib.ATR(high, low, close, ATR_PERIOD)
+    macd, macd_signal, _ = talib.MACD(close)
+    ema = talib.EMA(close, EMA_WINDOW)
 
-    # 6. Convert the Plotly figure to HTML so Flask can return it
-    html_chart = fig.to_html(full_html=False, include_plotlyjs='cdn')
+    # Calculate entry conditions
+    long_entry = (vbt.nb.crossed_above_1d_nb(macd, macd_signal)) & (close > ema) & (macd < 0)
+    short_entry = (vbt.nb.crossed_below_1d_nb(macd, macd_signal)) & (close < ema) & (macd > 0)
+    #long_entry = close > ema
+    #short_entry = close < ema
 
-    return html_chart
+    # Determine trade entry
+    latest_candle_idx = -1  # Check latest closed candle
+    if long_entry[latest_candle_idx]:
+        print("[ENTRY] 🔥 Long Entry Signal Detected!")
+        socketio.emit('trade_signal', {"side": "long", "price": close[latest_candle_idx]})
+        side = "long"
+        stopPrice = close[latest_candle_idx] - (atr[latest_candle_idx] * ATR_MULTIPLIER)
+        targetPrice = close[latest_candle_idx] + (atr[latest_candle_idx] * ATR_MULTIPLIER * RR)
+
+        execute_trade(side, close[latest_candle_idx], stopPrice, targetPrice,risk_percent,leverage)
+    elif short_entry[latest_candle_idx]:
+        print("[ENTRY] ❄️ Short Entry Signal Detected!")
+        socketio.emit('trade_signal', {"side": "short", "price": close[latest_candle_idx]})
+        side = "short"
+        stopPrice = close[latest_candle_idx] + (atr[latest_candle_idx] * ATR_MULTIPLIER)
+        targetPrice = close[latest_candle_idx] - (atr[latest_candle_idx] * ATR_MULTIPLIER * RR)
+
+        execute_trade(side, close[latest_candle_idx], stopPrice, targetPrice, risk_percent,leverage)
+    else:
+        print("[INFO] No trade entry on this candle.")
+
+    return long_entry, short_entry
+
+
+# WebSocket event listener function
+def handle_socket_message(msg):
+    """Handles real-time kline messages from Binance WebSocket."""
+    if msg['e'] == 'kline':  # Kline (candlestick) event
+        kline = msg['k']
+        is_closed = kline['x']
+
+        # Execute strategy when a new candle closes
+        if is_closed:
+            print(f"[INFO] Candle closed at {datetime.fromtimestamp(kline['t']/1000)}")
+            execute_strategy()
+
+# ✅ New API: Manually Open & Close Trades for Testing Binance API
+# Store active trade state globally
+active_trade = {"side": None, "entry_price": None, "quantity": 0}
+
+#Order from manual JSON
+def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_quantity, leverage, order_type=ORDER_TYPE_MARKET, Isolated=True):
+    try:
+        if side == "long" and position_size != 0:
+            result = client.futures_change_leverage(symbol = symbol, leverage = leverage)
+            #print(result)
+            #print(f"sending order {order_type} - {side} {quantity} {symbol}")
+            cancel = client.futures_cancel_all_open_orders(symbol = symbol)
+            sl_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_STOP_MARKET, quantity=quantity,stopPrice=stopPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            #print(sl_order)
+            tp_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_TAKE_PROFIT_MARKET, quantity=quantity,stopPrice=targetPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            #print(tp_order)
+            order = client.futures_create_order(symbol=symbol, side='BUY', type=order_type, quantity=quantity, Isolated=Isolated)
+            #print(order)
+        if side == "short" and position_size != 0:
+            result = client.futures_change_leverage(symbol = symbol, leverage = leverage)
+            #print(result)
+            #print(f"sending order {order_type} - {side} {quantity} {symbol}") 
+            cancel = client.futures_cancel_all_open_orders(symbol = symbol)         
+            sl_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_STOP_MARKET, quantity=quantity,stopPrice=stopPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            #print(sl_order)
+            tp_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_TAKE_PROFIT_MARKET, quantity=quantity,stopPrice=targetPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            #print(tp_order)      
+            order = client.futures_create_order(symbol=symbol, side='SELL', type=ORDER_TYPE_MARKET, quantity=quantity, Isolated=True)
+            #print(order)     
+        if side == "flat" and position_size == 0:
+            if stopPrice < targetPrice or stopPrice == "long": #long
+                cancel_buy = client.futures_create_order(symbol = symbol, side = "SELL", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
+            if stopPrice > targetPrice or stopPrice == "short": #short
+                cancel_sell = client.futures_create_order(symbol = symbol, side = "BUY", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
+    except Exception as e:
+        print("an exception occured - {}".format(e))
+        return False
+    else:   
+        if side == "long" and position_size != 0 and sl_order and tp_order:
+            return True
+        if side == "short" and position_size != 0 and sl_order and tp_order:
+            return True
+        if side == "flat" and position_size == 0:
+            return True
+        
+@app.route("/trade", methods=['POST'])
+def manual_trade():
+    #print(request.data)
+    data = json.loads(request.data)
+     
+    side = data['strategy']['market_position']
+    symbol= str(data["ticker"]).rstrip(".P")
+    leverage_dict = {
+    "AXSUSDT": 25,
+    "RENUSDT": 25,
+    "XLMUSDT": 25,
+    "ZRXUSDT": 25,
+    "GMTUSDT": 25,
+    "TOMOUSDT": 25,
+    "STXUSDT": 20,
+    "AUDIOUSDT": 20
+    }
+    leverage = leverage_dict.get(symbol, 30)
+
+    symbol_info = client.futures_exchange_info()
+    for entry in symbol_info["symbols"]:
+        if entry["symbol"] == symbol:
+            qty_precision = int(entry["quantityPrecision"])
+            for filter in entry["filters"]:
+                cancel_quantity = (int(entry["filters"][2]["maxQty"]))*0.95
+
+    acc_balance = client.futures_account_balance()
+    for check_balance in acc_balance:
+        if check_balance["asset"] == "USDT":
+            usdt_balance = round(float(check_balance["balance"]),3)
+            print(usdt_balance) # Prints 0.0000
+
+    if side != "flat": 
+        if data['strategy']['order_contracts'] == "DaviddTech":
+            risk_percent = data["risk_percent"]    
+            order_price = data["strategy"]["order_price"]
+            position_size = order_price
+            stoploss_price = data["stop_loss"]
+            quantity = round((usdt_balance*risk_percent)/(abs(order_price-stoploss_price)),qty_precision)
+            print(f"{quantity} = ({usdt_balance} * {risk_percent}) / ({order_price} - {stoploss_price})")
+        else:
+            if symbol == "AAVEUSDT":
+                quantity = round(data['strategy']['order_contracts'],1)
+            if symbol == "DOGEUSDT" or symbol == "ONEUSDT" or symbol == "MATICUSDT":
+                quantity = round(data['strategy']['order_contracts'],0)
+            else:
+                quantity = round(data['strategy']['order_contracts'],3)
+            strategy_equity = data['strategy']['Strategy_equity']    
+            quantity = round((quantity/strategy_equity)*usdt_balance,3) #If strategy has equity and position size
+            position_size = data["strategy"]["position_size"]
+        if symbol == "LTCUSDT":
+            stopPrice = round(data["stop_loss"],2)
+            targetPrice = round(data["take_profit"],2)
+        else:
+            stopPrice = data["stop_loss"]
+            targetPrice = data["take_profit"]    
+    else: #If side == "flat"
+        quantity = cancel_quantity
+        stopPrice = data["stop_loss"]
+        targetPrice = data["take_profit"] 
+        position_size = 0
+
+    order_response = order(side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage)
+
+    if order_response or side =="flat":
+        return {
+            "code": "success",
+            "message": "order executed"
+        }
+    else:
+        print("order failed")
+
+        return {
+            "code": "error",
+            "message": "order failed"
+        }
+
+# Function to start Binance WebSocket in a separate thread
+def start_binance_socket():
+    print("[INFO] Starting Binance WebSocket...")
+
+    async def handle_socket():
+        async with bsm.kline_socket(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
+            while True:
+                msg = await stream.recv()  # Receive messages asynchronously
+                handle_socket_message(msg)  # Process each message
+
+    # Run the WebSocket in an asyncio event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(handle_socket())
 
 if __name__ == "__main__":
-    # On Render, the environment variable PORT is typically set (e.g. 10000).
+    # Manually start WebSocket before running Flask
+    threading.Thread(target=start_binance_socket, daemon=True).start()
+
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
