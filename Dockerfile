@@ -80,10 +80,10 @@ RUN pip install --quiet --no-cache-dir \
     'tabulate'
 
 
-RUN pip install --quiet --no-cache-dir --upgrade bottleneck
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'
 RUN conda install --quiet --yes -c conda-forge cvxopt
+RUN pip install --quiet --no-cache-dir --upgrade bottleneck
 
 ADD ./vectorbtpro ./vectorbtpro
 ADD pyproject.toml ./
@@ -104,5 +104,5 @@ COPY app.py .
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
-#CMD ["python", "app.py"]
+CMD ["python", "--bind", "0.0.0.0:8080", "app:app"]
+#CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
