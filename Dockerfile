@@ -96,7 +96,7 @@ RUN pip install --quiet --no-cache-dir flask
 RUN pip install --quiet --no-cache-dir python-binance
 RUN pip install --no-cache-dir gunicorn
 RUN pip install --quiet --no-cache-dir Flask-SocketIO
-RUN pip install --quiet --no-cache-dir 
+
 
 COPY app.py .
 
