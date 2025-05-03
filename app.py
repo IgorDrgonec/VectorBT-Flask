@@ -191,7 +191,20 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             return True
         if side == "flat" and position_size == 0:
             return True
-        
+
+@app.route("/")
+def home():
+    return """
+    <html>
+        <head>
+            <title>Bot</title>
+        </head>
+        <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+            <h1 style="font-size: 5rem; color: #333;">Tu sa zarábajú milióny!</h1>
+        </body>
+    </html>
+    """
+
 @app.route("/trade", methods=['POST'])
 def manual_trade():
     #print(request.data)
