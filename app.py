@@ -87,23 +87,16 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
     order(side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage)
 
 # Function to execute strategy on new candle close
-def execute_strategy():
+def execute_strategy(kline):
     print("[INFO] Fetching latest data and executing strategy...")
 
-    # Save latest data to HDF
-    data = vbt.BinanceData.pull(symbol, **kwargs)
-    #data.to_hdf('ema_macd_data.h5')
-    df = data.get()
-    
-    # Extract OHLCV values
-    high = df['High'].values
-    low = df['Low'].values
-    close = df['Close'].values
-
-    # Compute indicators using VectorbtPro
-    atr = talib.ATR(high, low, close, ATR_PERIOD)
-    macd, macd_signal, _ = talib.MACD(close)
-    ema = talib.EMA(close, EMA_WINDOW)
+# Extract OHLCV values from the kline message
+    high = float(kline['h'])
+    low = float(kline['l'])
+    close = float(kline['c'])
+    atr = talib.ATR(np.array([high]), np.array([low]), np.array([close]), ATR_PERIOD)
+    macd, macd_signal, _ = talib.MACD(np.array([close]))
+    ema = talib.EMA(np.array([close]), EMA_WINDOW)
 
     # Calculate entry conditions
     long_entry = (vbt.nb.crossed_above_1d_nb(macd, macd_signal)) & (close > ema) & (macd < 0)
@@ -145,7 +138,7 @@ def handle_socket_message(msg):
         # Execute strategy when a new candle closes
         if is_closed:
             print(f"[INFO] Candle closed at {datetime.fromtimestamp(kline['t']/1000)}")
-            execute_strategy()
+            execute_strategy(kline)
 
 # ✅ New API: Manually Open & Close Trades for Testing Binance API
 # Store active trade state globally
