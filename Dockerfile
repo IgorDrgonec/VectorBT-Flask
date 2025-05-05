@@ -97,6 +97,7 @@ RUN pip install --quiet --no-cache-dir \
     'flask' \
     'Flask-SocketIO' \
     'gunicorn' \
+    'gevent' \
     'python-binance==1.0.19' \
     --upgrade pip
 
@@ -106,6 +107,6 @@ COPY app.py .
 
 EXPOSE 8080
 
-
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:8080", "app:app"]
+#CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
 #CMD ["python", "app.py"]
