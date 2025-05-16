@@ -53,6 +53,13 @@ kwargs = dict(
     klines_type=2,
 )
 
+csv_file = "ema_macd_data.csv"
+
+data = vbt.BinanceData.pull(symbol, **kwargs)
+df = data.get()
+data.to_csv(csv_file)
+data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+
 # Strategy Parameters
 ATR_MULTIPLIER = 2
 RR = 1.5
@@ -63,6 +70,32 @@ EMA_WINDOW = 200
 risk_percent = 0.01
 #qty_precision = 2
 leverage = 25
+
+# Function to update HDF with WebSocket data
+def update_hdf_with_websocket(kline):
+    global data
+
+    # Extract the open time and symbol for the index
+    open_time = pd.to_datetime(kline['t'], unit='ms', utc=True)
+
+    # Build a DataFrame with the same MultiIndex as your HDF file
+    new_row = pd.DataFrame({
+        "Open": [float(kline['o'])],
+        "High": [float(kline['h'])],
+        "Low": [float(kline['l'])],
+        "Close": [float(kline['c'])],
+        "Volume": [float(kline['v'])],
+        "Quote volume": [float(kline.get('q', 0))],
+        "Trade count": [int(kline.get('n', 0))],
+        "Taker base volume": [float(kline.get('V', 0))],
+        "Taker quote volume": [float(kline.get('Q', 0))]
+    }, index=pd.DatetimeIndex([open_time], name='Open time'))
+
+    # Append to in-memory DataFrame and CSV
+    data = pd.concat([data, new_row])
+    data = data[~data.index.duplicated(keep='last')]
+    data.to_csv(csv_file)
+    #print("[INFO] Appended new row and updated CSV file.")
 
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
     acc_balance = client.futures_account_balance()
@@ -87,16 +120,18 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
     order(side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage)
 
 # Function to execute strategy on new candle close
-def execute_strategy(kline):
+def execute_strategy(data):
     print("[INFO] Fetching latest data and executing strategy...")
 
-# Extract OHLCV values from the kline message
-    high = float(kline['h'])
-    low = float(kline['l'])
-    close = float(kline['c'])
-    atr = talib.ATR(np.array([high]), np.array([low]), np.array([close]), ATR_PERIOD)
-    macd, macd_signal, _ = talib.MACD(np.array([close]))
-    ema = talib.EMA(np.array([close]), EMA_WINDOW)
+    # Extract OHLCV values
+    high = data["High"].values
+    low = data["Low"].values
+    close = data["Close"].values
+
+    # Calculate indicators
+    atr = talib.ATR(high, low, close, ATR_PERIOD)
+    macd, macd_signal, _ = talib.MACD(close)
+    ema = talib.EMA(close, EMA_WINDOW)
 
     # Calculate entry conditions
     long_entry = (vbt.nb.crossed_above_1d_nb(macd, macd_signal)) & (close > ema) & (macd < 0)
@@ -138,7 +173,8 @@ def handle_socket_message(msg):
         # Execute strategy when a new candle closes
         if is_closed:
             print(f"[INFO] Candle closed at {datetime.fromtimestamp(kline['t']/1000)}")
-            execute_strategy(kline)
+            update_hdf_with_websocket(kline)
+            execute_strategy(data)  # Pass updated data to strategy
 
 # ✅ New API: Manually Open & Close Trades for Testing Binance API
 # Store active trade state globally
