@@ -22,7 +22,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time updates
 
-is_test=True
+is_test=False
 # Binance API Keys
 BINANCE_API_KEY = "SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej"
 BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
@@ -46,10 +46,10 @@ vbt.BinanceData.set_custom_settings(
 )
 
 # Parameters for historical data retrieval
-symbol = 'BTCUSDT'
+symbol = 'BTCUSDC'
 kwargs = dict(
-    start=datetime.now() - timedelta(days=1),
-    timeframe='1m',
+    start=datetime.now() - timedelta(days=60),
+    timeframe='15m',
     klines_type=2,
 )
 
@@ -316,7 +316,7 @@ def start_binance_socket():
     print("[INFO] Starting Binance WebSocket...")
 
     async def handle_socket():
-        async with bsm.kline_socket(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_1MINUTE) as stream:
+        async with bsm.kline_socket(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
             while True:
                 msg = await stream.recv()  # Receive messages asynchronously
                 handle_socket_message(msg)  # Process each message
