@@ -316,7 +316,7 @@ def start_binance_socket():
     print("[INFO] Starting Binance WebSocket...")
 
     async def handle_socket():
-        async with bsm.kline_socket(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
+        async with bsm.kline_socket(symbol='BTCUSDC', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
             while True:
                 msg = await stream.recv()  # Receive messages asynchronously
                 handle_socket_message(msg)  # Process each message
