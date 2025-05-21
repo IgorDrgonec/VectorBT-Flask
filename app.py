@@ -100,7 +100,7 @@ def update_hdf_with_websocket(kline):
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
     acc_balance = client.futures_account_balance()
     for check_balance in acc_balance:
-        if check_balance["asset"] == "USDT":
+        if check_balance["asset"] == "USDC":
             usdt_balance = round(float(check_balance["balance"]),3)
             print(usdt_balance) # Prints 0.0000  
     symbol_info = client.futures_exchange_info()
@@ -314,6 +314,12 @@ def manual_trade():
 # Function to start Binance WebSocket in a separate thread
 def start_binance_socket():
     print("[INFO] Starting Binance WebSocket...")
+
+    acc_balance = client.futures_account_balance()
+    for check_balance in acc_balance:
+        if check_balance["asset"] == "USDC":
+            usdt_balance = round(float(check_balance["balance"]),3)
+            print(usdt_balance) # Prints 0.0000
 
     async def handle_socket():
         async with bsm.kline_socket(symbol='BTCUSDC', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
