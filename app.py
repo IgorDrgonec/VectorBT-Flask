@@ -114,7 +114,7 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
     side = side
     stopPrice = round(stopPrice,qty_precision)
     targetPrice = round(targetPrice,qty_precision)
-    quantity = round((usdt_balance*risk_percent)/(abs(order_price-stopPrice)),qty_precision)
+    quantity = round((usdt_balance*risk_percent)/(abs(order_price-stopPrice)),3)
     print(f"{quantity} = ({usdt_balance} * {risk_percent}) / ({order_price} - {stopPrice})")
     print(f"Variables: side={side}, order_price={order_price}, stopPrice={stopPrice}, targetPrice={targetPrice}, risk_percent={risk_percent}, leverage={leverage}, quantity={quantity}, position_size={position_size}, cancel_quantity={cancel_quantity}")
     order(side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage)
