@@ -44,6 +44,7 @@ RUN pip install --quiet --no-cache-dir \
     'humanize' \
     'attrs>=21.1.0' \
     'websocket-client' \
+    'websockets>=10.4,<11' \
     'yfinance>=0.2.20' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
@@ -99,6 +100,7 @@ RUN pip install --quiet --no-cache-dir \
     'gunicorn' \
     'gevent' \
     'python-binance==1.0.19' \
+    'nest-asyncio' \
     --upgrade pip
 
 

@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import time
 import talib
-import scipy
 import os
 import threading
 import asyncio
@@ -11,12 +10,14 @@ from binance.enums import *
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from vectorbtpro import vbt
-from binance import BinanceSocketManager
+from binance import AsyncClient, BinanceSocketManager
 from datetime import datetime, timedelta
 from vectorbtpro import *
 from binance.client import Client
-from datetime import datetime, timedelta
-from decimal import Decimal
+import websockets
+import nest_asyncio
+
+nest_asyncio.apply()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
@@ -30,12 +31,13 @@ BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gsw
 API_KEY_TEST = "c0bf32af094d1b6f97e53d79e2d585003754d12fbe53a65f383d71e769d5b943"
 API_SECRET_TEST = "cf01902200ac97101266ec6247c80a6bcb2d005286e34b6684ea30cf6d88e20a"
 
-api_key =  API_KEY_TEST if is_test else  BINANCE_API_KEY
+api_key = API_KEY_TEST if is_test else  BINANCE_API_KEY
 api_secret = API_SECRET_TEST if is_test else BINANCE_SECRET_KEY
 
 client = Client(api_key, api_secret)
 client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "https://fapi.binance.com/fapi"
 bsm = BinanceSocketManager(client)
+
 
 # Configure Vectorbt with Binance API
 vbt.BinanceData.set_custom_settings(
@@ -66,10 +68,39 @@ RR = 1.5
 ATR_PERIOD = 14
 EMA_WINDOW = 200
 
-#Order Parameters
+# Order Parameters
 risk_percent = 0.01
-#qty_precision = 2
+# qty_precision = 2
 leverage = 25
+
+_balance_cache = {}
+_balance_timestamp = {}
+
+
+def get_account_balance(asset="USDC", cache_seconds=60):
+    """Return futures account balance while respecting API rate limits."""
+    now = time.time()
+    # Prefer value provided by the account WebSocket if available
+    if asset in _balance_cache:
+        if now - _balance_timestamp.get(asset, 0) < cache_seconds:
+            return _balance_cache[asset]
+        # even if stale return to avoid REST call unless absolutely needed
+        cached = _balance_cache.get(asset)
+        if cached is not None:
+            return cached
+
+    try:
+        balances = client.futures_account_balance()
+    except Exception as e:
+        print(f"[WARN] Failed to fetch account balance: {e}")
+        return _balance_cache.get(asset)
+    for b in balances:
+        if b["asset"] == asset:
+            bal = round(float(b["balance"]), 3)
+            _balance_cache[asset] = bal
+            _balance_timestamp[asset] = now
+            return bal
+    return None
 
 # Function to update HDF with WebSocket data
 def update_hdf_with_websocket(kline):
@@ -97,18 +128,36 @@ def update_hdf_with_websocket(kline):
     data.to_csv(csv_file)
     #print("[INFO] Appended new row and updated CSV file.")
 
+def handle_account_update(msg):
+    """Update cached balances from futures ACCOUNT_UPDATE events."""
+    if msg.get("e") != "ACCOUNT_UPDATE":
+        return
+    for bal in msg.get("a", {}).get("B", []):
+        asset = bal.get("a")
+        wallet_balance = bal.get("wb")
+        if asset and wallet_balance is not None:
+            try:
+                balance = float(wallet_balance)
+            except (TypeError, ValueError):
+                continue
+            _balance_cache[asset] = balance
+            _balance_timestamp[asset] = time.time()
+
+            #Print the updated balance
+            print(f"[BALANCE] Updated {asset}: {balance}")
+
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
-    acc_balance = client.futures_account_balance()
-    for check_balance in acc_balance:
-        if check_balance["asset"] == "USDC":
-            usdt_balance = round(float(check_balance["balance"]),3)
-            print(usdt_balance) # Prints 0.0000  
+    usdt_balance = get_account_balance("USDC")
+    print(usdt_balance)
+    if usdt_balance is None:
+        print("[WARN] Unable to fetch account balance")
+        return 
     symbol_info = client.futures_exchange_info()
     for entry in symbol_info["symbols"]:
         if entry["symbol"] == symbol:
-            qty_precision = 1 #int(entry["quantityPrecision"])
-            for filter in entry["filters"]:
-                cancel_quantity = (int(entry["filters"][2]["maxQty"]))*0.95
+            qty_precision = 1  # int(entry["quantityPrecision"])
+            cancel_quantity = int(entry["filters"][2]["maxQty"]) * 0.95
+            break
     order_price = order_price
     position_size = order_price
     side = side
@@ -260,11 +309,10 @@ def manual_trade():
             for filter in entry["filters"]:
                 cancel_quantity = (int(entry["filters"][2]["maxQty"]))*0.95
 
-    acc_balance = client.futures_account_balance()
-    for check_balance in acc_balance:
-        if check_balance["asset"] == "USDT":
-            usdt_balance = round(float(check_balance["balance"]),3)
-            print(usdt_balance) # Prints 0.0000
+    usdt_balance = get_account_balance("USDT")
+    if usdt_balance is None:
+        print("[WARN] Unable to fetch account balance")
+        return {"code": "error", "message": "balance fetch failed"}
 
     if side != "flat": 
         if data['strategy']['order_contracts'] == "DaviddTech":
@@ -311,34 +359,78 @@ def manual_trade():
             "message": "order failed"
         }
 
-# Function to start Binance WebSocket in a separate thread
-def start_binance_socket():
-    print("[INFO] Starting Binance WebSocket...")
+# Function to start Binance WebSocket (candlestick stream)
+async def launch_all_sockets():
+    print("[INFO] Launching all WebSockets...")
 
-    acc_balance = client.futures_account_balance()
-    for check_balance in acc_balance:
-        if check_balance["asset"] == "USDC":
-            usdt_balance = round(float(check_balance["balance"]),3)
-            print(usdt_balance) # Prints 0.0000
+    async def binance_socket():
+        while True:
+            try:
+                local_client = await AsyncClient.create(api_key, api_secret)
+                if is_test:
+                    local_client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
+                manager = BinanceSocketManager(local_client)
 
-    async def handle_socket():
-        async with bsm.kline_socket(symbol='BTCUSDC', interval=Client.KLINE_INTERVAL_15MINUTE) as stream:
-            while True:
-                msg = await stream.recv()  # Receive messages asynchronously
-                handle_socket_message(msg)  # Process each message
+                async with manager.kline_socket(symbol='btcusdc', interval=AsyncClient.KLINE_INTERVAL_15MINUTE) as stream:
+                    print("[SOCKET] Kline socket connected.")
+                    while True:
+                        msg = await stream.recv()
+                        handle_socket_message(msg)
+            except Exception as e:
+                print(f"[ERROR] Kline WebSocket error: {e}. Reconnecting in 5s...")
+                await asyncio.sleep(5)
+            finally:
+                await local_client.close_connection()
 
-    # Run the WebSocket in an asyncio event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(handle_socket())
+    async def account_socket():
+        while True:
+            try:
+                local_client = await AsyncClient.create(api_key, api_secret)
+                if is_test:
+                    local_client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
+                manager = BinanceSocketManager(local_client)
 
-#if __name__ == "__main__":
-    # Manually start WebSocket before running Flask
-    #threading.Thread(target=start_binance_socket, daemon=True).start()
+                # Fetch the listenKey just for keepalive (not to use directly in socket)
+                listen_key = await local_client.futures_stream_get_listen_key()
+                print(f"[SOCKET] Account socket connected. ListenKey: {listen_key}")
 
+                # Task to keep listen key alive
+                async def keepalive():
+                    while True:
+                        await asyncio.sleep(30 * 60)  # Every 30 minutes
+                        try:
+                            await local_client.futures_stream_keepalive()
+                            print("[KEEPALIVE] Sent ping to keep user stream alive.")
+                        except Exception as e:
+                            print(f"[KEEPALIVE ERROR] Failed to ping listenKey: {e}")
+
+                asyncio.create_task(keepalive())
+
+                async with manager.futures_user_socket() as stream:
+                    while True:
+                        msg = await stream.recv()
+                        handle_account_update(msg)
+
+            except Exception as e:
+                print(f"[ERROR] Account WebSocket error: {e}. Reconnecting in 5s...")
+                await asyncio.sleep(5)
+            finally:
+                await local_client.close_connection()
+
+    await asyncio.gather(
+        binance_socket(),
+        account_socket()
+    )
+
+
+# Launch sockets only when running with Gunicorn
 if __name__ != "__main__":
-    # Start the WebSocket thread when running with Gunicorn
-    threading.Thread(target=start_binance_socket, daemon=True).start()    
+    def start_async_loop():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(launch_all_sockets())
+
+    threading.Thread(target=start_async_loop, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
-    #socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
+    # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
