@@ -109,6 +109,7 @@ COPY app.py .
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:8080", "app:app"]
+CMD bash -c "python init_data.py && gunicorn --worker-class gevent --bind 0.0.0.0:8080 app:app"
+#CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:8080", "app:app"]
 #CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
 #CMD ["python", "app.py"]

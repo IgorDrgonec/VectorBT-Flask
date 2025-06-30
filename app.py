@@ -81,15 +81,8 @@ if os.path.exists(csv_file):
         print(f"[ERROR] Failed to load cached CSV: {e}")
         data = pd.DataFrame()
 else:
-    try:
-        print("[INFO] CSV file not found, pulling data from Binance API...")
-        data = vbt.BinanceData.pull(symbol, **kwargs)
-        check_api_weight(api_key)
-        data.to_csv(csv_file)
-        print("[INFO] Data pulled and cached successfully.")
-    except Exception as e:
-        print(f"[ERROR] Failed to pull data from Binance API: {e}")
-        data = pd.DataFrame()
+    print("[CRITICAL] CSV file not found. Please run init_data.py before starting app.")
+    data = pd.DataFrame()
 
 # Strategy Parameters
 ATR_MULTIPLIER = 2
