@@ -6,6 +6,7 @@ import os
 import threading
 import asyncio
 import json
+import requests
 from binance.enums import *
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
@@ -23,7 +24,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time updates
 
-is_test=False
+is_test=True
 # Binance API Keys
 BINANCE_API_KEY = "SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej"
 BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
@@ -38,6 +39,20 @@ client = Client(api_key, api_secret)
 client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "https://fapi.binance.com/fapi"
 bsm = BinanceSocketManager(client)
 
+def check_api_weight(api_key):
+    """Check and log current API usage headers for futures account."""
+    url = "https://fapi.binance.com/fapi/v2/account"
+    headers = {
+        'X-MBX-APIKEY': api_key
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        print("[WEIGHT] API Rate Limits:")
+        print("  X-MBX-USED-WEIGHT-1M:", response.headers.get("X-MBX-USED-WEIGHT-1M"))
+        print("  X-MBX-ORDER-COUNT-10S:", response.headers.get("X-MBX-ORDER-COUNT-10S"))
+        print("  X-MBX-ORDER-COUNT-1M:", response.headers.get("X-MBX-ORDER-COUNT-1M"))
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch API weights: {e}")
 
 # Configure Vectorbt with Binance API
 vbt.BinanceData.set_custom_settings(
@@ -58,6 +73,7 @@ kwargs = dict(
 csv_file = "ema_macd_data.csv"
 
 data = vbt.BinanceData.pull(symbol, **kwargs)
+check_api_weight(api_key)
 df = data.get()
 data.to_csv(csv_file)
 data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
@@ -90,16 +106,21 @@ def get_account_balance(asset="USDC", cache_seconds=60):
             return cached
 
     try:
-        balances = client.futures_account_balance()
+        account_info = client.futures_account()
     except Exception as e:
-        print(f"[WARN] Failed to fetch account balance: {e}")
+        print(f"[WARN] Failed to fetch futures account info: {e}")
         return _balance_cache.get(asset)
-    for b in balances:
-        if b["asset"] == asset:
-            bal = round(float(b["balance"]), 3)
-            _balance_cache[asset] = bal
-            _balance_timestamp[asset] = now
-            return bal
+
+    for balance in account_info.get("assets", []):
+        if balance["asset"] == asset:
+            try:
+                available = round(float(balance["availableBalance"]), 3)
+                _balance_cache[asset] = available
+                _balance_timestamp[asset] = now
+                return available
+            except Exception as e:
+                print(f"[WARN] Could not parse balance for {asset}: {e}")
+                return _balance_cache.get(asset)
     return None
 
 # Function to update HDF with WebSocket data
@@ -129,22 +150,37 @@ def update_hdf_with_websocket(kline):
     #print("[INFO] Appended new row and updated CSV file.")
 
 def handle_account_update(msg):
-    """Update cached balances from futures ACCOUNT_UPDATE events."""
-    if msg.get("e") != "ACCOUNT_UPDATE":
-        return
-    for bal in msg.get("a", {}).get("B", []):
-        asset = bal.get("a")
-        wallet_balance = bal.get("wb")
-        if asset and wallet_balance is not None:
-            try:
-                balance = float(wallet_balance)
-            except (TypeError, ValueError):
-                continue
-            _balance_cache[asset] = balance
-            _balance_timestamp[asset] = time.time()
+    event_type = msg.get("e")
 
-            #Print the updated balance
-            print(f"[BALANCE] Updated {asset}: {balance}")
+    if event_type == "ACCOUNT_UPDATE":
+        for bal in msg.get("a", {}).get("B", []):
+            asset = bal.get("a")
+            wallet_balance = bal.get("wb")
+            if asset and wallet_balance is not None:
+                try:
+                    balance = float(wallet_balance)
+                    _balance_cache[asset] = balance
+                    _balance_timestamp[asset] = time.time()
+                    print(f"[BALANCE] Updated {asset} (ACCOUNT_UPDATE): {balance}")
+                except (TypeError, ValueError):
+                    continue
+
+    elif event_type == "ORDER_TRADE_UPDATE":
+        order = msg.get("o", {})
+        if order.get("X") == "FILLED":
+            symbol = order.get("s")
+            side = order.get("S")
+            qty = order.get("z")
+            price = order.get("ap")
+            realized_pnl = order.get("rp")
+
+            print(f"[ORDER] Trade filled for {symbol}, side: {side}, qty: {qty}, price: {price}")
+            if realized_pnl is not None:
+                print(f"[PNL] Realized PnL: {realized_pnl} {order.get('N', 'USDC')}")
+
+            # Trigger a manual refresh from REST as backup
+            refreshed = get_account_balance("USDC", cache_seconds=0)
+            print(f"[BALANCE] Manually refreshed (after fill): {refreshed}")
 
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
     usdt_balance = get_account_balance("USDC")
@@ -264,10 +300,13 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
         return False
     else:   
         if side == "long" and position_size != 0 and sl_order and tp_order:
+            check_api_weight(api_key)
             return True
         if side == "short" and position_size != 0 and sl_order and tp_order:
+            check_api_weight(api_key)
             return True
         if side == "flat" and position_size == 0:
+            check_api_weight(api_key)
             return True
 
 @app.route("/")
@@ -309,7 +348,7 @@ def manual_trade():
             for filter in entry["filters"]:
                 cancel_quantity = (int(entry["filters"][2]["maxQty"]))*0.95
 
-    usdt_balance = get_account_balance("USDT")
+    usdt_balance = get_account_balance("USDC")
     if usdt_balance is None:
         print("[WARN] Unable to fetch account balance")
         return {"code": "error", "message": "balance fetch failed"}
@@ -409,6 +448,7 @@ async def launch_all_sockets():
                 async with manager.futures_user_socket() as stream:
                     while True:
                         msg = await stream.recv()
+                        print(f"[WS MESSAGE] {msg}")
                         handle_account_update(msg)
 
             except Exception as e:
