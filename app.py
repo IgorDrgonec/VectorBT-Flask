@@ -71,18 +71,25 @@ kwargs = dict(
 )
 
 csv_file = "ema_macd_data.csv"
-
 data = None
-if __name__ == "__main__":
-    data = vbt.BinanceData.pull(symbol, **kwargs)
-    check_api_weight(api_key)
-    data.to_csv(csv_file)
-else:
+
+if os.path.exists(csv_file):
     try:
         data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+        print("[INFO] Loaded data from CSV")
     except Exception as e:
         print(f"[ERROR] Failed to load cached CSV: {e}")
-        data = pd.DataFrame()  # fallback
+        data = pd.DataFrame()
+else:
+    try:
+        print("[INFO] CSV file not found, pulling data from Binance API...")
+        data = vbt.BinanceData.pull(symbol, **kwargs)
+        check_api_weight(api_key)
+        data.to_csv(csv_file)
+        print("[INFO] Data pulled and cached successfully.")
+    except Exception as e:
+        print(f"[ERROR] Failed to pull data from Binance API: {e}")
+        data = pd.DataFrame()
 
 # Strategy Parameters
 ATR_MULTIPLIER = 2
