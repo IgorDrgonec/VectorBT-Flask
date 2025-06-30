@@ -438,7 +438,7 @@ async def launch_all_sockets():
                     while True:
                         await asyncio.sleep(30 * 60)  # Every 30 minutes
                         try:
-                            await local_client.futures_stream_keepalive()
+                            await local_client.futures_stream_keepalive(listen_key)
                             print("[KEEPALIVE] Sent ping to keep user stream alive.")
                         except Exception as e:
                             print(f"[KEEPALIVE ERROR] Failed to ping listenKey: {e}")
