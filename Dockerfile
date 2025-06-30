@@ -106,6 +106,7 @@ RUN pip install --quiet --no-cache-dir \
 
 
 COPY app.py .
+COPY init_data.py .
 
 EXPOSE 8080
 
