@@ -111,7 +111,7 @@ COPY EMA_MACD.py .
 
 EXPOSE 8080
 
-CMD python init_data.py && gunicorn --worker-class gevent --bind 0.0.0.0:8080 app:app
+CMD python init_data.py && python EMA_MACD.py && gunicorn --worker-class gevent --bind 0.0.0.0:8080 app:app
 #CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:8080", "app:app"]
 #CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
 #CMD ["python", "app.py"]
