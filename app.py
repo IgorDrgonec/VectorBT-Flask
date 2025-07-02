@@ -318,11 +318,23 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             return True
 
 def run_scheduler():
+    html_file = "backtest_chart.html"
+    
+    # Generate once if missing
+    if not os.path.exists(html_file):
+        print("[SCHEDULER] Chart missing. Generating initially...")
+        try:
+            refresh_strategy_html()
+        except Exception as e:
+            print(f"[ERROR] Failed to generate chart: {e}")
+    
+    # Then refresh hourly
     schedule.every().hour.do(refresh_strategy_html)
+
     while True:
         schedule.run_pending()
         time.sleep(60)
-
+        
 @app.route("/")
 def home():
     return """
@@ -491,6 +503,7 @@ if __name__ != "__main__":
         loop.run_until_complete(launch_all_sockets())
 
     threading.Thread(target=start_async_loop, daemon=True).start()
+    threading.Thread(target=run_scheduler, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
     # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
