@@ -17,6 +17,7 @@ from vectorbtpro import *
 from binance.client import Client
 import websockets
 import nest_asyncio
+from flask import send_from_directory
 
 nest_asyncio.apply()
 
@@ -24,7 +25,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time updates
 
-is_test=False
+is_test=True
 # Binance API Keys
 BINANCE_API_KEY = "SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej"
 BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
@@ -315,6 +316,8 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             check_api_weight(api_key)
             return True
 
+pf1 = None
+
 @app.route("/")
 def home():
     return """
@@ -327,6 +330,10 @@ def home():
         </body>
     </html>
     """
+
+@app.route("/chart")
+def serve_chart():
+    return send_from_directory("static", "backtest_chart.html")
 
 @app.route("/trade", methods=['POST'])
 def manual_trade():
