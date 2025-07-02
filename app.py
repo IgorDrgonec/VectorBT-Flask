@@ -7,8 +7,10 @@ import threading
 import asyncio
 import json
 import requests
+import schedule
+from EMA_MACD import refresh_strategy_html
 from binance.enums import *
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_socketio import SocketIO
 from vectorbtpro import vbt
 from binance import AsyncClient, BinanceSocketManager
@@ -17,7 +19,6 @@ from vectorbtpro import *
 from binance.client import Client
 import websockets
 import nest_asyncio
-from flask import send_from_directory
 
 nest_asyncio.apply()
 
@@ -316,7 +317,11 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             check_api_weight(api_key)
             return True
 
-pf1 = None
+def run_scheduler():
+    schedule.every().hour.do(refresh_strategy_html)
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
 
 @app.route("/")
 def home():
@@ -332,8 +337,10 @@ def home():
     """
 
 @app.route("/chart")
-def serve_chart():
-    return send_from_directory("static", "backtest_chart.html")
+def chart():
+    if not os.path.exists("backtest_chart.html"):
+        return "Chart not generated yet", 500
+    return send_file("backtest_chart.html")
 
 @app.route("/trade", methods=['POST'])
 def manual_trade():

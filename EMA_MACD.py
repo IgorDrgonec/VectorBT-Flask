@@ -170,10 +170,11 @@ def generate_portfolio():
         freq=timeframe
     )
     return pf1
+
+def refresh_strategy_html():
+    pf1 = generate_portfolio()
+    pf1.plot().write_html("backtest_chart.html")
+    print("[INFO] Strategy HTML updated.")
     
 if __name__ == "__main__":
-    pf1 = generate_portfolio()
-    fig = pf1.plot()
-    output_file = "static/backtest_chart.html"
-    fig.write_html(output_file)
-    print(f"[INFO] Chart saved to '{output_file}'")
+    refresh_strategy_html()
