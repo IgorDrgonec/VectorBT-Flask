@@ -4,7 +4,7 @@ USER root
 WORKDIR /tmp
 
 RUN apt-get update && \
- apt-get install -yq --no-install-recommends cmake && \
+ apt-get install -yq --no-install-recommends cmake --fix-missing && \
  apt-get clean && \
  rm -rf /var/lib/apt/lists/*
 
