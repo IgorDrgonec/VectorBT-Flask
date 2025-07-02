@@ -334,7 +334,7 @@ def run_scheduler():
     while True:
         schedule.run_pending()
         time.sleep(60)
-        
+
 @app.route("/")
 def home():
     return """
@@ -503,7 +503,7 @@ if __name__ != "__main__":
         loop.run_until_complete(launch_all_sockets())
 
     threading.Thread(target=start_async_loop, daemon=True).start()
-    threading.Thread(target=run_scheduler, daemon=True).start()
+    #threading.Thread(target=run_scheduler, daemon=True).start()
 
     port = int(os.environ.get("PORT", 8080))
     # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
