@@ -26,7 +26,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time updates
 
-is_test=False
+is_test=True
 # Binance API Keys
 BINANCE_API_KEY = "SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej"
 BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
@@ -465,6 +465,7 @@ async def launch_all_sockets():
                 listen_key = await local_client.futures_stream_get_listen_key()
                 print(f"[SOCKET] Account socket connected. ListenKey: {listen_key}")
 
+
                 # Task to keep listen key alive
                 async def keepalive():
                     while True:
@@ -504,6 +505,12 @@ if __name__ != "__main__":
 
     threading.Thread(target=start_async_loop, daemon=True).start()
     #threading.Thread(target=run_scheduler, daemon=True).start()
+
+    try:
+        initial_balance = get_account_balance("USDC", cache_seconds=0)
+        print(f"[STARTUP] Initial USDC balance: {initial_balance}")
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch initial balance: {e}")
 
     port = int(os.environ.get("PORT", 8080))
     # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
