@@ -1,7 +1,7 @@
 # strategy_config.py
 
 # Set True to use testnet keys and endpoints
-IS_TEST = True
+IS_TEST = False
 
 # Trading symbol and data location
 SYMBOL = "BTCUSDC"

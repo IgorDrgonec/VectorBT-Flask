@@ -138,7 +138,12 @@ def update_hdf_with_websocket(kline):
     # Append to in-memory DataFrame and CSV
     data = pd.concat([data, new_row])
     data = data[~data.index.duplicated(keep='last')]
-    data.to_csv(csv_file)
+    new_row.to_csv(
+    csv_file,
+    mode='a',  # Append mode
+    header=not os.path.exists(csv_file),  # Write header only if file doesn't exist
+    )
+    #data.to_csv(csv_file)
     #print("[INFO] Appended new row and updated CSV file.")
 
 def handle_account_update(msg):
