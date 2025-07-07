@@ -105,7 +105,7 @@ def get_account_balance(asset="USDC", cache_seconds=60):
     for balance in account_info.get("assets", []):
         if balance["asset"] == asset:
             try:
-                available = round(float(balance["availableBalance"]), 3)
+                available = round(float(balance["balance"]), 3)
                 _balance_cache[asset] = available
                 _balance_timestamp[asset] = now
                 return available
