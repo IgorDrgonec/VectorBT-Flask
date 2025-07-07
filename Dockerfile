@@ -1,34 +1,32 @@
-FROM jupyter/scipy-notebook:python-3.9.12
-
-USER root
-WORKDIR /tmp
+# ---------- Stage 1: Build TA-Lib ----------
+FROM debian:bullseye-slim AS ta-lib-builder
 
 RUN apt-get update && \
- apt-get install -yq --no-install-recommends cmake --fix-missing && \
- apt-get clean && \
- rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends build-essential wget cmake && \
+    wget https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz && \
+    tar -xvzf ta-lib-0.4.0-src.tar.gz && \
+    cd ta-lib && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install
 
-RUN wget https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz && \
-  tar -xvzf ta-lib-0.4.0-src.tar.gz && \
-  cd ta-lib/ && \
-  ./configure --prefix=/usr --build=unknown-unknown-linux && \
-  make && \
-  make install
+# ---------- Stage 2: Main Runtime Image ----------
+FROM jupyter/scipy-notebook:python-3.9.12
 
-RUN rm -R ta-lib ta-lib-0.4.0-src.tar.gz
+# Switch to root to install system dependencies
+USER root
 
-USER ${NB_UID}
+# Copy TA-Lib from builder stage
+COPY --from=ta-lib-builder /usr/lib/libta* /usr/lib/
+COPY --from=ta-lib-builder /usr/include/ta-lib/ /usr/include/ta-lib/
 
+# Install Python dependencies (keep this early for layer caching)
 RUN pip install --quiet --no-cache-dir \
+    'pybind11' \
+    'llvmlite' \
     'jupyter-dash' \
     'plotly>=5.0.0' \
-    'kaleido' && \
-    jupyter lab build --minimize=False
-
-RUN pip install --quiet --no-cache-dir 'pybind11'
-RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
-
-RUN pip install --quiet --no-cache-dir \
+    'kaleido' \
     'numpy==1.23.5' \
     'pandas>=1.5.0' \
     'numba==0.56.4' \
@@ -78,39 +76,32 @@ RUN pip install --quiet --no-cache-dir \
     'dill' \
     'lz4' \
     'blosc2' \
-    'tabulate'
-
-
-RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
-RUN pip install --quiet --no-cache-dir 'pandas_datareader'
-RUN conda install --quiet --yes -c conda-forge cvxopt
-RUN pip install --quiet --no-cache-dir --upgrade bottleneck
-
-ADD ./vectorbtpro ./vectorbtpro
-ADD pyproject.toml ./
-ADD LICENSE ./
-ADD README.md ./
-RUN pip install --quiet --no-cache-dir --no-deps .
-
-WORKDIR /usr/src/app
-
-RUN pip install --quiet --no-cache-dir \
+    'tabulate' \
+    'universal-portfolios' \
+    'pandas_datareader' \
+    'bottleneck' \
     'flask' \
     'Flask-SocketIO' \
     'gunicorn' \
     'gevent' \
-    'python-binance==1.0.19' \
-    'nest-asyncio' \
-    --upgrade pip
+    'nest-asyncio'
 
+# Optional: install cvxopt using conda
+RUN conda install --quiet --yes -c conda-forge cvxopt
 
+# Add vectorbtpro package and install
+COPY ./vectorbtpro /tmp/vectorbtpro
+COPY pyproject.toml LICENSE README.md /tmp/
+RUN pip install --quiet --no-cache-dir --no-deps /tmp
 
-COPY app.py .
-COPY init_data.py .
-COPY EMA_MACD.py .
+# Set working dir for app
+WORKDIR /usr/src/app
 
+# Copy app source
+COPY app.py init_data.py EMA_MACD.py ./
+
+# Expose port for web
 EXPOSE 8080
 
+# Startup command
 CMD python init_data.py && gunicorn --worker-class gevent --bind 0.0.0.0:8080 app:app
-#CMD python init_data.py && python EMA_MACD.py && gunicorn --worker-class gevent --bind 0.0.0.0:8080 app:app
-#CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:8080", "app:app"]
