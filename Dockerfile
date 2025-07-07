@@ -108,6 +108,7 @@ RUN pip install --quiet --no-cache-dir \
 COPY app.py .
 COPY init_data.py .
 COPY EMA_MACD.py .
+COPY strategy_config.py .
 
 EXPOSE 8080
 

@@ -19,6 +19,7 @@ from vectorbtpro import *
 from binance.client import Client
 import websockets
 import nest_asyncio
+from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME, risk_percent, leverage, ATR_MULTIPLIER, RR, ATR_PERIOD, EMA_WINDOW
 
 nest_asyncio.apply()
 
@@ -26,16 +27,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time updates
 
-is_test=False
-# Binance API Keys
-BINANCE_API_KEY = "SyWHwZv9BTOiFN3NxJvbTlNjXdRvW9HEQdGJrZp0PFTK4aMekC2tt8d9qRNwUEej"
-BINANCE_SECRET_KEY = "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
-#Testnet Futures Binance
-API_KEY_TEST = "c0bf32af094d1b6f97e53d79e2d585003754d12fbe53a65f383d71e769d5b943"
-API_SECRET_TEST = "cf01902200ac97101266ec6247c80a6bcb2d005286e34b6684ea30cf6d88e20a"
-
-api_key = API_KEY_TEST if is_test else  BINANCE_API_KEY
-api_secret = API_SECRET_TEST if is_test else BINANCE_SECRET_KEY
+# Use imported variables from strategy_config instead of manual inputs
+is_test = IS_TEST
+api_key = BINANCE_KEYS["test"]["api_key"] if is_test else BINANCE_KEYS["live"]["api_key"]
+api_secret = BINANCE_KEYS["test"]["api_secret"] if is_test else BINANCE_KEYS["live"]["api_secret"]
 
 client = Client(api_key, api_secret)
 client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "https://fapi.binance.com/fapi"
@@ -65,14 +60,13 @@ vbt.BinanceData.set_custom_settings(
 )
 
 # Parameters for historical data retrieval
-symbol = 'BTCUSDC'
+symbol = SYMBOL
+csv_file = CSV_FILE
 kwargs = dict(
-    start=datetime.now() - timedelta(days=60),
-    timeframe='15m',
+    start=datetime.now() - timedelta(days=LOOKBACK_DAYS),
+    timeframe=TIMEFRAME,
     klines_type=2,
 )
-
-csv_file = "ema_macd_data.csv"
 data = None
 
 if os.path.exists(csv_file):
@@ -85,17 +79,6 @@ if os.path.exists(csv_file):
 else:
     print("[CRITICAL] CSV file not found. Please run init_data.py before starting app.")
     data = pd.DataFrame()
-
-# Strategy Parameters
-ATR_MULTIPLIER = 2
-RR = 1.5
-ATR_PERIOD = 14
-EMA_WINDOW = 200
-
-# Order Parameters
-risk_percent = 0.01
-# qty_precision = 2
-leverage = 25
 
 _balance_cache = {}
 _balance_timestamp = {}
@@ -318,7 +301,7 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             check_api_weight(api_key)
             return True
 
-def run_scheduler():
+""" def run_scheduler():
     html_file = "backtest_chart.html"
     
     # Generate once if missing
@@ -334,7 +317,7 @@ def run_scheduler():
 
     while True:
         schedule.run_pending()
-        time.sleep(60)
+        time.sleep(60) """
 
 @app.route("/")
 def home():
@@ -349,11 +332,11 @@ def home():
     </html>
     """
 
-@app.route("/chart")
+""" @app.route("/chart")
 def chart():
     if not os.path.exists("backtest_chart.html"):
         return "Chart not generated yet", 500
-    return send_file("backtest_chart.html")
+    return send_file("backtest_chart.html") """
 
 @app.route("/trade", methods=['POST'])
 def manual_trade():
