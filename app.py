@@ -129,6 +129,7 @@ def get_account_balance(asset="USDC", cache_seconds=60):
             except Exception as e:
                 print(f"[WARN] Could not parse balance for {asset}: {e}")
                 return _balance_cache.get(asset)
+    check_api_weight(api_key)
     return None
 
 # Function to update HDF with WebSocket data
@@ -506,11 +507,17 @@ if __name__ != "__main__":
     threading.Thread(target=start_async_loop, daemon=True).start()
     #threading.Thread(target=run_scheduler, daemon=True).start()
 
+    initial_balance_cached = None
+
     try:
-        initial_balance = get_account_balance("USDC", cache_seconds=0)
-        print(f"[STARTUP] Initial USDC balance: {initial_balance}")
+        with open("initial_balance.json", "r") as f:
+            balance_data = json.load(f)
+            initial_balance_cached = float(balance_data["USDC"])
+            print(f"[STARTUP] Initial USDC balance (from file): {initial_balance_cached}")
+    except FileNotFoundError:
+        print("[WARN] initial_balance.json not found. Did you forget to run init_data.py?")
     except Exception as e:
-        print(f"[ERROR] Failed to fetch initial balance: {e}")
+        print(f"[ERROR] Failed to load initial balance: {e}")
 
     port = int(os.environ.get("PORT", 8080))
     # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
