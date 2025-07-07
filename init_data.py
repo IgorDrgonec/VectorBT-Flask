@@ -26,10 +26,10 @@ client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "h
 # Fetch balance only once before app starts
 def get_account_balance():
     try:
-        account_info = client.futures_account()
-        for balance in account_info["assets"]:
+        account_info = client.futures_account_balance()
+        for balance in account_info:
             if balance["asset"] == "USDC":
-                initial_balance = float(balance["availableBalance"])
+                initial_balance = float(balance["balance"])
                 break
         else:
             initial_balance = None
