@@ -512,12 +512,14 @@ if __name__ != "__main__":
     try:
         with open("initial_balance.json", "r") as f:
             balance_data = json.load(f)
-            initial_balance_cached = float(balance_data["USDC"])
-            print(f"[STARTUP] Initial USDC balance (from file): {initial_balance_cached}")
+            initial_balance_cached = round(float(balance_data["USDC"]), 3)
+            _balance_cache["USDC"] = initial_balance_cached
+            _balance_timestamp["USDC"] = time.time()
+            print(f"[STARTUP] Preloaded USDC balance: {initial_balance_cached}")
     except FileNotFoundError:
         print("[WARN] initial_balance.json not found. Did you forget to run init_data.py?")
     except Exception as e:
-        print(f"[ERROR] Failed to load initial balance: {e}")
+        print(f"[ERROR] Failed to preload balance: {e}")
 
     port = int(os.environ.get("PORT", 8080))
     # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
