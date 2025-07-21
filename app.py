@@ -84,7 +84,7 @@ _balance_cache = {}
 _balance_timestamp = {}
 
 
-def get_account_balance(asset="USDC", cache_seconds=60):
+def get_account_balance(asset="BNFCR", cache_seconds=60):
     """Return futures account balance while respecting API rate limits."""
     now = time.time()
     # Prefer value provided by the account WebSocket if available
@@ -105,7 +105,7 @@ def get_account_balance(asset="USDC", cache_seconds=60):
     for balance in account_info.get("assets", []):
         if balance["asset"] == asset:
             try:
-                available = round(float(balance["balance"]), 3)
+                available = round(float(balance["availableBalance"]), 3)
                 _balance_cache[asset] = available
                 _balance_timestamp[asset] = now
                 return available
@@ -173,14 +173,14 @@ def handle_account_update(msg):
 
             print(f"[ORDER] Trade filled for {symbol}, side: {side}, qty: {qty}, price: {price}")
             if realized_pnl is not None:
-                print(f"[PNL] Realized PnL: {realized_pnl} {order.get('N', 'USDC')}")
+                print(f"[PNL] Realized PnL: {realized_pnl} {order.get('N', 'BNFCR')}")
 
             # Trigger a manual refresh from REST as backup
-            refreshed = get_account_balance("USDC", cache_seconds=0)
+            refreshed = get_account_balance("BNFCR", cache_seconds=0)
             print(f"[BALANCE] Manually refreshed (after fill): {refreshed}")
 
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
-    usdt_balance = get_account_balance("USDC")
+    usdt_balance = get_account_balance("BNFCR")
     print(usdt_balance)
     if usdt_balance is None:
         print("[WARN] Unable to fetch account balance")
@@ -369,7 +369,7 @@ def manual_trade():
             for filter in entry["filters"]:
                 cancel_quantity = (int(entry["filters"][2]["maxQty"]))*0.95
 
-    usdt_balance = get_account_balance("USDC")
+    usdt_balance = get_account_balance("BNFCR")
     if usdt_balance is None:
         print("[WARN] Unable to fetch account balance")
         return {"code": "error", "message": "balance fetch failed"}
@@ -500,10 +500,10 @@ if __name__ != "__main__":
     try:
         with open("initial_balance.json", "r") as f:
             balance_data = json.load(f)
-            initial_balance_cached = round(float(balance_data["USDC"]), 3)
-            _balance_cache["USDC"] = initial_balance_cached
-            _balance_timestamp["USDC"] = time.time()
-            print(f"[STARTUP] Preloaded USDC balance: {initial_balance_cached}")
+            initial_balance_cached = round(float(balance_data["BNFCR"]), 3)
+            _balance_cache["BNFCR"] = initial_balance_cached
+            _balance_timestamp["BNFCR"] = time.time()
+            print(f"[STARTUP] Preloaded BNFCR balance: {initial_balance_cached}")
     except FileNotFoundError:
         print("[WARN] initial_balance.json not found. Did you forget to run init_data.py?")
     except Exception as e:

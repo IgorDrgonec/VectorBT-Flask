@@ -14,12 +14,12 @@ def get_api_client():
         client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
     return client
 
-def get_account_balance(client, asset="USDC"):
+def get_account_balance(client, asset="BNFCR"):
     try:
         account_info = client.futures_account_balance()
         for balance in account_info:
             if balance["asset"] == asset:
-                initial_balance = float(balance["balance"])
+                initial_balance = float(balance["availableBalance"])
                 break
         else:
             initial_balance = None
