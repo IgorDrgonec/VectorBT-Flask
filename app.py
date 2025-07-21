@@ -270,9 +270,9 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             #print(result)
             #print(f"sending order {order_type} - {side} {quantity} {symbol}")
             cancel = client.futures_cancel_all_open_orders(symbol = symbol)
-            sl_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_STOP_MARKET, quantity=quantity,stopPrice=stopPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            sl_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(sl_order)
-            tp_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_TAKE_PROFIT_MARKET, quantity=quantity,stopPrice=targetPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            tp_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice, price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(tp_order)
             order = client.futures_create_order(symbol=symbol, side='BUY', type=order_type, quantity=quantity, Isolated=Isolated)
             #print(order)
@@ -281,9 +281,9 @@ def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_
             #print(result)
             #print(f"sending order {order_type} - {side} {quantity} {symbol}") 
             cancel = client.futures_cancel_all_open_orders(symbol = symbol)         
-            sl_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_STOP_MARKET, quantity=quantity,stopPrice=stopPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            sl_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(sl_order)
-            tp_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_TAKE_PROFIT_MARKET, quantity=quantity,stopPrice=targetPrice, timeInForce=TIME_IN_FORCE_GTC, closePosition = True)
+            tp_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice,price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(tp_order)      
             order = client.futures_create_order(symbol=symbol, side='SELL', type=ORDER_TYPE_MARKET, quantity=quantity, Isolated=True)
             #print(order)     
@@ -431,7 +431,7 @@ async def launch_all_sockets():
                     local_client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
                 manager = BinanceSocketManager(local_client)
 
-                async with manager.kline_socket(symbol='btcusdc', interval=AsyncClient.KLINE_INTERVAL_15MINUTE) as stream:
+                async with manager.kline_socket(symbol='btcusdc', interval=TIMEFRAME) as stream:
                     print("[SOCKET] Kline socket connected.")
                     while True:
                         msg = await stream.recv()
