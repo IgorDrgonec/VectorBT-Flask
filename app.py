@@ -19,7 +19,7 @@ from vectorbtpro import *
 from binance.client import Client
 import websockets
 import nest_asyncio
-from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME, risk_percent, leverage, ATR_MULTIPLIER, RR, ATR_PERIOD, EMA_WINDOW
+from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME, risk_percent, leverage, ATR_MULTIPLIER, RR, ATR_PERIOD, EMA_WINDOW, test_mode
 
 nest_asyncio.apply()
 
@@ -80,38 +80,23 @@ else:
     print("[CRITICAL] CSV file not found. Please run init_data.py before starting app.")
     data = pd.DataFrame()
 
-_balance_cache = {}
-_balance_timestamp = {}
-
-
-def get_account_balance(asset="BNFCR", cache_seconds=60):
-    """Return futures account balance while respecting API rate limits."""
-    now = time.time()
-    # Prefer value provided by the account WebSocket if available
-    if asset in _balance_cache:
-        if now - _balance_timestamp.get(asset, 0) < cache_seconds:
-            return _balance_cache[asset]
-        # even if stale return to avoid REST call unless absolutely needed
-        cached = _balance_cache.get(asset)
-        if cached is not None:
-            return cached
-
+def get_account_balance(asset="BNFCR"):
+    """Return futures account balance directly from REST API (no caching)."""
     try:
-        account_info = client.futures_account()
+        account_info = client.futures_account_balance()
     except Exception as e:
         print(f"[WARN] Failed to fetch futures account info: {e}")
-        return _balance_cache.get(asset)
+        return None
 
-    for balance in account_info.get("assets", []):
+    for balance in account_info:
         if balance["asset"] == asset:
             try:
                 available = round(float(balance["availableBalance"]), 3)
-                _balance_cache[asset] = available
-                _balance_timestamp[asset] = now
                 return available
             except Exception as e:
                 print(f"[WARN] Could not parse balance for {asset}: {e}")
-                return _balance_cache.get(asset)
+                return None
+
     check_api_weight(api_key)
     return None
 
@@ -149,20 +134,7 @@ def update_hdf_with_websocket(kline):
 def handle_account_update(msg):
     event_type = msg.get("e")
 
-    if event_type == "ACCOUNT_UPDATE":
-        for bal in msg.get("a", {}).get("B", []):
-            asset = bal.get("a")
-            wallet_balance = bal.get("wb")
-            if asset and wallet_balance is not None:
-                try:
-                    balance = float(wallet_balance)
-                    _balance_cache[asset] = balance
-                    _balance_timestamp[asset] = time.time()
-                    print(f"[BALANCE] Updated {asset} (ACCOUNT_UPDATE): {balance}")
-                except (TypeError, ValueError):
-                    continue
-
-    elif event_type == "ORDER_TRADE_UPDATE":
+    if event_type == "ORDER_TRADE_UPDATE":
         order = msg.get("o", {})
         if order.get("X") == "FILLED":
             symbol = order.get("s")
@@ -176,7 +148,7 @@ def handle_account_update(msg):
                 print(f"[PNL] Realized PnL: {realized_pnl} {order.get('N', 'BNFCR')}")
 
             # Trigger a manual refresh from REST as backup
-            refreshed = get_account_balance("BNFCR", cache_seconds=0)
+            refreshed = get_account_balance("BNFCR")
             print(f"[BALANCE] Manually refreshed (after fill): {refreshed}")
 
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
@@ -188,18 +160,29 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
     symbol_info = client.futures_exchange_info()
     for entry in symbol_info["symbols"]:
         if entry["symbol"] == symbol:
-            qty_precision = 1  # int(entry["quantityPrecision"])
+            qty_precision = entry["quantityPrecision"]
+            price_precision = entry["pricePrecision"]
             cancel_quantity = int(entry["filters"][2]["maxQty"]) * 0.95
             break
     order_price = order_price
     position_size = order_price
     side = side
-    stopPrice = round(stopPrice,qty_precision)
-    targetPrice = round(targetPrice,qty_precision)
-    quantity = round((usdt_balance*risk_percent)/(abs(order_price-stopPrice)),3)
+    stopPrice = round(stopPrice,price_precision)
+    targetPrice = round(targetPrice,price_precision)
+    quantity = round((usdt_balance*risk_percent)/(abs(order_price-stopPrice)),qty_precision)
     print(f"{quantity} = ({usdt_balance} * {risk_percent}) / ({order_price} - {stopPrice})")
     print(f"Variables: side={side}, order_price={order_price}, stopPrice={stopPrice}, targetPrice={targetPrice}, risk_percent={risk_percent}, leverage={leverage}, quantity={quantity}, position_size={position_size}, cancel_quantity={cancel_quantity}")
-    order(side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage)
+    order(price_precision,qty_precision,side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage,test_mode=test_mode)
+
+def get_position_amt(symbol):
+    try:
+        positions = client.futures_position_information(symbol=symbol)
+        for pos in positions:
+            if pos["symbol"] == symbol:
+                return float(pos["positionAmt"])
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch position for {symbol}: {e}")
+    return 0.0
 
 # Function to execute strategy on new candle close
 def execute_strategy(data):
@@ -223,6 +206,11 @@ def execute_strategy(data):
 
     # Determine trade entry
     latest_candle_idx = -1  # Check latest closed candle
+    current_position = get_position_amt(symbol)
+    if current_position != 0:
+        print(f"[INFO] Skipping signal: Active position exists ({current_position})")
+        return  # Skip signal if a trade is open
+    
     if long_entry[latest_candle_idx]:
         print("[ENTRY] 🔥 Long Entry Signal Detected!")
         socketio.emit('trade_signal', {"side": "long", "price": close[latest_candle_idx]})
@@ -263,35 +251,45 @@ def handle_socket_message(msg):
 active_trade = {"side": None, "entry_price": None, "quantity": 0}
 
 #Order from manual JSON
-def order(side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_quantity, leverage, order_type=ORDER_TYPE_MARKET, Isolated=True):
+def order(price_precision,qty_precision,side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_quantity, leverage, order_type=ORDER_TYPE_MARKET, Isolated=True,test_mode=False):
+    sl_offset = stopPrice * 0.002  # 0.2% buffer, adjust as needed
+    quantity = round(quantity, qty_precision)
+    stopPrice = round(stopPrice, price_precision)
+    targetPrice = round(targetPrice, price_precision)
     try:
+        create_order_func = client.futures_create_order
+        if test_mode:
+            create_order_func = client.futures_create_test_order
+
         if side == "long" and position_size != 0:
             result = client.futures_change_leverage(symbol = symbol, leverage = leverage)
             #print(result)
             #print(f"sending order {order_type} - {side} {quantity} {symbol}")
             cancel = client.futures_cancel_all_open_orders(symbol = symbol)
-            sl_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
+            sl_order = create_order_func(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(sl_order)
-            tp_order = client.futures_create_order(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice, price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
+            sl_market_order = create_order_func(symbol=symbol,side='SELL',type=FUTURE_ORDER_TYPE_STOP_MARKET,quantity=quantity,stopPrice=round(stopPrice - sl_offset, price_precision),timeInForce=TIME_IN_FORCE_GTC,reduceOnly=True)
+            tp_order = create_order_func(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice, price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(tp_order)
-            order = client.futures_create_order(symbol=symbol, side='BUY', type=order_type, quantity=quantity, Isolated=Isolated)
+            order = create_order_func(symbol=symbol, side='BUY', type=order_type, quantity=quantity, Isolated=Isolated)
             #print(order)
         if side == "short" and position_size != 0:
             result = client.futures_change_leverage(symbol = symbol, leverage = leverage)
             #print(result)
             #print(f"sending order {order_type} - {side} {quantity} {symbol}") 
             cancel = client.futures_cancel_all_open_orders(symbol = symbol)         
-            sl_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
+            sl_order = create_order_func(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(sl_order)
-            tp_order = client.futures_create_order(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice,price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
+            sl_market_order = create_order_func(symbol=symbol,side='BUY',type=FUTURE_ORDER_TYPE_STOP_MARKET,quantity=quantity,stopPrice=round(stopPrice + sl_offset, price_precision),timeInForce=TIME_IN_FORCE_GTC,reduceOnly=True)
+            tp_order = create_order_func(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice,price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
             #print(tp_order)      
-            order = client.futures_create_order(symbol=symbol, side='SELL', type=ORDER_TYPE_MARKET, quantity=quantity, Isolated=True)
+            order = create_order_func(symbol=symbol, side='SELL', type=ORDER_TYPE_MARKET, quantity=quantity, Isolated=True)
             #print(order)     
         if side == "flat" and position_size == 0:
             if stopPrice < targetPrice or stopPrice == "long": #long
-                cancel_buy = client.futures_create_order(symbol = symbol, side = "SELL", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
+                cancel_buy = create_order_func(symbol = symbol, side = "SELL", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
             if stopPrice > targetPrice or stopPrice == "short": #short
-                cancel_sell = client.futures_create_order(symbol = symbol, side = "BUY", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
+                cancel_sell = create_order_func(symbol = symbol, side = "BUY", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
     except Exception as e:
         print("an exception occured - {}".format(e))
         return False
@@ -501,8 +499,6 @@ if __name__ != "__main__":
         with open("initial_balance.json", "r") as f:
             balance_data = json.load(f)
             initial_balance_cached = round(float(balance_data["BNFCR"]), 3)
-            _balance_cache["BNFCR"] = initial_balance_cached
-            _balance_timestamp["BNFCR"] = time.time()
             print(f"[STARTUP] Preloaded BNFCR balance: {initial_balance_cached}")
     except FileNotFoundError:
         print("[WARN] initial_balance.json not found. Did you forget to run init_data.py?")

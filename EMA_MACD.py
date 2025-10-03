@@ -5,6 +5,7 @@ import talib
 import scipy
 import os
 import matplotlib.pyplot as plt
+from numba import njit
 from scipy.stats import linregress
 from vectorbtpro import *
 from binance.client import Client

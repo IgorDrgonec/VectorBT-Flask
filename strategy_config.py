@@ -2,11 +2,12 @@
 
 # Set True to use testnet keys and endpoints
 IS_TEST = False
+test_mode = False # Use test mode for order execution
 
 # Trading symbol and data location
 SYMBOL = "BTCUSDC"
 CSV_FILE = "ema_macd_data.csv"
-TIMEFRAME = "15m"
+TIMEFRAME = "1h"
 LOOKBACK_DAYS = 60
 
 # Binance API keys
