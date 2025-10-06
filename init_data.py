@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from binance.client import Client
 from vectorbtpro import vbt
-from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS
+from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME
 
 def get_api_client():
     keys = BINANCE_KEYS["test" if IS_TEST else "live"]
@@ -41,7 +41,7 @@ def pull_historical_data():
         data = vbt.BinanceData.pull(
             SYMBOL,
             start=datetime.now() - timedelta(days=LOOKBACK_DAYS),
-            timeframe='15m',
+            timeframe=TIMEFRAME,
             klines_type=2,
         )
         data.to_csv(CSV_FILE)

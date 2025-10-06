@@ -8,7 +8,7 @@ test_mode = False # Use test mode for order execution
 SYMBOL = "BTCUSDC"
 CSV_FILE = "ema_macd_data.csv"
 TIMEFRAME = "1h"
-LOOKBACK_DAYS = 60
+LOOKBACK_DAYS = 160
 
 # Binance API keys
 BINANCE_KEYS = {
