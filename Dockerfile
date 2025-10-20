@@ -44,7 +44,7 @@ RUN uv pip install --no-cache-dir \
     gevent \
     nest-asyncio \
     python-binance==1.0.19 \
-    websockets>=12,<13 \
+    "websockets>=12,<13" \
     schedule requests tqdm \
     yfinance>=0.2.20 \
     ccxt>=1.89.14 \
@@ -65,6 +65,7 @@ RUN uv pip install --no-cache-dir \
     pandas-datareader \
     polygon-api-client>=1.0.0 \
     beautifulsoup4 nasdaq-data-link alpha_vantage databento
+
 
 # Copy your app
 WORKDIR /usr/src/app
