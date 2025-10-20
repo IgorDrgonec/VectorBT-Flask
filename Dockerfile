@@ -26,7 +26,8 @@ RUN pip install --quiet --no-cache-dir \
     jupyter lab build --minimize=False
 
 RUN pip install --quiet --no-cache-dir 'pybind11'
-RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
+RUN pip install --quiet --no-cache-dir 'llvmlite==0.39.1'
+RUN pip install --quiet --no-cache-dir git+https://github.com/twopirllc/pandas-ta.git
 
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.5' \
@@ -61,7 +62,6 @@ RUN pip install --quiet --no-cache-dir \
     'databento' \
     'TA-Lib==0.4.21' \
     'ta' \
-    'pandas_ta' \
     'technical' \
     'numexpr>=2.8.4' \
     'hyperopt' \
@@ -79,7 +79,6 @@ RUN pip install --quiet --no-cache-dir \
     'lz4' \
     'blosc2' \
     'tabulate'
-
 
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'
