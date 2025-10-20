@@ -429,7 +429,7 @@ async def launch_all_sockets():
                     local_client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
                 manager = BinanceSocketManager(local_client)
 
-                async with manager.kline_socket(symbol='btcusdc', interval=TIMEFRAME) as stream:
+                async with manager.kline_futures_socket(symbol=SYMBOL.lower(), interval=TIMEFRAME) as stream:
                     print("[SOCKET] Kline socket connected.")
                     while True:
                         msg = await stream.recv()
