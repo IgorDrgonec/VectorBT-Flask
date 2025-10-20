@@ -1,122 +1,73 @@
-# Base image (keeps conda + Jupyter tooling + Python 3.9)
-FROM jupyter/scipy-notebook:python-3.9.12
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-# Switch to root for system installs
-USER root
-WORKDIR /tmp
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_SYSTEM_PYTHON=1 \
+    DEBIAN_FRONTEND=noninteractive
 
-# --- System dependencies ---
+# System deps
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        cmake \
-        wget \
-        git \
-        build-essential && \
-    apt-get clean && \
+    apt-get install -y --no-install-recommends build-essential cmake git wget && \
     rm -rf /var/lib/apt/lists/*
 
-# --- Build TA-Lib from source ---
-RUN wget https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz && \
-    tar -xvzf ta-lib-0.4.0-src.tar.gz && \
-    cd ta-lib && \
-    ./configure --prefix=/usr --build=unknown-unknown-linux && \
+# TA-Lib 0.6.4
+RUN wget https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz && \
+    tar -xzf ta-lib-0.6.4-src.tar.gz && \
+    cd ta-lib-0.6.4/ && \
+    ./configure --prefix=/usr && \
     make && \
     make install && \
-    cd .. && \
-    rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+    cd .. && rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
 
-# Switch back to default notebook user
-USER ${NB_UID}
+# Copy VBT Pro package
+WORKDIR /tmp
+COPY ./vectorbtpro ./vectorbtpro
+COPY pyproject.toml LICENSE README.md ./
 
-# --- Core Jupyter utilities ---
-RUN pip install --quiet --no-cache-dir \
-    'jupyter-dash' \
-    'plotly>=5.0.0' \
-    'kaleido' && \
-    jupyter lab build --minimize=False
+# Prefer newer NumPy when resolving extras
+RUN echo "numpy>1.24.3" > override.txt
+# Install VBT Pro with "all-stable" extras
+RUN uv pip install --no-cache-dir ".[all-stable]" --override override.txt
 
-# --- Core numerical stack (via conda for stability) ---
-RUN conda install --quiet --yes -c conda-forge \
-    'llvmlite==0.39.1' \
-    'numba==0.56.4' \
-    'cvxopt' \
-    'bottleneck' && \
-    conda clean -afy
+# Unstable/strict deps (pin to things that play well with Py 3.12)
+# - pandas-ta: OK on 3.12 from PyPI
+RUN uv pip install --no-cache-dir --no-deps pandas-ta
+# - universal-portfolios: use patched fork instead of PyPI to avoid pip.req error
+RUN uv pip install --no-cache-dir --no-deps git+https://github.com/Marigold/universal-portfolios.git
 
-# --- Python dependencies (via pip) ---
-RUN pip install --quiet --no-cache-dir \
-    'pybind11' \
-    'numpy==1.23.5' \
-    'pandas>=1.5.0' \
-    'scipy' \
-    'scikit-learn' \
-    'schedule' \
-    'requests' \
-    'tqdm' \
-    'python-dateutil' \
-    'dateparser' \
-    'imageio' \
-    'mypy_extensions' \
-    'humanize' \
-    'attrs>=21.1.0' \
-    'websocket-client' \
-    'websockets>=10.4,<11' \
-    'yfinance>=0.2.20' \
-    'python-binance>=1.0.16' \
-    'alpaca-py' \
-    'ccxt>=1.89.14' \
-    'tables>=3.8.0' \
-    'SQLAlchemy>=2.0.0' \
-    'duckdb' \
-    'duckdb-engine' \
-    'pyarrow' \
-    'polygon-api-client>=1.0.0' \
-    'beautifulsoup4' \
-    'nasdaq-data-link' \
-    'alpha_vantage' \
-    'databento' \
-    'TA-Lib==0.4.21' \
-    'ta' \
-    'technical' \
-    'numexpr>=2.8.4' \
-    'hyperopt' \
-    'optuna' \
-    'pathos' \
-    'mpire' \
-    'dask' \
-    'ray>=1.4.1' \
-    'plotly-resampler' \
-    'quantstats>=0.0.37' \
-    'PyPortfolioOpt>=1.5.1' \
-    'Riskfolio-Lib>=3.3.0' \
-    'python-telegram-bot>=13.4' \
-    'dill' \
-    'lz4' \
-    'blosc2' \
-    'tabulate' \
-    'pandas-datareader' 
+# === Your bot runtime deps ===
+# Keep websockets compatible with Py 3.12 (drop <11 pin); 12.x works well
+RUN uv pip install --no-cache-dir \
+    flask \
+    Flask-SocketIO \
+    gunicorn \
+    gevent \
+    nest-asyncio \
+    python-binance==1.0.19 \
+    websockets>=12,<13 \
+    schedule requests tqdm \
+    yfinance>=0.2.20 \
+    ccxt>=1.89.14 \
+    SQLAlchemy>=2.0.0 \
+    duckdb duckdb-engine pyarrow \
+    tables>=3.8.0 \
+    TA-Lib==0.4.28 \
+    ta technical \
+    numexpr>=2.8.4 \
+    hyperopt optuna pathos mpire dask \
+    ray>=2.10.0 \
+    plotly plotly-resampler kaleido \
+    quantstats>=0.0.37 \
+    PyPortfolioOpt>=1.5.1 \
+    Riskfolio-Lib>=3.3.0 \
+    python-telegram-bot>=13.4 \
+    dill lz4 blosc2 tabulate \
+    pandas-datareader \
+    polygon-api-client>=1.0.0 \
+    beautifulsoup4 nasdaq-data-link alpha_vantage databento
 
-# --- Install pandas_ta from ZIP (no GitHub auth required) ---
-RUN pip install --quiet --no-cache-dir \
-    https://github.com/twopirllc/pandas-ta/archive/refs/heads/main.zip
-
-# --- Add your custom vectorbtpro package ---
-ADD ./vectorbtpro ./vectorbtpro
-ADD pyproject.toml LICENSE README.md ./
-RUN pip install --quiet --no-cache-dir --no-deps .
-
-# --- Web app dependencies ---
+# Copy your app
 WORKDIR /usr/src/app
-RUN pip install --quiet --no-cache-dir \
-    'flask' \
-    'Flask-SocketIO' \
-    'gunicorn' \
-    'gevent' \
-    'nest-asyncio' \
-    'python-binance==1.0.19' \
-    --upgrade pip
-
-# --- Copy bot files ---
 COPY app.py .
 COPY init_data.py .
 COPY EMA_MACD.py .
@@ -124,8 +75,4 @@ COPY strategy_config.py .
 
 EXPOSE 8080
 
-# --- Start bot ---
 CMD python init_data.py && gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:8080 app:app
-
-#CMD python init_data.py && python EMA_MACD.py && gunicorn --worker-class gevent --bind 0.0.0.0:8080 app:app
-#CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:8080", "app:app"]
