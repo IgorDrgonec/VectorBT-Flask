@@ -26,13 +26,12 @@ RUN pip install --quiet --no-cache-dir \
     jupyter lab build --minimize=False
 
 RUN pip install --quiet --no-cache-dir 'pybind11'
-RUN pip install --quiet --no-cache-dir 'llvmlite==0.39.1'
+RUN conda install --quiet --yes -c conda-forge 'llvmlite==0.39.1' 'numba==0.56.4'
 RUN pip install --quiet --no-cache-dir git+https://github.com/twopirllc/pandas-ta.git
 
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.5' \
     'pandas>=1.5.0' \
-    'numba==0.56.4' \
     'scipy' \
     'scikit-learn' \
     'schedule' \
