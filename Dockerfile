@@ -1,13 +1,14 @@
-# --- Base image: official vectorbtpro dev setup ---
-FROM quay.io/jupyter/scipy-notebook:python-3.12
+########## ────────────────  STAGE 1 – BUILD & COMPILE  ──────────────── ##########
+FROM quay.io/jupyter/scipy-notebook:python-3.12 AS builder
 
 USER root
 WORKDIR /tmp
 
-# === System deps + TA-Lib 0.6.4 (native C lib) ===
+# --- Build dependencies & TA-Lib 0.6.4 ---
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get update && \
-    apt-get install -y --no-install-recommends cmake nodejs git build-essential wget && \
+    apt-get install -y --no-install-recommends \
+        build-essential cmake git wget nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 RUN wget https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz && \
@@ -18,23 +19,43 @@ RUN wget https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-
 USER ${NB_UID}
 RUN pip install uv
 
-# === VectorBT Pro core ===
+# --- VectorBT Pro base ---
 COPY ./vectorbtpro ./vectorbtpro
 COPY pyproject.toml LICENSE README.md ./
 
 RUN echo "numpy>1.24.3" > override.txt
 RUN uv pip install --system --no-cache-dir ".[all-stable]" --override override.txt
 
-# === Optional unstable deps ===
+# --- Optional unstable deps ---
 RUN uv pip install --system --no-cache-dir --no-deps pandas-ta
 RUN uv pip install --system --no-cache-dir --no-deps git+https://github.com/Marigold/universal-portfolios.git
 
-# === Install TA-Lib Python binding compatible with NumPy 2 / Py 3.12 ===
+# --- TA-Lib Python binding compatible with NumPy 2 / Py 3.12 ---
 RUN uv pip install --system --no-cache-dir --no-deps \
     git+https://github.com/mrjbq7/ta-lib@numpy2-fix
 
-# === Bot runtime dependencies ===
-RUN uv pip install --system --no-cache-dir \
+
+########## ────────────────  STAGE 2 – RUNTIME (DEPLOYMENT)  ──────────────── ##########
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_SYSTEM_PYTHON=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# --- Copy compiled TA-Lib native library from builder ---
+COPY --from=builder /usr/lib/libta_lib.so* /usr/lib/
+
+# --- Minimal system deps for runtime ---
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Copy installed Python environment from builder (faster than reinstall) ---
+COPY --from=builder /usr/local /usr/local
+
+# --- Runtime-specific dependencies ---
+RUN uv pip install --no-cache-dir \
     flask Flask-SocketIO gunicorn gevent nest-asyncio \
     python-binance==1.0.19 "websockets>=12,<13" \
     schedule requests tqdm yfinance>=0.2.20 ccxt>=1.89.14 \
@@ -45,7 +66,7 @@ RUN uv pip install --system --no-cache-dir \
     python-telegram-bot>=13.4 dill lz4 blosc2 tabulate pandas-datareader \
     polygon-api-client>=1.0.0 beautifulsoup4 nasdaq-data-link alpha_vantage databento
 
-# === Copy your trading bot ===
+# --- Copy your bot ---
 WORKDIR /usr/src/app
 COPY app.py .
 COPY init_data.py .
