@@ -94,8 +94,7 @@ RUN pip install --quiet --no-cache-dir \
     'lz4' \
     'blosc2' \
     'tabulate' \
-    'pandas-datareader' \
-    'universal-portfolios'
+    'pandas-datareader' 
 
 # --- Install pandas_ta from ZIP (no GitHub auth required) ---
 RUN pip install --quiet --no-cache-dir \
