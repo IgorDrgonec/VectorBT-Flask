@@ -48,5 +48,7 @@ COPY init_data.py .
 COPY EMA_MACD.py .
 COPY strategy_config.py .
 
+RUN uv pip install --no-cache-dir --upgrade "websockets>=12,<13"
+
 EXPOSE 8080
 CMD python init_data.py && gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:8080 app:app
