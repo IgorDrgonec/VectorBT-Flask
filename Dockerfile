@@ -47,7 +47,8 @@ COPY init_data.py .
 COPY EMA_MACD.py .
 COPY strategy_config.py .
 
-RUN uv pip install --no-cache-dir --upgrade "websockets>=12,<13"
+# Preload Binance data once at build time
+RUN python init_data.py || echo "Skipping data pull if already exists"
 
 EXPOSE 8080
-CMD python init_data.py && gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:8080 app:app
+CMD gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:8080 app:app
