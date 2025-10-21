@@ -27,13 +27,12 @@ RUN uv pip install --no-cache-dir ".[all-stable]" --override override.txt
 
 # Unstable deps from VectorBT Pro author
 RUN uv pip install --no-cache-dir --no-deps pandas-ta
-RUN uv pip install --no-cache-dir --no-deps universal-portfolios
 
 # --- Your app dependencies ---
 RUN uv pip install --no-cache-dir \
     flask Flask-SocketIO gunicorn gevent nest-asyncio \
     python-binance==1.0.19 "websockets>=12,<13" \
-    schedule requests tqdm yfinance>=0.2.20 ccxt>=1.89.14 \
+    schedule requests tqdm ccxt>=1.89.14 \
     SQLAlchemy>=2.0.0 duckdb duckdb-engine pyarrow tables>=3.8.0 \
     ta technical numexpr>=2.8.4 hyperopt optuna pathos mpire dask \
     ray>=2.10.0 "plotly<=5.22.0" plotly-resampler kaleido quantstats>=0.0.37 \
