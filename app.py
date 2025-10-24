@@ -483,27 +483,25 @@ async def launch_all_sockets():
     )
 
 
-# Launch sockets only when running with Gunicorn
-if __name__ != "__main__":
-    def start_async_loop():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(launch_all_sockets())
 
-    threading.Thread(target=start_async_loop, daemon=True).start()
-    #threading.Thread(target=run_scheduler, daemon=True).start()
+def start_async_loop():
+    """Run Binance WebSocket streams asynchronously in background thread."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(launch_all_sockets())
 
-    initial_balance_cached = None
 
-    try:
-        with open("initial_balance.json", "r") as f:
-            balance_data = json.load(f)
-            initial_balance_cached = round(float(balance_data["BNFCR"]), 3)
-            print(f"[STARTUP] Preloaded BNFCR balance: {initial_balance_cached}")
-    except FileNotFoundError:
-        print("[WARN] initial_balance.json not found. Did you forget to run init_data.py?")
-    except Exception as e:
-        print(f"[ERROR] Failed to preload balance: {e}")
+print("[INIT] Starting Binance WebSocket streams...")
+threading.Thread(target=start_async_loop, daemon=True).start()
 
-    port = int(os.environ.get("PORT", 8080))
-    # socketio.run(app, host="0.0.0.0", port=port, debug=True, use_reloader=False)
+initial_balance_cached = None
+
+try:
+    with open("initial_balance.json", "r") as f:
+        balance_data = json.load(f)
+        initial_balance_cached = round(float(balance_data["BNFCR"]), 3)
+        print(f"[STARTUP] Preloaded BNFCR balance: {initial_balance_cached}")
+except FileNotFoundError:
+    print("[WARN] initial_balance.json not found. Did you forget to run init_data.py?")
+except Exception as e:
+    print(f"[ERROR] Failed to preload balance: {e}")
