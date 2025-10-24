@@ -236,7 +236,7 @@ def execute_strategy(data):
 # WebSocket event listener function
 def handle_socket_message(msg):
     """Handles real-time kline messages from Binance WebSocket."""
-    if msg['e'] == 'kline':  # Kline (candlestick) event
+    if msg['e'] == 'continuous_kline':  # Kline (candlestick) event
         kline = msg['k']
         is_closed = kline['x']
 

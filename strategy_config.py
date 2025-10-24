@@ -17,8 +17,8 @@ BINANCE_KEYS = {
         "api_secret": "XkryIgFQgZhIg4l77sFfcU6LQjYlklCRqf1Eedo6XJvNJT3rjESgad0gswX8BpZY"
     },
     "test": {
-        "api_key": "c0bf32af094d1b6f97e53d79e2d585003754d12fbe53a65f383d71e769d5b943",
-        "api_secret": "cf01902200ac97101266ec6247c80a6bcb2d005286e34b6684ea30cf6d88e20a"
+        "api_key": "Y5YKyeloqeBzQjmjGQRseXtHnwInIuFe3ksDm0cPVOS4zlObzS1dFYnriYJmtZWm",
+        "api_secret": "vm5j2ZZqZUBS5oFc1FQyPPsZ1y5CPlpXYzHGedaLRpaK5FMdqULHiLazXGgjF24f"
     }
 }
 
