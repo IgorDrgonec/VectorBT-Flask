@@ -516,7 +516,7 @@ async def account_socket():
                 print("[TASK] Started keepalive background task")
 
             # Start the user data socket using the persistent listenKey
-            async with manager.futures_user_socket(listen_key=listen_key) as stream:
+            async with manager.futures_user_socket() as stream:
                 print("[SOCKET] Account socket connected.")
                 while True:
                     try:
