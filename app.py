@@ -32,9 +32,20 @@ is_test = IS_TEST
 api_key = BINANCE_KEYS["test"]["api_key"] if is_test else BINANCE_KEYS["live"]["api_key"]
 api_secret = BINANCE_KEYS["test"]["api_secret"] if is_test else BINANCE_KEYS["live"]["api_secret"]
 
-client = Client(api_key, api_secret)
+try:
+    client = Client(api_key, api_secret)
+except Exception as e:
+    print(f"[WARN] Binance client init failed: {e}")
+    client = None
 client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "https://fapi.binance.com/fapi"
 bsm = BinanceSocketManager(client)
+try:
+    exchange_info = client.futures_exchange_info()
+    print("[INFO] Cached futures exchange info.")
+except Exception as e:
+    print(f"[WARN] Could not cache futures exchange info: {e}")
+    exchange_info = None
+
 
 def check_api_weight(api_key):
     """Check and log current API usage headers for futures account."""
@@ -81,24 +92,14 @@ else:
     data = pd.DataFrame()
 
 def get_account_balance(asset="BNFCR"):
-    """Return futures account balance directly from REST API (no caching)."""
+    """Return cached balance from local JSON file (no REST)."""
     try:
-        account_info = client.futures_account_balance()
+        with open("initial_balance.json", "r") as f:
+            data = json.load(f)
+        return round(float(data.get(asset, 0.0)), 3)
     except Exception as e:
-        print(f"[WARN] Failed to fetch futures account info: {e}")
+        print(f"[WARN] Failed to read balance from cache: {e}")
         return None
-
-    for balance in account_info:
-        if balance["asset"] == asset:
-            try:
-                available = round(float(balance["availableBalance"]), 3)
-                return available
-            except Exception as e:
-                print(f"[WARN] Could not parse balance for {asset}: {e}")
-                return None
-
-    check_api_weight(api_key)
-    return None
 
 # Function to update HDF with WebSocket data
 def update_hdf_with_websocket(kline):
@@ -129,6 +130,30 @@ def update_hdf_with_websocket(kline):
     else:
         print(f"[DATA] Candle {open_time} already in CSV, skipped write.")
 
+def update_balance_from_api(asset="BNFCR"):
+    """Fetch fresh balance from Binance Futures REST API and update local JSON cache."""
+    try:
+        account_info = client.futures_account_balance()
+        for balance in account_info:
+            if balance["asset"] == asset:
+                available = round(float(balance["availableBalance"]), 8)
+
+                # Update JSON with same flat structure
+                data = {asset: available}
+                with open("initial_balance.json", "w") as f:
+                    json.dump(data, f, indent=4)
+
+                print(f"[BALANCE] Updated {asset} = {available} (from REST API)")
+                return available
+
+        print(f"[WARN] Asset {asset} not found in account balance response.")
+        return None
+
+    except Exception as e:
+        print(f"[ERROR] Failed to update balance from REST API: {e}")
+        return None
+
+
 def handle_account_update(msg):
     event_type = msg.get("e")
 
@@ -142,12 +167,12 @@ def handle_account_update(msg):
             realized_pnl = order.get("rp")
 
             print(f"[ORDER] Trade filled for {symbol}, side: {side}, qty: {qty}, price: {price}")
-            if realized_pnl is not None:
+            # Only update if a PnL was realized (position actually closed)
+            if realized_pnl is not None and float(realized_pnl) != 0:
                 print(f"[PNL] Realized PnL: {realized_pnl} {order.get('N', 'BNFCR')}")
-
-            # Trigger a manual refresh from REST as backup
-            refreshed = get_account_balance("BNFCR")
-            print(f"[BALANCE] Manually refreshed (after fill): {refreshed}")
+                update_balance_from_api("BNFCR")
+            else:
+                print("[INFO] No realized PnL, skipping balance update.")
 
 def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage):
     usdt_balance = get_account_balance("BNFCR")
@@ -155,8 +180,7 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
     if usdt_balance is None:
         print("[WARN] Unable to fetch account balance")
         return 
-    symbol_info = client.futures_exchange_info()
-    for entry in symbol_info["symbols"]:
+    for entry in exchange_info["symbols"]:
         if entry["symbol"] == symbol:
             qty_precision = entry["quantityPrecision"]
             price_precision = entry["pricePrecision"]
@@ -302,13 +326,13 @@ def order(price_precision,qty_precision,side, quantity, symbol, stopPrice, targe
         return False
     else:   
         if side == "long" and position_size != 0 and sl_order and tp_order:
-            check_api_weight(api_key)
+            #check_api_weight(api_key)
             return True
         if side == "short" and position_size != 0 and sl_order and tp_order:
-            check_api_weight(api_key)
+            #check_api_weight(api_key)
             return True
         if side == "flat" and position_size == 0:
-            check_api_weight(api_key)
+            #check_api_weight(api_key)
             return True
 
 """ def run_scheduler():
@@ -381,8 +405,7 @@ def manual_trade():
     }
     leverage = leverage_dict.get(symbol, 30)
 
-    symbol_info = client.futures_exchange_info()
-    for entry in symbol_info["symbols"]:
+    for entry in exchange_info["symbols"]:
         if entry["symbol"] == symbol:
             qty_precision = int(entry["quantityPrecision"])
             for filter in entry["filters"]:
@@ -506,7 +529,7 @@ async def account_socket():
         finally:
             if local_client:
                 await local_client.close_connection()
-                
+
 # Function to start Binance WebSocket (candlestick stream)
 async def launch_all_sockets():
     print("[INFO] Launching all WebSockets...")
