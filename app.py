@@ -123,13 +123,11 @@ def update_hdf_with_websocket(kline):
     # Append to in-memory DataFrame and CSV
     data = pd.concat([data, new_row])
     data = data[~data.index.duplicated(keep='last')]
-    new_row.to_csv(
-    csv_file,
-    mode='a',  # Append mode
-    header=not os.path.exists(csv_file),  # Write header only if file doesn't exist
-    )
-    #data.to_csv(csv_file)
-    #print("[INFO] Appended new row and updated CSV file.")
+    if not os.path.exists(csv_file) or open_time not in pd.read_csv(csv_file, usecols=[0], squeeze=True, parse_dates=True).values:
+        new_row.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file))
+        print(f"[DATA] Saved new candle: {open_time}")
+    else:
+        print(f"[DATA] Candle {open_time} already in CSV, skipped write.")
 
 def handle_account_update(msg):
     event_type = msg.get("e")
@@ -187,6 +185,8 @@ def get_position_amt(symbol):
 # Function to execute strategy on new candle close
 def execute_strategy(data):
     print("[INFO] Fetching latest data and executing strategy...")
+    data = data[~data.index.duplicated(keep='last')].sort_index()
+
 
     # Extract OHLCV values
     high = data["High"].values
@@ -203,6 +203,12 @@ def execute_strategy(data):
     short_entry = (vbt.nb.crossed_below_1d_nb(macd, macd_signal)) & (close < ema) & (macd > 0)
     #long_entry = close > ema
     #short_entry = close < ema
+
+    if long_entry[-1] or short_entry[-1]:
+        last_ts = data.index[-1]
+        print(f"[DEBUG] Candle: {last_ts}, MACD={macd[-2]:.5f}->{macd[-1]:.5f}, "
+            f"Signal={macd_signal[-2]:.5f}->{macd_signal[-1]:.5f}, "
+            f"EMA={ema[-1]:.2f}, Close={close[-1]:.2f}")
 
     # Determine trade entry
     latest_candle_idx = -1  # Check latest closed candle
@@ -244,6 +250,7 @@ def handle_socket_message(msg):
         if is_closed:
             print(f"[INFO] Candle closed at {datetime.fromtimestamp(kline['t']/1000)}")
             update_hdf_with_websocket(kline)
+            time.sleep(0.2)
             execute_strategy(data)  # Pass updated data to strategy
 
 # ✅ New API: Manually Open & Close Trades for Testing Binance API
@@ -340,6 +347,20 @@ def chart():
     if not os.path.exists("backtest_chart.html"):
         return "Chart not generated yet", 500
     return send_file("backtest_chart.html") """
+
+@app.route("/data/preview")
+def preview_csv():
+    if not os.path.exists(csv_file):
+        return "CSV file not found", 404
+    df = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+    return df.tail(20).to_html()
+
+@app.route("/data")
+def download_csv():
+    """Serve the latest CSV file for inspection."""
+    if not os.path.exists(csv_file):
+        return "CSV file not found", 404
+    return send_file(csv_file, as_attachment=True)
 
 @app.route("/trade", methods=['POST'])
 def manual_trade():
