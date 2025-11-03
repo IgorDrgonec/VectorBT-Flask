@@ -32,13 +32,24 @@ is_test = IS_TEST
 api_key = BINANCE_KEYS["test"]["api_key"] if is_test else BINANCE_KEYS["live"]["api_key"]
 api_secret = BINANCE_KEYS["test"]["api_secret"] if is_test else BINANCE_KEYS["live"]["api_secret"]
 
+# Initialize Binance client safely
+client = None
 try:
     client = Client(api_key, api_secret)
+    # Only set FUTURES_URL if the client was created successfully
+    if client is not None:
+        client.FUTURES_URL = (
+            "https://testnet.binancefuture.com/fapi"
+            if is_test
+            else "https://fapi.binance.com/fapi"
+        )
+        print("[INFO] Binance client initialized successfully.")
 except Exception as e:
     print(f"[WARN] Binance client init failed: {e}")
     client = None
-client.FUTURES_URL = "https://testnet.binancefuture.com/fapi" if is_test else "https://fapi.binance.com/fapi"
+
 bsm = BinanceSocketManager(client)
+
 try:
     exchange_info = client.futures_exchange_info()
     print("[INFO] Cached futures exchange info.")
