@@ -438,6 +438,75 @@ def manual_trade():
             "message": "order failed"
         }
 
+listen_key = None
+keepalive_task_ref = None
+
+async def start_keepalive_task(local_client):
+    """Run a single background keepalive loop for the global listenKey."""
+    global listen_key
+
+    while True:
+        await asyncio.sleep(30 * 60)  # every 30 minutes
+        try:
+            if listen_key:
+                await local_client.futures_stream_keepalive(listen_key)
+                print("[KEEPALIVE] Sent ping to keep user stream alive.")
+            else:
+                print("[KEEPALIVE] Skipped: listenKey not initialized yet.")
+        except Exception as e:
+            print(f"[KEEPALIVE ERROR] {e}")
+
+
+async def account_socket():
+    """Maintain a single account WebSocket with persistent listenKey."""
+    global listen_key, keepalive_task_ref
+
+    while True:
+        local_client = None
+        try:
+            local_client = await AsyncClient.create(api_key, api_secret)
+            if is_test:
+                local_client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
+            manager = BinanceSocketManager(local_client)
+
+            # Create or reuse existing listenKey
+            if not listen_key:
+                listen_key = await local_client.futures_stream_get_listen_key()
+                print(f"[INIT] Created listenKey: {listen_key}")
+            else:
+                print(f"[REUSE] Using existing listenKey: {listen_key}")
+
+            # Start only one keepalive task (if not already running)
+            if not keepalive_task_ref or keepalive_task_ref.done():
+                keepalive_task_ref = asyncio.create_task(start_keepalive_task(local_client))
+                print("[TASK] Started keepalive background task")
+
+            # Start the user data socket using the persistent listenKey
+            async with manager.futures_user_socket(listen_key=listen_key) as stream:
+                print("[SOCKET] Account socket connected.")
+                while True:
+                    try:
+                        msg = await stream.recv()
+                        handle_account_update(msg)
+                    except Exception as e:
+                        # Detect listenKey expiration error
+                        if "listenKey does not exist" in str(e) or "code 4009" in str(e):
+                            print("[WARN] ListenKey expired, requesting a new one...")
+                            listen_key = await local_client.futures_stream_get_listen_key()
+                            print(f"[NEW] Refreshed listenKey: {listen_key}")
+                            break  # restart socket loop with new key
+                        else:
+                            print(f"[ERROR] Account stream message error: {e}")
+                            break  # reconnect
+
+        except Exception as e:
+            print(f"[ERROR] Account WebSocket error: {e}. Reconnecting in 5s...")
+            await asyncio.sleep(5)
+
+        finally:
+            if local_client:
+                await local_client.close_connection()
+                
 # Function to start Binance WebSocket (candlestick stream)
 async def launch_all_sockets():
     print("[INFO] Launching all WebSockets...")
@@ -461,49 +530,10 @@ async def launch_all_sockets():
             finally:
                 await local_client.close_connection()
 
-    async def account_socket():
-        while True:
-            try:
-                local_client = await AsyncClient.create(api_key, api_secret)
-                if is_test:
-                    local_client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
-                manager = BinanceSocketManager(local_client)
-
-                # Fetch the listenKey just for keepalive (not to use directly in socket)
-                listen_key = await local_client.futures_stream_get_listen_key()
-                print(f"[SOCKET] Account socket connected. ListenKey: {listen_key}")
-
-
-                # Task to keep listen key alive
-                async def keepalive():
-                    while True:
-                        await asyncio.sleep(30 * 60)  # Every 30 minutes
-                        try:
-                            await local_client.futures_stream_keepalive(listen_key)
-                            print("[KEEPALIVE] Sent ping to keep user stream alive.")
-                        except Exception as e:
-                            print(f"[KEEPALIVE ERROR] Failed to ping listenKey: {e}")
-
-                asyncio.create_task(keepalive())
-
-                async with manager.futures_user_socket() as stream:
-                    while True:
-                        msg = await stream.recv()
-                        print(f"[WS MESSAGE] {msg}")
-                        handle_account_update(msg)
-
-            except Exception as e:
-                print(f"[ERROR] Account WebSocket error: {e}. Reconnecting in 5s...")
-                await asyncio.sleep(5)
-            finally:
-                await local_client.close_connection()
-
     await asyncio.gather(
         binance_socket(),
         account_socket()
     )
-
-
 
 def start_async_loop():
     """Run Binance WebSocket streams asynchronously in background thread."""
