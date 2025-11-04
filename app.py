@@ -135,7 +135,7 @@ def update_hdf_with_websocket(kline):
     # Append to in-memory DataFrame and CSV
     data = pd.concat([data, new_row])
     data = data[~data.index.duplicated(keep='last')]
-    if not os.path.exists(csv_file) or open_time not in pd.read_csv(csv_file, usecols=[0], squeeze=True, parse_dates=True).values:
+    if open_time not in data.index[:-1]:
         new_row.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file))
         print(f"[DATA] Saved new candle: {open_time}")
     else:
