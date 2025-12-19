@@ -135,11 +135,12 @@ def update_hdf_with_websocket(kline):
     # Append to in-memory DataFrame and CSV
     data = pd.concat([data, new_row])
     data = data[~data.index.duplicated(keep='last')]
-    if open_time not in data.index[:-1]:
+    if open_time in data.index:
+        data.to_csv(csv_file)
+        print(f"[DATA] Updated existing candle: {open_time}")
+    else:
         new_row.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file))
         print(f"[DATA] Saved new candle: {open_time}")
-    else:
-        print(f"[DATA] Candle {open_time} already in CSV, skipped write.")
 
 def update_balance_from_api(asset="BNFCR"):
     """Fetch fresh balance from Binance Futures REST API and update local JSON cache."""
