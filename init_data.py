@@ -7,6 +7,11 @@ from binance.client import Client
 from vectorbtpro import vbt
 from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME
 
+DATA_DIR = os.getenv("DATA_DIR", os.path.join(os.getcwd(), "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+CSV_PATH = os.path.join(DATA_DIR, CSV_FILE)
+
+
 def get_api_client():
     keys = BINANCE_KEYS["test" if IS_TEST else "live"]
     client = Client(keys["api_key"], keys["api_secret"])
@@ -25,7 +30,9 @@ def get_account_balance(client, asset="BNFCR"):
             initial_balance = None
 
         if initial_balance is not None:
-            with open("initial_balance.json", "w") as f:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            balance_path = os.path.join(DATA_DIR, "initial_balance.json")
+            with open(balance_path, "w") as f:
                 json.dump({asset: initial_balance}, f)
             print(f"[BALANCE] Saved initial balance: {initial_balance} {asset}")
         else:
@@ -34,7 +41,7 @@ def get_account_balance(client, asset="BNFCR"):
         print(f"[ERROR] Could not fetch initial balance: {e}")
 
 def pull_historical_data():
-    if os.path.exists(CSV_FILE):
+    if os.path.exists(CSV_PATH):
         print("[INFO] CSV already exists, skipping API pull.")
     else:
         print("[INFO] Pre-fetching historical data...")
@@ -44,7 +51,7 @@ def pull_historical_data():
             timeframe=TIMEFRAME,
             klines_type=2,
         )
-        data.to_csv(CSV_FILE)
+        data.to_csv(CSV_PATH)
         print("[INFO] Data pulled and saved to CSV.")
 
 if __name__ == "__main__":

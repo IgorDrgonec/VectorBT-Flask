@@ -36,6 +36,13 @@ is_test = IS_TEST
 api_key = BINANCE_KEYS["test"]["api_key"] if is_test else BINANCE_KEYS["live"]["api_key"]
 api_secret = BINANCE_KEYS["test"]["api_secret"] if is_test else BINANCE_KEYS["live"]["api_secret"]
 
+DATA_DIR = os.getenv("DATA_DIR", os.path.join(os.getcwd(), "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+
+CSV_PATH = os.path.join(DATA_DIR, CSV_FILE)
+BALANCE_PATH = os.path.join(DATA_DIR, "initial_balance.json")
+
+
 # Initialize Binance client safely
 client = None
 try:
@@ -111,7 +118,7 @@ vbt.BinanceData.set_custom_settings(
 
 # Parameters for historical data retrieval
 symbol = SYMBOL
-csv_file = CSV_FILE
+csv_file = CSV_PATH
 kwargs = dict(
     start=datetime.now() - timedelta(days=LOOKBACK_DAYS),
     timeframe=TIMEFRAME,
@@ -133,7 +140,7 @@ else:
 def get_account_balance(asset="BNFCR"):
     """Return cached balance from local JSON file (no REST)."""
     try:
-        with open("initial_balance.json", "r") as f:
+        with open(BALANCE_PATH, "r") as f:
             data = json.load(f)
         return round(float(data.get(asset, 0.0)), 3)
     except Exception as e:
@@ -180,7 +187,7 @@ def update_balance_from_api(asset="BNFCR"):
 
                 # Update JSON with same flat structure
                 data = {asset: available}
-                with open("initial_balance.json", "w") as f:
+                with open(BALANCE_PATH, "w") as f:
                     json.dump(data, f, indent=4)
 
                 print(f"[BALANCE] Updated {asset} = {available} (from REST API)")
@@ -711,7 +718,7 @@ threading.Thread(target=start_async_loop, daemon=True).start()
 initial_balance_cached = None
 
 try:
-    with open("initial_balance.json", "r") as f:
+    with open(BALANCE_PATH, "r") as f:
         balance_data = json.load(f)
         initial_balance_cached = round(float(balance_data["BNFCR"]), 3)
         print(f"[STARTUP] Preloaded BNFCR balance: {initial_balance_cached}")
