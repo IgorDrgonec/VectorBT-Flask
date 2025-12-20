@@ -8,6 +8,10 @@ import asyncio
 import json
 import requests
 import schedule
+import hmac
+import hashlib
+import time
+from urllib.parse import urlencode
 from EMA_MACD import refresh_strategy_html
 from binance.enums import *
 from flask import Flask, request, jsonify, send_file
@@ -56,6 +60,30 @@ try:
 except Exception as e:
     print(f"[WARN] Could not cache futures exchange info: {e}")
     exchange_info = None
+
+def _sign(params: dict, api_secret: str) -> str:
+    query = urlencode(params, doseq=True)
+    return hmac.new(api_secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256).hexdigest()
+
+def futures_algo_order_request(http_method: str, path: str, params: dict):
+    """Signed request to USD-M futures algo endpoints (e.g., /fapi/v1/algoOrder)."""
+    base_url = "https://testnet.binancefuture.com" if is_test else "https://fapi.binance.com"
+    url = base_url + path
+
+    params = dict(params)
+    params["timestamp"] = int(time.time() * 1000)
+    params["signature"] = _sign(params, api_secret)
+
+    headers = {"X-MBX-APIKEY": api_key}
+
+    if http_method.upper() == "POST":
+        return requests.post(url, headers=headers, params=params, timeout=10).json()
+    if http_method.upper() == "DELETE":
+        return requests.delete(url, headers=headers, params=params, timeout=10).json()
+    if http_method.upper() == "GET":
+        return requests.get(url, headers=headers, params=params, timeout=10).json()
+
+    raise ValueError(f"Unsupported method: {http_method}")
 
 
 def check_api_weight(api_key):
@@ -293,59 +321,159 @@ def handle_socket_message(msg):
 # Store active trade state globally
 active_trade = {"side": None, "entry_price": None, "quantity": 0}
 
+def ok(resp: dict) -> bool:
+    return isinstance(resp, dict) and resp.get("code") is None and resp.get("algoId") is not None
+
 #Order from manual JSON
-def order(price_precision,qty_precision,side, quantity, symbol, stopPrice, targetPrice, position_size, cancel_quantity, leverage, order_type=ORDER_TYPE_MARKET, Isolated=True,test_mode=False):
-    sl_offset = stopPrice * 0.002  # 0.2% buffer, adjust as needed
+def order(price_precision, qty_precision, side, quantity, symbol,
+          stopPrice, targetPrice, position_size, cancel_quantity, leverage,
+          order_type=ORDER_TYPE_MARKET, Isolated=True, test_mode=False):
+
+    # ---- normalize / round first ----
     quantity = round(quantity, qty_precision)
     stopPrice = round(stopPrice, price_precision)
     targetPrice = round(targetPrice, price_precision)
+
+    # 0.2% buffer around stop for emergency market stop
+    # NOTE: use ABS buffer so it works for both sides
+    sl_offset = abs(stopPrice) * 0.002
+
+    # Optional: “price slippage” for stop-limit to increase fill probability
+    # (if you want pure maker attempts, set it to 0, but fill probability drops)
+    limit_slippage = abs(stopPrice) * 0.0002  # 0.02% tweak; adjust or set 0
+
     try:
         create_order_func = client.futures_create_order
         if test_mode:
             create_order_func = client.futures_create_test_order
 
+        # ---- always clear existing orders on that symbol ----
+        client.futures_cancel_all_open_orders(symbol=symbol)
+        futures_algo_order_request("DELETE", "/fapi/v1/algoOpenOrders", {"symbol": symbol})
+        # (You already added algoOpenOrders cancel in long branch; do it for short too.)
+
+        # ---- leverage ----
+        client.futures_change_leverage(symbol=symbol, leverage=leverage)
+
+        # ---- place ENTRY first (so reduceOnly protectors make sense) ----
         if side == "long" and position_size != 0:
-            result = client.futures_change_leverage(symbol = symbol, leverage = leverage)
-            #print(result)
-            #print(f"sending order {order_type} - {side} {quantity} {symbol}")
-            cancel = client.futures_cancel_all_open_orders(symbol = symbol)
-            sl_order = create_order_func(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
-            #print(sl_order)
-            sl_market_order = create_order_func(symbol=symbol,side='SELL',type=FUTURE_ORDER_TYPE_STOP_MARKET,quantity=quantity,stopPrice=round(stopPrice - sl_offset, price_precision),timeInForce=TIME_IN_FORCE_GTC,reduceOnly=True)
-            tp_order = create_order_func(symbol=symbol, side='SELL', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice, price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
-            #print(tp_order)
-            order = create_order_func(symbol=symbol, side='BUY', type=order_type, quantity=quantity, Isolated=Isolated)
-            #print(order)
+            entry = create_order_func(
+                symbol=symbol, side="BUY", type=order_type, quantity=quantity, Isolated=Isolated
+            )
+
+            # Protective orders must be Algo (CONDITIONAL)
+            # 1) SL STOP-LIMIT (primary) - tries to fill as maker/limit
+            # For a long, SL is SELL. Trigger at stopPrice, place limit slightly below stopPrice.
+            sl_limit_price = round(stopPrice - limit_slippage, price_precision)
+
+            sl_order = futures_algo_order_request("POST", "/fapi/v1/algoOrder", {
+                "algoType": "CONDITIONAL",
+                "symbol": symbol,
+                "side": "SELL",
+                "type": "STOP",
+                "triggerPrice": stopPrice,         # <-- NEW name (was stopPrice on old endpoint)
+                "price": sl_limit_price,
+                "timeInForce": "GTC",
+                "reduceOnly": "true",
+                "quantity": quantity
+            })
+
+            # 2) Emergency SL STOP_MARKET (backup)
+            emergency_trigger = round(stopPrice - sl_offset, price_precision)
+            sl_market_order = futures_algo_order_request("POST", "/fapi/v1/algoOrder", {
+                "algoType": "CONDITIONAL",
+                "symbol": symbol,
+                "side": "SELL",
+                "type": "STOP_MARKET",
+                "triggerPrice": emergency_trigger,
+                "reduceOnly": "true",
+                "quantity": quantity
+            })
+
+            # 3) TP TAKE_PROFIT (limit TP like you had)
+            tp_order = futures_algo_order_request("POST", "/fapi/v1/algoOrder", {
+                "algoType": "CONDITIONAL",
+                "symbol": symbol,
+                "side": "SELL",
+                "type": "TAKE_PROFIT",
+                "triggerPrice": targetPrice,
+                "price": targetPrice,
+                "timeInForce": "GTC",
+                "reduceOnly": "true",
+                "quantity": quantity
+            })
+            print("[ALGO] SL_LIMIT algoId:", sl_order.get("algoId"))
+            print("[ALGO] SL_MKT  algoId:", sl_market_order.get("algoId"))
+            print("[ALGO] TP      algoId:", tp_order.get("algoId"))
+
+            return True if ok(sl_order) and ok(sl_market_order) and ok(tp_order) and entry else False
+
         if side == "short" and position_size != 0:
-            result = client.futures_change_leverage(symbol = symbol, leverage = leverage)
-            #print(result)
-            #print(f"sending order {order_type} - {side} {quantity} {symbol}") 
-            cancel = client.futures_cancel_all_open_orders(symbol = symbol)         
-            sl_order = create_order_func(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_STOP, quantity=quantity,stopPrice=stopPrice, price=stopPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
-            #print(sl_order)
-            sl_market_order = create_order_func(symbol=symbol,side='BUY',type=FUTURE_ORDER_TYPE_STOP_MARKET,quantity=quantity,stopPrice=round(stopPrice + sl_offset, price_precision),timeInForce=TIME_IN_FORCE_GTC,reduceOnly=True)
-            tp_order = create_order_func(symbol=symbol, side='BUY', type=FUTURE_ORDER_TYPE_TAKE_PROFIT, quantity=quantity,stopPrice=targetPrice,price=targetPrice, timeInForce=TIME_IN_FORCE_GTC, reduceOnly = True)
-            #print(tp_order)      
-            order = create_order_func(symbol=symbol, side='SELL', type=ORDER_TYPE_MARKET, quantity=quantity, Isolated=True)
-            #print(order)     
+            entry = create_order_func(
+                symbol=symbol, side="SELL", type=order_type, quantity=quantity, Isolated=Isolated
+            )
+
+            # For a short, SL is BUY. Trigger at stopPrice, place limit slightly above stopPrice.
+            sl_limit_price = round(stopPrice + limit_slippage, price_precision)
+
+            sl_order = futures_algo_order_request("POST", "/fapi/v1/algoOrder", {
+                "algoType": "CONDITIONAL",
+                "symbol": symbol,
+                "side": "BUY",
+                "type": "STOP",
+                "triggerPrice": stopPrice,
+                "price": sl_limit_price,
+                "timeInForce": "GTC",
+                "reduceOnly": "true",
+                "quantity": quantity
+            })
+
+            emergency_trigger = round(stopPrice + sl_offset, price_precision)
+            sl_market_order = futures_algo_order_request("POST", "/fapi/v1/algoOrder", {
+                "algoType": "CONDITIONAL",
+                "symbol": symbol,
+                "side": "BUY",
+                "type": "STOP_MARKET",
+                "triggerPrice": emergency_trigger,
+                "reduceOnly": "true",
+                "quantity": quantity
+            })
+
+            tp_order = futures_algo_order_request("POST", "/fapi/v1/algoOrder", {
+                "algoType": "CONDITIONAL",
+                "symbol": symbol,
+                "side": "BUY",
+                "type": "TAKE_PROFIT",
+                "triggerPrice": targetPrice,
+                "price": targetPrice,
+                "timeInForce": "GTC",
+                "reduceOnly": "true",
+                "quantity": quantity
+            })
+            print("[ALGO] SL_LIMIT algoId:", sl_order.get("algoId"))
+            print("[ALGO] SL_MKT  algoId:", sl_market_order.get("algoId"))
+            print("[ALGO] TP      algoId:", tp_order.get("algoId"))
+
+            return True if ok(sl_order) and ok(sl_market_order) and ok(tp_order) and entry else False
+
+        # ---- FLAT: close position with market reduceOnly (unchanged) ----
         if side == "flat" and position_size == 0:
-            if stopPrice < targetPrice or stopPrice == "long": #long
-                cancel_buy = create_order_func(symbol = symbol, side = "SELL", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
-            if stopPrice > targetPrice or stopPrice == "short": #short
-                cancel_sell = create_order_func(symbol = symbol, side = "BUY", type = ORDER_TYPE_MARKET, quantity = cancel_quantity, reduceOnly = True)
-    except Exception as e:
-        print("an exception occured - {}".format(e))
+            # (your logic here is a bit odd: stopPrice/targetPrice comparisons to detect direction)
+            # but I'll keep it to avoid changing behavior.
+            if stopPrice < targetPrice or stopPrice == "long":  # long close
+                create_order_func(symbol=symbol, side="SELL", type="MARKET",
+                                  quantity=cancel_quantity, reduceOnly=True)
+            if stopPrice > targetPrice or stopPrice == "short":  # short close
+                create_order_func(symbol=symbol, side="BUY", type="MARKET",
+                                  quantity=cancel_quantity, reduceOnly=True)
+            return True
+
         return False
-    else:   
-        if side == "long" and position_size != 0 and sl_order and tp_order:
-            #check_api_weight(api_key)
-            return True
-        if side == "short" and position_size != 0 and sl_order and tp_order:
-            #check_api_weight(api_key)
-            return True
-        if side == "flat" and position_size == 0:
-            #check_api_weight(api_key)
-            return True
+
+    except Exception as e:
+        print(f"an exception occured - {e}")
+        return False
+
 
 """ def run_scheduler():
     html_file = "backtest_chart.html"
