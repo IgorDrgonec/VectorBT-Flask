@@ -129,13 +129,14 @@ data = None
 if os.path.exists(csv_file):
     try:
         data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
-        print("[INFO] Loaded data from CSV")
+        print(f"[INFO] Loaded data from CSV: {csv_file}")
     except Exception as e:
-        print(f"[ERROR] Failed to load cached CSV: {e}")
+        print(f"[ERROR] Failed to load cached CSV at {csv_file}: {e}")
         data = pd.DataFrame()
 else:
-    print("[CRITICAL] CSV file not found. Please run init_data.py before starting app.")
+    print(f"[CRITICAL] CSV file not found at {csv_file}. init_data.py should create it on startup.")
     data = pd.DataFrame()
+
 
 def get_account_balance(asset="BNFCR"):
     """Return cached balance from local JSON file (no REST)."""
