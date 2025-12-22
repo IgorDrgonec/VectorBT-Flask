@@ -1,7 +1,8 @@
 # Runtime data
-data/
-logs/
-
+data/*
+logs/*
+shared/*
+!.gitkeep
 # Local backups
 *.bak
 
