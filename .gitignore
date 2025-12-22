@@ -1,0 +1,14 @@
+# Runtime data
+data/
+logs/
+
+# Local backups
+*.bak
+
+# Python noise
+__pycache__/
+*.pyc
+
+# Env / secrets
+.env
+.env.*

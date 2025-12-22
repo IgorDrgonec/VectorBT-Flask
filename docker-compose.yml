@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  tradingbot:
+    build: .
+    container_name: tradingbot
+    restart: always
+    # IMPORTANT: remove host port mapping; nginx will expose the app on 8080
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - ENV=production
+      - DATA_DIR=/app/data
+      - LOG_DIR=/app/logs
+
+  dozzle:
+    image: amir20/dozzle
+    container_name: dozzle
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOZZLE_BASE=/logs
+    expose:
+      - "8080"
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    depends_on:
+      - tradingbot
+      - dozzle
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
