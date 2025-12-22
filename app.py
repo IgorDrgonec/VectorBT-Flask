@@ -1,3 +1,4 @@
+# Env vars: STRATEGY_NAME, SYMBOL, DATA_DIR, LOG_DIR, BALANCE_DIR, CSV_FILENAME.
 import numpy as np
 import pandas as pd
 import time
@@ -10,7 +11,6 @@ import requests
 import schedule
 import hmac
 import hashlib
-import time
 from urllib.parse import urlencode
 from EMA_MACD import refresh_strategy_html
 from binance.enums import *
@@ -23,7 +23,7 @@ from vectorbtpro import *
 from binance.client import Client
 import websockets
 import nest_asyncio
-from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME, risk_percent, leverage, ATR_MULTIPLIER, RR, ATR_PERIOD, EMA_WINDOW, test_mode
+from strategy_config import IS_TEST, get_binance_keys, SYMBOL as DEFAULT_SYMBOL, LOOKBACK_DAYS, TIMEFRAME, risk_percent, leverage, ATR_MULTIPLIER, RR, ATR_PERIOD, EMA_WINDOW, test_mode
 
 nest_asyncio.apply()
 
@@ -33,14 +33,30 @@ socketio = SocketIO(app, cors_allowed_origins="*")  # WebSocket for real-time up
 
 # Use imported variables from strategy_config instead of manual inputs
 is_test = IS_TEST
-api_key = BINANCE_KEYS["test"]["api_key"] if is_test else BINANCE_KEYS["live"]["api_key"]
-api_secret = BINANCE_KEYS["test"]["api_secret"] if is_test else BINANCE_KEYS["live"]["api_secret"]
+api_key, api_secret = get_binance_keys(is_test)
 
+STRATEGY_NAME = os.getenv("STRATEGY_NAME", "ema_macd")
+SYMBOL = os.getenv("SYMBOL", DEFAULT_SYMBOL)
 DATA_DIR = os.getenv("DATA_DIR", os.path.join(os.getcwd(), "data"))
-os.makedirs(DATA_DIR, exist_ok=True)
+LOG_DIR = os.getenv("LOG_DIR", os.path.join(os.getcwd(), "logs"))
+BALANCE_DIR = os.getenv("BALANCE_DIR", DATA_DIR)
+CSV_FILENAME = os.getenv("CSV_FILENAME", f"{STRATEGY_NAME}_{SYMBOL}.csv")
+CSV_PATH = os.path.join(DATA_DIR, CSV_FILENAME)
+BALANCE_PATH = os.path.join(BALANCE_DIR, "initial_balance.json")
 
-CSV_PATH = os.path.join(DATA_DIR, CSV_FILE)
-BALANCE_PATH = os.path.join(DATA_DIR, "initial_balance.json")
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(BALANCE_DIR, exist_ok=True)
+
+print(
+    "[CONFIG] "
+    f"STRATEGY_NAME={STRATEGY_NAME} "
+    f"SYMBOL={SYMBOL} "
+    f"CSV_PATH={CSV_PATH} "
+    f"BALANCE_PATH={BALANCE_PATH} "
+    f"DATA_DIR={DATA_DIR} "
+    f"LOG_DIR={LOG_DIR}"
+)
 
 
 # Initialize Binance client safely
@@ -117,8 +133,6 @@ vbt.BinanceData.set_custom_settings(
 )
 
 # Parameters for historical data retrieval
-symbol = SYMBOL
-csv_file = CSV_PATH
 kwargs = dict(
     start=datetime.now() - timedelta(days=LOOKBACK_DAYS),
     timeframe=TIMEFRAME,
@@ -126,15 +140,15 @@ kwargs = dict(
 )
 data = None
 
-if os.path.exists(csv_file):
+if os.path.exists(CSV_PATH):
     try:
-        data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
-        print(f"[INFO] Loaded data from CSV: {csv_file}")
+        data = pd.read_csv(CSV_PATH, index_col=0, parse_dates=True)
+        print(f"[INFO] Loaded data from CSV: {CSV_PATH}")
     except Exception as e:
-        print(f"[ERROR] Failed to load cached CSV at {csv_file}: {e}")
+        print(f"[ERROR] Failed to load cached CSV at {CSV_PATH}: {e}")
         data = pd.DataFrame()
 else:
-    print(f"[CRITICAL] CSV file not found at {csv_file}. init_data.py should create it on startup.")
+    print(f"[CRITICAL] CSV file not found at {CSV_PATH}. init_data.py should create it on startup.")
     data = pd.DataFrame()
 
 
@@ -172,10 +186,10 @@ def update_hdf_with_websocket(kline):
     data = pd.concat([data, new_row])
     data = data[~data.index.duplicated(keep='last')]
     if open_time in data.index:
-        data.to_csv(csv_file)
+        data.to_csv(CSV_PATH)
         print(f"[DATA] Updated existing candle: {open_time}")
     else:
-        new_row.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file))
+        new_row.to_csv(CSV_PATH, mode='a', header=not os.path.exists(CSV_PATH))
         print(f"[DATA] Saved new candle: {open_time}")
 
 def update_balance_from_api(asset="BNFCR"):
@@ -229,7 +243,7 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
         print("[WARN] Unable to fetch account balance")
         return 
     for entry in exchange_info["symbols"]:
-        if entry["symbol"] == symbol:
+        if entry["symbol"] == SYMBOL:
             qty_precision = entry["quantityPrecision"]
             price_precision = entry["pricePrecision"]
             cancel_quantity = int(entry["filters"][2]["maxQty"]) * 0.95
@@ -242,7 +256,7 @@ def execute_trade(side, order_price,stopPrice,targetPrice,risk_percent,leverage)
     quantity = round((usdt_balance*risk_percent)/(abs(order_price-stopPrice)),qty_precision)
     print(f"{quantity} = ({usdt_balance} * {risk_percent}) / ({order_price} - {stopPrice})")
     print(f"Variables: side={side}, order_price={order_price}, stopPrice={stopPrice}, targetPrice={targetPrice}, risk_percent={risk_percent}, leverage={leverage}, quantity={quantity}, position_size={position_size}, cancel_quantity={cancel_quantity}")
-    order(price_precision,qty_precision,side,quantity,symbol,stopPrice,targetPrice,position_size,cancel_quantity,leverage,test_mode=test_mode)
+    order(price_precision,qty_precision,side,quantity,SYMBOL,stopPrice,targetPrice,position_size,cancel_quantity,leverage,test_mode=test_mode)
 
 def get_position_amt(symbol):
     try:
@@ -284,7 +298,7 @@ def execute_strategy(data):
 
     # Determine trade entry
     latest_candle_idx = -1  # Check latest closed candle
-    current_position = get_position_amt(symbol)
+    current_position = get_position_amt(SYMBOL)
     if current_position != 0:
         print(f"[INFO] Skipping signal: Active position exists ({current_position})")
         return  # Skip signal if a trade is open
@@ -522,17 +536,17 @@ def chart():
 
 @app.route("/data/preview")
 def preview_csv():
-    if not os.path.exists(csv_file):
+    if not os.path.exists(CSV_PATH):
         return "CSV file not found", 404
-    df = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+    df = pd.read_csv(CSV_PATH, index_col=0, parse_dates=True)
     return df.tail(20).to_html()
 
 @app.route("/data")
 def download_csv():
     """Serve the latest CSV file for inspection."""
-    if not os.path.exists(csv_file):
+    if not os.path.exists(CSV_PATH):
         return "CSV file not found", 404
-    return send_file(csv_file, as_attachment=True)
+    return send_file(CSV_PATH, as_attachment=True)
 
 @app.route("/trade", methods=['POST'])
 def manual_trade():

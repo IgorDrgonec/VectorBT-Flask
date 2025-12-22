@@ -11,6 +11,8 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    env_file:
+      - .env
     environment:
       - ENV=production
       - DATA_DIR=/app/data

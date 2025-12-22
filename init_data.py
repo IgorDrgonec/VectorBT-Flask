@@ -1,20 +1,28 @@
 # init_data.py
+# Env vars: STRATEGY_NAME, SYMBOL, DATA_DIR, BALANCE_DIR, CSV_FILENAME.
 import os
 import json
 import pandas as pd
 from datetime import datetime, timedelta
 from binance.client import Client
 from vectorbtpro import vbt
-from strategy_config import IS_TEST, BINANCE_KEYS, SYMBOL, CSV_FILE, LOOKBACK_DAYS, TIMEFRAME
+from strategy_config import IS_TEST, get_binance_keys, SYMBOL as DEFAULT_SYMBOL, LOOKBACK_DAYS, TIMEFRAME
 
+STRATEGY_NAME = os.getenv("STRATEGY_NAME", "ema_macd")
+SYMBOL = os.getenv("SYMBOL", DEFAULT_SYMBOL)
 DATA_DIR = os.getenv("DATA_DIR", os.path.join(os.getcwd(), "data"))
+BALANCE_DIR = os.getenv("BALANCE_DIR", DATA_DIR)
+CSV_FILENAME = os.getenv("CSV_FILENAME", f"{STRATEGY_NAME}_{SYMBOL}.csv")
+CSV_PATH = os.path.join(DATA_DIR, CSV_FILENAME)
+BALANCE_PATH = os.path.join(BALANCE_DIR, "initial_balance.json")
+
 os.makedirs(DATA_DIR, exist_ok=True)
-CSV_PATH = os.path.join(DATA_DIR, CSV_FILE)
+os.makedirs(BALANCE_DIR, exist_ok=True)
 
 
 def get_api_client():
-    keys = BINANCE_KEYS["test" if IS_TEST else "live"]
-    client = Client(keys["api_key"], keys["api_secret"])
+    api_key, api_secret = get_binance_keys(IS_TEST)
+    client = Client(api_key, api_secret)
     if IS_TEST:
         client.FUTURES_URL = "https://testnet.binancefuture.com/fapi"
     return client
@@ -30,9 +38,7 @@ def get_account_balance(client, asset="BNFCR"):
             initial_balance = None
 
         if initial_balance is not None:
-            os.makedirs(DATA_DIR, exist_ok=True)
-            balance_path = os.path.join(DATA_DIR, "initial_balance.json")
-            with open(balance_path, "w") as f:
+            with open(BALANCE_PATH, "w") as f:
                 json.dump({asset: initial_balance}, f)
             print(f"[BALANCE] Saved initial balance: {initial_balance} {asset}")
         else:
@@ -55,9 +61,9 @@ def pull_historical_data():
         print("[INFO] Data pulled and saved to CSV.")
 
 if __name__ == "__main__":
-    keys = BINANCE_KEYS["test" if IS_TEST else "live"]
+    api_key, api_secret = get_binance_keys(IS_TEST)
     vbt.BinanceData.set_custom_settings(
-        client_config=dict(api_key=keys["api_key"], api_secret=keys["api_secret"])
+        client_config=dict(api_key=api_key, api_secret=api_secret)
     )
     client = get_api_client()
     pull_historical_data()
