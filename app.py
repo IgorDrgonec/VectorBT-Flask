@@ -8,11 +8,9 @@ import threading
 import asyncio
 import json
 import requests
-import schedule
 import hmac
 import hashlib
 from urllib.parse import urlencode
-from EMA_MACD import refresh_strategy_html
 from binance.enums import *
 from flask import Flask, request, jsonify, send_file
 from flask_socketio import SocketIO
@@ -497,23 +495,6 @@ def order(price_precision, qty_precision, side, quantity, symbol,
         return False
 
 
-""" def run_scheduler():
-    html_file = "backtest_chart.html"
-    
-    # Generate once if missing
-    if not os.path.exists(html_file):
-        print("[SCHEDULER] Chart missing. Generating initially...")
-        try:
-            refresh_strategy_html()
-        except Exception as e:
-            print(f"[ERROR] Failed to generate chart: {e}")
-    
-    # Then refresh hourly
-    schedule.every().hour.do(refresh_strategy_html)
-
-    while True:
-        schedule.run_pending()
-        time.sleep(60) """
 
 @app.route("/")
 def home():
@@ -528,11 +509,6 @@ def home():
     </html>
     """
 
-""" @app.route("/chart")
-def chart():
-    if not os.path.exists("backtest_chart.html"):
-        return "Chart not generated yet", 500
-    return send_file("backtest_chart.html") """
 
 @app.route("/data/preview")
 def preview_csv():
