@@ -5,18 +5,21 @@ services:
     build: .
     container_name: tradingbot
     restart: always
-    # IMPORTANT: remove host port mapping; nginx will expose the app on 8080
     expose:
       - "8080"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./shared:/app/shared
     env_file:
       - .env
     environment:
       - ENV=production
-      - DATA_DIR=/app/data
-      - LOG_DIR=/app/logs
+      - STRATEGY_NAME=ema_macd
+      - SYMBOL=BTCUSDC
+      - DATA_DIR=/app/data/strategies/btc
+      - LOG_DIR=/app/logs/strategies/btc
+      - BALANCE_DIR=/app/shared
 
   dozzle:
     image: amir20/dozzle
