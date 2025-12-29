@@ -21,6 +21,26 @@ services:
       - LOG_DIR=/app/logs/strategies/btc
       - BALANCE_DIR=/app/shared
 
+  ethbot:
+    build: .
+    container_name: ethbot
+    restart: always
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./shared:/app/shared
+    env_file:
+      - .env
+    environment:
+      - ENV=production
+      - STRATEGY_NAME=ema_macd
+      - SYMBOL=ETHUSDC
+      - DATA_DIR=/app/data/strategies/eth
+      - LOG_DIR=/app/logs/strategies/eth
+      - BALANCE_DIR=/app/shared
+
   dozzle:
     image: amir20/dozzle
     container_name: dozzle
@@ -38,6 +58,7 @@ services:
     restart: always
     depends_on:
       - tradingbot
+      - ethbot
       - dozzle
     ports:
       - "8080:80"
